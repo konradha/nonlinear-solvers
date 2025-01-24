@@ -19,7 +19,7 @@ def animate(X, Y, data, nt, save=None):
     if save and save == "gif":
         fname = f"evolution.gif"
         ani.save(fname,)
-        img.open(fname).save(fname, optimize=True)
+        #img.open(fname).save(fname, optimize=True)
 
     elif save and save ==  "mp4":
         fname = f"evolution.mp4"
