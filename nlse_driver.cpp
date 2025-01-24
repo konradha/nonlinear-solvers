@@ -32,7 +32,7 @@ int main() {
   const f_ty Lx = 10., Ly = 10.;
   const f_ty dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
 
-  const f_ty T = 5.;
+  const f_ty T = 2.5;
   const uint32_t nt = 100;
   const uint32_t num_snapshots = 100;
   
