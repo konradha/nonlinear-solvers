@@ -28,13 +28,14 @@ int main() {
   using f_ty = double;
   using c_ty = std::complex<f_ty>;
 
-  const uint32_t nx = 100, ny = 100;
+  const uint32_t nx = 512, ny = 512;
   const f_ty Lx = 10., Ly = 10.;
   const f_ty dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
 
-  const f_ty T = 2.5;
-  const uint32_t nt = 100;
+  const f_ty T = 1.5;
+  const uint32_t nt = 500;
   const uint32_t num_snapshots = 100;
+  const auto freq = nt / num_snapshots;
   
   const auto dt = T / nt;
   c_ty dti = c_ty(0, dt);
@@ -45,7 +46,7 @@ int main() {
   f_ty theta = 3.14 * .25;
   f_ty kx = k0 * std::cos(theta);
   f_ty ky = k0 * std::sin(theta);
-  f_ty sigma = .3;
+  f_ty sigma = .2;
   f_ty A = 1.;
 
   auto f_collision = [&](c_ty x, c_ty y) {
@@ -60,13 +61,19 @@ int main() {
   Eigen::VectorX<c_ty> u0 =
       apply_function_uniform<c_ty>(-Lx, Lx, nx, -Ly, Ly, ny, f_collision);
 
-  u0 = u0 / u0.norm();
+  auto get_norm = [&](const Eigen::VectorX<c_ty> & x) {
+      return std::sqrt(
+              (x.array().abs2() * dx * dy).sum());
+  };
+  const auto Norm = get_norm(u0);
+  u0 = u0 / Norm;
 
-  Eigen::VectorX<f_ty> u_save(num_snapshots * nx * ny);
-  Eigen::Map<Eigen::Matrix<f_ty, -1, -1, Eigen::RowMajor>>(
+  Eigen::VectorX<c_ty> u_save(num_snapshots * nx * ny);
+  Eigen::Map<Eigen::Matrix<c_ty, -1, -1, Eigen::RowMajor>>(
       u_save.data(), num_snapshots, nx * ny)
       .row(0) = (
-              u0.real().cwiseProduct(u0.real()) + u0.imag().cwiseProduct(u0.imag())
+              u0
+              //u0.real().cwiseProduct(u0.real()) + u0.imag().cwiseProduct(u0.imag())
               ).transpose(); 
 
   Eigen::VectorX<c_ty> u = u0;
@@ -77,10 +84,12 @@ int main() {
   for(uint32_t i=1; i < nt; ++i){ 
     NLSESolver::step<c_ty>(buf, rho_buf, u, L, dti);
 
-    Eigen::Map<Eigen::Matrix<f_ty, -1, -1, Eigen::RowMajor>>(
-    u_save.data(), num_snapshots, nx * ny)
-    .row(i) = (u.real().cwiseProduct(u.real()) + u.imag().cwiseProduct(u.imag())
-              ).transpose();
+    if (i % freq == 0) {
+      Eigen::Map<Eigen::Matrix<c_ty, -1, -1, Eigen::RowMajor>>(
+      u_save.data(), num_snapshots, nx * ny)
+      .row(i / freq) = (u /*(u.real().cwiseProduct(u.real()) + u.imag().cwiseProduct(u.imag())*/
+                ).transpose();
+    }
     PROGRESS_BAR(i, nt);
   }
 
