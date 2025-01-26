@@ -27,7 +27,7 @@ Eigen::VectorX<Float> apply_function_uniform(Float x_min, Float x_max,
 int main() {
   using f_ty = double;
   const uint32_t nx = 128, ny = 128;
-  const f_ty Lx = 4., Ly = 4.;
+  const f_ty Lx = 3., Ly = 3.;
   const f_ty dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
   const f_ty T = 5;
   const uint32_t nt = 500;
@@ -35,7 +35,6 @@ int main() {
   const auto freq = nt / num_snapshots;
   const auto dt = T / nt;
 
-  // 2 * torch.atan(torch.exp(3 - 5 * torch.sqrt(x ** 2 + y ** 2)))
   auto f = [](f_ty x, f_ty y) {
     return 2. * std::atan(std::exp(3. - 5. * std::sqrt(x * x + y * y)));
   };

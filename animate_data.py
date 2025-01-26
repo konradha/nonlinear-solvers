@@ -11,7 +11,7 @@ def animate(X, Y, data, nt, save=None):
     def update(frame):
         ax.clear()
         ax.plot_surface(X, Y,
-                np.abs(data[frame]),
+                data[frame],
                 cmap='viridis')
     fps = 1
     ani = FuncAnimation(fig, update, frames=nt, interval=nt / fps, )

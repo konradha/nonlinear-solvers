@@ -1,6 +1,6 @@
 #include "laplacians.hpp"
 //#include "eigen_krylov.hpp" TODO: implement the methods needed (simple float
-//krylov iteration)
+// krylov iteration)
 
 /*
  Here we implement time stepping for the sine-Gordon equation (simple):
@@ -44,10 +44,13 @@ void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
           Eigen::VectorX<Scalar_t> &buf, const Eigen::SparseMatrix<Scalar_t> &L,
           const Eigen::VectorX<Scalar_t> &c, const Eigen::VectorX<Scalar_t> &m,
           const Scalar_t tau) {
-  buf = c.cwiseProduct(L * u) +
-        m.cwiseProduct(u.unaryExpr([&](Scalar_t x) { return std::sin(x); }));
-  const auto buf2 = u;
-  u = 2 * u - u_past + .5 * tau * tau * buf;
+  Eigen::VectorX<Scalar_t> buf2 =
+      u.unaryExpr([&](Scalar_t x) { return std::sin(x); });
+  buf = c.cwiseProduct((L * u)) +
+        m.cwiseProduct(buf2);
+
+  buf2 = u;
+  u = 2 * u - u_past + tau * tau * buf;
   u_past = buf2;
 }
 }; // namespace SGESolver
