@@ -62,20 +62,17 @@ void step(Eigen::VectorX<Scalar_t> &buf, Eigen::VectorX<Scalar_t> &rho_buf,
   // TODO: incomplete wrt m = m(x, y) and c = c(x, y)
   // TODO: also very unreadable. Can make it longer and have compiler fold
   // useless indirection.
-  
+
   rho_buf =
-      (
-       (u.real().cwiseProduct(u.real())) + (u.imag()).cwiseProduct(u.imag())).unaryExpr([&tau](Scalar_t x) {
-        return std::exp(-.5 * tau * x);
-      }).cwiseProduct(u);
+      ((u.real().cwiseProduct(u.real())) + (u.imag()).cwiseProduct(u.imag()))
+          .unaryExpr([&tau](Scalar_t x) { return std::exp(-.5 * tau * x); })
+          .cwiseProduct(u);
 
   buf = expm_multiply(L, rho_buf, -tau);
 
-  u =
-      (
-       (buf.real().cwiseProduct(buf.real())) + (buf.imag()).cwiseProduct(buf.imag())).unaryExpr([&tau](Scalar_t x) {
-        return std::exp(-.5 * tau * x);
-      }).cwiseProduct(buf);
-  
+  u = ((buf.real().cwiseProduct(buf.real())) +
+       (buf.imag()).cwiseProduct(buf.imag()))
+          .unaryExpr([&tau](Scalar_t x) { return std::exp(-.5 * tau * x); })
+          .cwiseProduct(buf);
 }
 }; // namespace NLSESolver

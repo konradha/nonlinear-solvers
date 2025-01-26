@@ -25,25 +25,23 @@ Eigen::VectorX<Float> apply_function_uniform(Float x_min, Float x_max,
 }
 
 int main() {
-  using f_ty = double; 
+  using f_ty = double;
   const uint32_t nx = 128, ny = 128;
   const f_ty Lx = 4., Ly = 4.;
   const f_ty dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
   const f_ty T = 5;
   const uint32_t nt = 500;
   const uint32_t num_snapshots = 100;
-  const auto freq = nt / num_snapshots; 
+  const auto freq = nt / num_snapshots;
   const auto dt = T / nt;
 
   // 2 * torch.atan(torch.exp(3 - 5 * torch.sqrt(x ** 2 + y ** 2)))
   auto f = [](f_ty x, f_ty y) {
-      return 2. * std::atan(
-              std::exp(3. - 5. * std::sqrt(x * x + y * y))
-              );};
-  auto zero = [](f_ty x, f_ty y) { return 0.; }; 
+    return 2. * std::atan(std::exp(3. - 5. * std::sqrt(x * x + y * y)));
+  };
+  auto zero = [](f_ty x, f_ty y) { return 0.; };
   auto one = [](f_ty x, f_ty y) { return 1.; };
   auto neg = [](f_ty x, f_ty y) { return -1.; };
-
 
   Eigen::VectorX<f_ty> u0 =
       apply_function_uniform<f_ty>(-Lx, Lx, nx, -Ly, Ly, ny, f);
@@ -57,49 +55,45 @@ int main() {
   Eigen::VectorX<f_ty> c =
       apply_function_uniform<f_ty>(-Lx, Lx, nx, -Ly, Ly, ny, one);
 
-
-
-
   Eigen::VectorX<f_ty> u_save(num_snapshots * nx * ny);
   Eigen::VectorX<f_ty> v_save(num_snapshots * nx * ny);
 
   Eigen::Map<Eigen::Matrix<f_ty, -1, -1, Eigen::RowMajor>>(
       u_save.data(), num_snapshots, nx * ny)
-      .row(0) = (
-              u0
-              ).transpose(); 
+      .row(0) = (u0).transpose();
   Eigen::Map<Eigen::Matrix<f_ty, -1, -1, Eigen::RowMajor>>(
       v_save.data(), num_snapshots, nx * ny)
-      .row(0) = (
-              v0
-              ).transpose();
+      .row(0) = (v0).transpose();
 
-  const Eigen::SparseMatrix<f_ty> L = build_laplacian_noflux<f_ty>(nx-2, ny-2, dx, dy);
+  const Eigen::SparseMatrix<f_ty> L =
+      build_laplacian_noflux<f_ty>(nx - 2, ny - 2, dx, dy);
   Eigen::VectorX<f_ty> u = u0;
   Eigen::VectorX<f_ty> v = v0;
   Eigen::VectorX<f_ty> buf = v0;
   Eigen::VectorX<f_ty> u_past = u0 - dt * v0;
   Eigen::VectorX<f_ty> v_past = v0 - dt * dt * (L * u0);
- 
-  for(uint32_t i=1; i < nt; ++i){  
+
+  for (uint32_t i = 1; i < nt; ++i) {
     SGESolver::step<f_ty>(u, u_past, buf, L, c, m, dt);
     const auto v_cpy = u;
-    v = v + dt * (c.cwiseProduct(L * u) + m.cwiseProduct(u.unaryExpr([](f_ty x){return std::sin(x);})));
+    v = v +
+        dt * (c.cwiseProduct(L * u) +
+              m.cwiseProduct(u.unaryExpr([](f_ty x) { return std::sin(x); })));
     v_past = v_cpy;
 
     if (i % freq == 0) {
       Eigen::Map<Eigen::Matrix<f_ty, -1, -1, Eigen::RowMajor>>(
-      u_save.data(), num_snapshots, nx * ny)
-      .row(i / freq) = u.transpose();
+          u_save.data(), num_snapshots, nx * ny)
+          .row(i / freq) = u.transpose();
 
       Eigen::Map<Eigen::Matrix<f_ty, -1, -1, Eigen::RowMajor>>(
-      v_save.data(), num_snapshots, nx * ny)
-      .row(i / freq) = v.transpose();
+          v_save.data(), num_snapshots, nx * ny)
+          .row(i / freq) = v.transpose();
     }
     PROGRESS_BAR(i, nt);
   }
 
-  const std::vector<uint32_t> shape = {num_snapshots, nx, ny}; 
+  const std::vector<uint32_t> shape = {num_snapshots, nx, ny};
   const auto fname_u = "evolution_sg_u.npy";
   save_to_npy(fname_u, u_save, shape);
   const auto fname_v = "evolution_sg_v.npy";

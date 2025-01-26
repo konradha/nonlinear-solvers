@@ -29,10 +29,9 @@ void save_to_npy(const std::string &filename, const Eigen::VectorX<Float> &data,
   std::vector<uint64_t> shape_ul;
   for (const auto dim : shape)
     shape_ul.push_back(static_cast<uint64_t>(dim));
-  //for (const auto dim : shape)
-  //  std::cout << dim << " ";
-  //std::cout << "\n"
-  //          << "shape size: " << shape.size() << "\n";
+  // for (const auto dim : shape)
+  //   std::cout << dim << " ";
+  // std::cout << "\n"
+  //           << "shape size: " << shape.size() << "\n";
   npy::SaveArrayAsNumpy(filename, false, shape.size(), shape_ul.data(), vec);
 }
-
