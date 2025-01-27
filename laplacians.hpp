@@ -47,3 +47,98 @@ Eigen::SparseMatrix<Float> build_laplacian_noflux(uint32_t nx, uint32_t ny,
 
   return L;
 }
+
+template <typename Float>
+std::pair<Eigen::SparseMatrix<Float>, Eigen::SparseMatrix<Float>>
+build_separated_laplacian_noflux(uint32_t nx, uint32_t ny, Float dx, Float dy) {
+  assert(nx == ny);
+  assert(std::abs(dx - dy) < 1e-10);
+
+  const uint32_t N = (nx + 2) * (nx + 2);
+  using T = Eigen::Triplet<Float>;
+  std::vector<T> triplets_x, triplets_y;
+  triplets_x.reserve(N * 3);
+  triplets_y.reserve(N * 3);
+
+  for (uint32_t j = 0; j < nx + 2; ++j) {
+    for (uint32_t i = 0; i < nx + 2; ++i) {
+      uint32_t idx = j * (nx + 2) + i;
+      Float val_x = static_cast<Float>(-2.0);
+      Float val_y = static_cast<Float>(-2.0);
+
+      bool is_corner = (i == 0 || i == nx + 1) && (j == 0 || j == nx + 1);
+      if (i == 0 || i == nx + 1)
+        val_x = is_corner ? static_cast<Float>(-1.5) : static_cast<Float>(-1.0);
+      if (j == 0 || j == nx + 1)
+        val_y = is_corner ? static_cast<Float>(-1.5) : static_cast<Float>(-1.0);
+
+      triplets_x.emplace_back(idx, idx, val_x);
+      triplets_y.emplace_back(idx, idx, val_y);
+
+      if (i < nx + 1) {
+        triplets_x.emplace_back(idx, idx + 1, static_cast<Float>(1.0));
+        triplets_x.emplace_back(idx + 1, idx, static_cast<Float>(1.0));
+      }
+      if (j < nx + 1) {
+        triplets_y.emplace_back(idx, idx + nx + 2, static_cast<Float>(1.0));
+        triplets_y.emplace_back(idx + nx + 2, idx, static_cast<Float>(1.0));
+      }
+    }
+  }
+
+  Eigen::SparseMatrix<Float> Lx(N, N), Ly(N, N);
+  Lx.setFromTriplets(triplets_x.begin(), triplets_x.end());
+  Ly.setFromTriplets(triplets_y.begin(), triplets_y.end());
+
+  Lx.makeCompressed();
+  Ly.makeCompressed();
+
+  Lx *= static_cast<Float>(1.0) / (dx * dx);
+  Ly *= static_cast<Float>(1.0) / (dy * dy);
+
+  return {Lx, Ly};
+}
+
+template <typename Float>
+Eigen::SparseMatrix<Float> build_xxxx_noflux(uint32_t nx, uint32_t ny,
+                                             Float dx) {
+  assert(nx == ny);
+  const uint32_t N = (nx + 2) * (nx + 2);
+  using T = Eigen::Triplet<Float>;
+  std::vector<T> triplets;
+  triplets.reserve(N * 5);
+
+  for (uint32_t j = 0; j < nx + 2; ++j) {
+    for (uint32_t i = 0; i < nx + 2; ++i) {
+      uint32_t idx = j * (nx + 2) + i;
+
+      if (i == 0 || i == nx + 1) {
+        // boundary: no-flux
+        triplets.emplace_back(idx, idx, static_cast<Float>(2.0));
+        triplets.emplace_back(idx, i == 0 ? idx + 1 : idx - 1,
+                              static_cast<Float>(-2.0));
+      } else if (i == 1 || i == nx) {
+        // close-to-boundary: second-order
+        triplets.emplace_back(idx, i == 1 ? idx + 1 : idx - 1,
+                              static_cast<Float>(-2.0));
+        triplets.emplace_back(idx, idx, static_cast<Float>(4.0));
+        triplets.emplace_back(idx, i == 1 ? idx + 2 : idx - 2,
+                              static_cast<Float>(-2.0));
+      } else {
+        // interior: 5-point stencil
+        triplets.emplace_back(idx, idx - 2, static_cast<Float>(1.0));
+        triplets.emplace_back(idx, idx - 1, static_cast<Float>(-4.0));
+        triplets.emplace_back(idx, idx, static_cast<Float>(6.0));
+        triplets.emplace_back(idx, idx + 1, static_cast<Float>(-4.0));
+        triplets.emplace_back(idx, idx + 2, static_cast<Float>(1.0));
+      }
+    }
+  }
+
+  Eigen::SparseMatrix<Float> L4(N, N);
+  L4.setFromTriplets(triplets.begin(), triplets.end());
+  L4.makeCompressed();
+  L4 *= static_cast<Float>(1.0) / (dx * dx * dx * dx);
+
+  return L4;
+}
