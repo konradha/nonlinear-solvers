@@ -1,4 +1,4 @@
-#include "eigen_krylov.hpp"
+#include "eigen_krylov_real.hpp"
 #include "laplacians.hpp"
 namespace BSolver {
 /*
@@ -44,20 +44,23 @@ template <typename Scalar_t>
 void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
           Eigen::VectorX<Scalar_t> &buf, const Eigen::SparseMatrix<Scalar_t> &L,
           const Eigen::VectorX<Scalar_t> &c, const Eigen::VectorX<Scalar_t> &m,
-          const Scalar_t tau,
-          const uint32_t nx, const uint32_t ny, const Scalar_t dx) {
+          const Scalar_t tau, const uint32_t nx, const uint32_t ny,
+          const Scalar_t dx) {
 
   // g (tau \Omega u)
-  auto nonlin = id_sqrt_multiply(L, u, tau);  
+  auto nonlin = id_sqrt_multiply(L, u, tau);
   nonlin = nonlin.cwiseProduct(nonlin);
   u_xx(buf, nonlin, nx, ny, dx);
 
-  // sinc²(tau / 2 \Omega) 3 * (u²)_xx
-  const auto s2 = sinc2_sqrt_multiply(L, 3. * buf, .5 * tau);
-  const auto c = cos_sqrt_multiply(L, u, tau);
+  // sinc²(tau / 2 \Omega) -3 * (u²)_xx
+  // see reasoning above for the sign
+  
+  buf = -3. * buf;
+  const auto s2 = sinc2_sqrt_multiply(L, buf, .5 * tau);
+  const auto cos = cos_sqrt_multiply(L, u, tau);
 
   auto u_cpy = u;
-  u = 2 * c - u_past + tau * tau * s2;  
+  u = 2 * cos - u_past + tau * tau * s2;
   u_past = u_cpy;
 }
 }; // namespace BSolver
