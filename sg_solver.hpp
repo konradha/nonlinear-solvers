@@ -1,6 +1,5 @@
+#include "eigen_krylov_real.hpp"
 #include "laplacians.hpp"
-//#include "eigen_krylov.hpp" TODO: implement the methods needed (simple float
-// krylov iteration)
 
 /*
  Here we implement time stepping for the sine-Gordon equation (simple):
@@ -38,12 +37,12 @@
 
 namespace SGESolver {
 
-// TODO template step type; implement Gautschi step of course
 template <typename Scalar_t>
-void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
-          Eigen::VectorX<Scalar_t> &buf, const Eigen::SparseMatrix<Scalar_t> &L,
-          const Eigen::VectorX<Scalar_t> &c, const Eigen::VectorX<Scalar_t> &m,
-          const Scalar_t tau) {
+void step_sv(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
+             Eigen::VectorX<Scalar_t> &buf,
+             const Eigen::SparseMatrix<Scalar_t> &L,
+             const Eigen::VectorX<Scalar_t> &c,
+             const Eigen::VectorX<Scalar_t> &m, const Scalar_t tau) {
   Eigen::VectorX<Scalar_t> buf2 =
       u.unaryExpr([&](Scalar_t x) { return std::sin(x); });
   buf = c.cwiseProduct((L * u)) + m.cwiseProduct(buf2);
@@ -52,4 +51,23 @@ void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
   u = 2 * u - u_past + tau * tau * buf;
   u_past = buf2;
 }
+
+template <typename Scalar_t>
+void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
+          Eigen::VectorX<Scalar_t> &buf, const Eigen::SparseMatrix<Scalar_t> &L,
+          const Eigen::VectorX<Scalar_t> &c, const Eigen::VectorX<Scalar_t> &m,
+          const Scalar_t tau) {
+  // u_tt + Au = g(u)
+  // u_{n+1} =
+  // 2 cos (tau \Omega) u_{n} - u_{n-1} + tau² sinc²(tau / 2 \Omega)
+  // x g(\phi(tau \Omega)u_{n}))
+
+  Eigen::VectorX<Scalar_t> buf2 = id_sqrt_multiply(L, u, tau);
+  buf2 = buf2.unaryExpr([](Scalar_t x) { return -std::sin(x); });
+  buf2 = sinc2_sqrt_half(L, buf2, tau);
+  Eigen::VectorX<Scalar_t> u_cpy = u;
+  u = 2 * cos_sqrt_multiply(L, u, tau) - u_past + tau * tau * buf2;
+  u_past = u_cpy;
+}
+
 }; // namespace SGESolver

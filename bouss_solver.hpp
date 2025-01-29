@@ -8,6 +8,10 @@ namespace BSolver {
     with   L = -\Delta u - u_xxxx
         g(u) = - 3 (u²)_xx
 
+    OR
+
+    -u_tt + Lu = g(u)
+
 */
 
 template <typename Float_t>
@@ -48,19 +52,30 @@ void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
           const Scalar_t dx) {
 
   // g (tau \Omega u)
-  auto nonlin = id_sqrt_multiply(L, u, tau);
-  nonlin = nonlin.cwiseProduct(nonlin);
+  buf = id_sqrt_multiply(L, u, tau);
+  Eigen::VectorX<Scalar_t> nonlin = (buf.cwiseProduct(buf)).eval();
   u_xx(buf, nonlin, nx, ny, dx);
-
-  // sinc²(tau / 2 \Omega) -3 * (u²)_xx
-  // see reasoning above for the sign
-  
   buf = -3. * buf;
-  const auto s2 = sinc2_sqrt_multiply(L, buf, .5 * tau);
+  // sinc²(tau / 2 \Omega) -3 * (u²)_xx
+  const auto s2 = sinc2_sqrt_half(L, buf, tau);
   const auto cos = cos_sqrt_multiply(L, u, tau);
-
   auto u_cpy = u;
-  u = 2 * cos - u_past + tau * tau * s2;
+  u = (2 * cos - u_past + tau * tau * s2);
+  u_past = u_cpy;
+}
+
+template <typename Scalar_t>
+void step_stiff(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
+                Eigen::VectorX<Scalar_t> &buf,
+                const Eigen::SparseMatrix<Scalar_t> &L,
+                const Eigen::VectorX<Scalar_t> &c,
+                const Eigen::VectorX<Scalar_t> &m, const Scalar_t tau,
+                const uint32_t nx, const uint32_t ny, const Scalar_t dx) {
+  // u_{n+1} = 2 * u - u_past + tau²((\Delta + (d/dx)⁴)u_n + 3(u_n)²_xx)
+  const Eigen::VectorX<Scalar_t> u_cpy = u;
+  Eigen::VectorX<Scalar_t> buf2 = u.cwiseProduct(u);
+  u_xx(buf, buf2, nx, ny, dx);
+  u = 2. * u - u_past + tau * tau * (L * u + 3 * buf);
   u_past = u_cpy;
 }
 }; // namespace BSolver

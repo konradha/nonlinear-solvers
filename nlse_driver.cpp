@@ -28,7 +28,7 @@ int main() {
   using f_ty = double;
   using c_ty = std::complex<f_ty>;
 
-  const uint32_t nx = 512, ny = 512;
+  const uint32_t nx = 256, ny = 256;
   const f_ty Lx = 10., Ly = 10.;
   const f_ty dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
 
@@ -101,6 +101,6 @@ int main() {
   }
 
   const std::vector<uint32_t> shape = {num_snapshots, nx, ny};
-  const auto fname_u = "evolution.npy";
+  const auto fname_u = "evolution_nlse.npy";
   save_to_npy(fname_u, u_save, shape);
 }
