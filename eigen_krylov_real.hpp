@@ -51,6 +51,9 @@ Eigen::VectorX<Float> cos_sqrt_multiply(const Eigen::SparseMatrix<Float> &L,
       (es.eigenvectors() *
        (t * es.eigenvalues().array().abs().sqrt()).cos().matrix().asDiagonal() *
        es.eigenvectors().transpose());
+
+  // find decomposition T = Q D Q.T
+  // then apply Q t * sqrt({d_i}) * Q.T
   Eigen::VectorX<Float> e1 = Eigen::VectorX<Float>::Zero(T.rows());
   e1(0) = 1.0;
   return beta * V * cos_sqrt_T * e1;

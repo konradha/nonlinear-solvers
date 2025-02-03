@@ -1,6 +1,12 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
+#define DEBUG 0
+
+#if DEBUG
+  #include <iostream>
+#endif
+
 template <typename Float>
 std::tuple<Eigen::MatrixX<Float>, Eigen::MatrixX<Float>, Float>
 lanczos_L(const Eigen::SparseMatrix<Float> &L, const Eigen::VectorX<Float> &u,
@@ -17,11 +23,13 @@ lanczos_L(const Eigen::SparseMatrix<Float> &L, const Eigen::VectorX<Float> &u,
     if (j > 0)
       w -= T(j - 1, j) * V.col(j - 1);
 
-    T(j, j) = w.dot(V.col(j));
+    // T(j, j) = w.dot(V.col(j)); -- real version
+    T(j, j) = V.col(j).adjoint() * w;
     w -= T(j, j) * V.col(j);
 
     for (uint32_t i = 0; i <= j; i++) {
-      Float coeff = w.dot(V.col(i));
+      // Float coeff = w.dot(V.col(i)); -- real version
+      Float coeff = V.col(i).adjoint() * w;
       // CGS
       // w -= coeff * V.col(i);
 
@@ -46,6 +54,11 @@ Eigen::VectorX<Float> expm_multiply(const Eigen::SparseMatrix<Float> &L,
                                     const Eigen::VectorX<Float> &u, Float t,
                                     const uint32_t m = 10) {
   const auto [V, T, beta] = lanczos_L(L, u, m);
+#if DEBUG
+  std::cout << "V: " << V << "\n";
+  std::cout << "T: " << T << "\n";
+  std::cin.get();
+#endif
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
   Eigen::MatrixX<Float> exp_T =
       (es.eigenvectors() *
