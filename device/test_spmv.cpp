@@ -66,7 +66,8 @@ void test_spmv(const Eigen::SparseMatrix<double> &A, uint32_t num_trials = 10) {
     avg_gpu_time += milliseconds;
 
     std::vector<double> y_gpu_vec(n);
-    cudaMemcpy(y_gpu_vec.data(), d_y, n * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(y_gpu_vec.data(), d_y, n * sizeof(double),
+               cudaMemcpyDeviceToHost);
 
     Eigen::Map<Eigen::VectorXd> y_gpu(y_gpu_vec.data(), n);
     Eigen::VectorXd diff = y_eigen - y_gpu;
@@ -95,7 +96,7 @@ void test_spmv(const Eigen::SparseMatrix<double> &A, uint32_t num_trials = 10) {
   cudaFree(d_y);
 }
 
-int main(int argc, char **argv) { 
+int main(int argc, char **argv) {
   auto ns = {128, 256, 512, 1024};
   for (auto ni : ns) {
     const uint32_t nx = ni;
@@ -103,7 +104,8 @@ int main(int argc, char **argv) {
     uint32_t n = nx * ny;
     double Lx = 5., Ly = 5.;
     double dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
-    Eigen::SparseMatrix<double> A = build_laplacian_noflux<double>(nx - 2, ny - 2, dx, dy);
+    Eigen::SparseMatrix<double> A =
+        build_laplacian_noflux<double>(nx - 2, ny - 2, dx, dy);
     test_spmv(A);
   }
   return 0;
