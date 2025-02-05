@@ -7,6 +7,40 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 from sys import argv
 
+# TODO make use of pyvista or something similar for nice animations
+
+def animate_single(X, Y, Z, data, nt, save=None):
+    fig, ax = plt.subplots(ncols=1, figsize=(20, 6), 
+                                      subplot_kw={'projection': '3d'})
+    scatters = [] 
+    scatter = ax.scatter([], [], [], c=[], cmap='viridis', alpha=0.5)
+    scatters.append(scatter)
+    ax.set_xlim([X[1:-1].min(), X[1:-1].max()])
+    ax.set_ylim([Y[1:-1].min(), Y[1:-1].max()])
+    ax.set_zlim([Z[1:-1].min(), Z[1:-1].max()])
+
+    def update(frame):
+        data_frame = data[frame]  
+        abs_data = np.abs(data_frame)
+
+        threshold = 0.3 * np.max(abs_data)
+        points = np.where(abs_data > threshold) 
+        for a, scatter, component in zip([ax], scatters, [data_frame.real]):
+               scatter._offsets3d = (X[points], Y[points], Z[points])
+               scatter.set_array(component[points]) 
+        return scatters
+
+    fps = 10
+    ani = FuncAnimation(fig, update, frames=nt, interval=1000/fps)
+
+    if save == "gif":
+        ani.save("evolution_3d.gif", writer='pillow', fps=fps)
+    elif save == "mp4":
+        ani.save("evolution_3d.mp4", writer='ffmpeg', fps=fps)
+    else:
+        plt.show()
+
+
 
 def animate_3d(X, Y, Z, data, nt, save=None):
    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 6), 
@@ -68,4 +102,4 @@ if __name__ == '__main__':
     zn = np.linspace(-L, L, nz)
     X, Y, Z = np.meshgrid(xn, yn, zn, indexing='ij')
 
-    animate_3d(X, Y, Z, data, nt, save_ani)
+    animate_single(X, Y, Z, data, nt, save_ani)
