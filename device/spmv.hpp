@@ -59,9 +59,9 @@ public:
         handle_, CUSPARSE_OPERATION_NON_TRANSPOSE,
         reinterpret_cast<cuda_scalar_t *>(&alpha), mat_desc_, vec_x_,
         reinterpret_cast<cuda_scalar_t *>(&beta), vec_y_, cuda_data_type(),
-        CUSPARSE_SPMV_CSR_ALG1, &buffer_size));
+        CUSPARSE_SPMV_CSR_ALG2, &buffer_size));
     // maybe too much mem, we don't care for now -- rather more mem than too
-    // little
+    // little :)
     CHECK_CUDA(cudaMalloc(&buffer_, buffer_size * sizeof(T)));
   }
 
@@ -89,7 +89,7 @@ public:
                      reinterpret_cast<cuda_scalar_t *>(&alpha), mat_desc_,
                      vec_x_, reinterpret_cast<cuda_scalar_t *>(&beta), vec_y_,
                      cuda_data_type(), CUSPARSE_SPMV_CSR_ALG2, buffer_));
-    // ALG1 seems to perform close-to-perfect
+    // ALG2 seems to perform close-to-perfect
     // (hand-optimized kernel for 2d no-flux Laplacian with 5 diagonals takes
     // a comparable amount of time)
   }
