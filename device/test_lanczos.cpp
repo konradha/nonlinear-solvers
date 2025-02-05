@@ -79,7 +79,8 @@ void test_lanczos(const Eigen::SparseMatrix<double>& A,
        cudaEventElapsedTime(&milliseconds, start, stop);
        avg_gpu_time += milliseconds;
 
-       /*if(trial == 0)*/ {
+       // To check if V and T agree, print for all trials!
+       if(trial == 0) {
            std::vector<double> V_gpu(n * m);
            std::vector<double> T_gpu(m * m);
            
@@ -135,8 +136,8 @@ void test_lanczos(const Eigen::SparseMatrix<double>& A,
 
 int main(int argc, char** argv) {
    setbuf(stdout, NULL);
-   auto ns = {100, 300};
-   std::vector<uint32_t> krylov_dims = {10};
+   auto ns = {100, 200, 300};
+   std::vector<uint32_t> krylov_dims = {10, 20, 30};
    
    for(auto ni : ns) {
        const uint32_t nx = ni;

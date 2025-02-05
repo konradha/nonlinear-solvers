@@ -112,8 +112,7 @@ void lanczos_iteration(const Eigen::SparseMatrix<double> &L,
     const uint32_t n = krylov->n;
     const uint32_t m = krylov->m;
     dim3 grid(NUM_BLOCKS);
-    dim3 block(BLOCK_SIZE);
- 
+    dim3 block(BLOCK_SIZE); 
     cudaMemcpy(krylov->V, (void*)u, n * sizeof(double), cudaMemcpyDeviceToDevice);
 
     // \beta = ||u||
@@ -124,29 +123,22 @@ void lanczos_iteration(const Eigen::SparseMatrix<double> &L,
     cudaMemcpy(&beta, krylov->d_beta, sizeof(double), cudaMemcpyDeviceToHost);
     beta = std::sqrt(beta);
     vector_scale_kernel<<<grid, block>>>(krylov->V, beta, n);
-
-    Eigen::MatrixX<double> V(n, m);
-    Eigen::MatrixX<double> T(m, m); 
-
-    cudaMemcpy(V.data(), krylov->V, n * sizeof(double), cudaMemcpyDeviceToHost);
-    
-    for (uint32_t j = 0; j < m - 1; j++) {
-	//cudaMemcpy(&krylov->V[j * n], V.col(j).data(), n * sizeof(double), cudaMemcpyHostToDevice);	
-	spmv->multiply(&krylov->V[j*n], krylov->buf1);
-	 
+     
+    // this small matrix will disappear after some optimization such that this entire function runs on device only
+    Eigen::MatrixX<double> T(m, m);
+    cudaMemset(krylov->T, 0, m * m * sizeof(double));
+    for (uint32_t j = 0; j < m - 1; j++) {	
+	spmv->multiply(&krylov->V[j*n], krylov->buf1); 
 	if (j> 0) {
 	  vector_axpby_kernel<<<grid, block>>>(krylov->buf1, &krylov->V[(j-1)*n], 1.0, -T(j-1,j), n);           
 	}
-        	
-	
+        		
 	cudaMemset(krylov->T + m * j + j, 0, sizeof(double));
 	dot_product_kernel<<<grid, block>>>(krylov->buf1, &(krylov->V[j * n]), krylov->T + m * j + j, n);
 	cudaMemcpy(&T(j, j), krylov->T + m * j + j, sizeof(double), cudaMemcpyDeviceToHost);
         vector_axpby_kernel<<<grid, block>>>(krylov->buf1, &krylov->V[j*n], 1.0, -T(j,j), n);
-
 	
-	for (uint32_t i = 0; i <= j; i++) {
-	      
+	for (uint32_t i = 0; i <= j; i++) { 
 	      cudaMemset(krylov->buf2, 0, sizeof(double));
 	      dot_product_kernel<<<grid, block>>>(krylov->buf1, &(krylov->V[i * n]), krylov->buf2, n);    
 	      double coeff;
@@ -155,25 +147,17 @@ void lanczos_iteration(const Eigen::SparseMatrix<double> &L,
 	      vector_axpby_kernel<<<grid, block>>>(krylov->buf1, &krylov->V[i*n], 1.0, -coeff, n);
 	    }
 
-	Eigen::VectorX<double> w(n);
-        cudaMemcpy(w.data(), krylov->buf1, n * sizeof(double), cudaMemcpyDeviceToHost);
-
         cudaMemset(krylov->T + m * j + j + 1, 0, sizeof(double)); 
 	vector_norm_kernel<<<grid, block>>>(krylov->buf1, krylov->T + m * j + j + 1, n);
 	scalar_sqrt<<<1, 1>>>(krylov->T + m * j + j + 1);
+	cudaDeviceSynchronize();
 	cudaMemcpy(krylov->T + m * (j+1) + j, krylov->T + m * j + j + 1,  sizeof(double), cudaMemcpyDeviceToDevice);
 	cudaMemcpy(&T(j+1,j), krylov->T + m * j + j + 1,  sizeof(double), cudaMemcpyDeviceToHost);
-
 	
+	//V.col(j + 1) = w / T(j + 1, j);
 	vector_scale_kernel<<<grid, block>>>(krylov->buf1, T(j + 1, j), n);
-	cudaMemcpy(&krylov->V[(j+1) * n], krylov->buf1, n * sizeof(double), cudaMemcpyDeviceToHost);
-                                   
-        //V.col(j + 1) = w / T(j + 1, j);
-    }
-
-
-    cudaMemcpy(krylov->V, V.data(), n * m * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(krylov->T, T.data(), m * m * sizeof(double), cudaMemcpyHostToDevice);  
+	cudaMemcpy(&krylov->V[(j+1) * n], krylov->buf1, n * sizeof(double), cudaMemcpyDeviceToHost); 
+    } 
 }
 
 #endif
