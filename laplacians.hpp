@@ -49,8 +49,9 @@ Eigen::SparseMatrix<Float> build_laplacian_noflux(uint32_t nx, uint32_t ny,
 }
 
 template <typename Float>
-Eigen::SparseMatrix<Float> build_laplacian_noflux_3d(uint32_t nx, uint32_t ny, uint32_t nz,
-                                                     Float dx, Float dy, Float dz) {
+Eigen::SparseMatrix<Float> build_laplacian_noflux_3d(uint32_t nx, uint32_t ny,
+                                                     uint32_t nz, Float dx,
+                                                     Float dy, Float dz) {
   assert(nx == ny && ny == nz);
   assert(std::abs(dx - dy) < 1e-10 && std::abs(dy - dz) < 1e-10);
 
@@ -66,10 +67,10 @@ Eigen::SparseMatrix<Float> build_laplacian_noflux_3d(uint32_t nx, uint32_t ny, u
     for (uint32_t j = 0; j < ny + 2; ++j) {
       for (uint32_t i = 0; i < nx + 2; ++i) {
         const uint32_t idx = k * plane_size + j * (nx + 2) + i;
-        const Float val = (k == 0 || k == nz + 1 || 
-                         j == 0 || j == ny + 1 || 
-                         i == 0 || i == nx + 1) ? 
-                         static_cast<Float>(-5.0) : static_cast<Float>(-6.0);
+        const Float val = (k == 0 || k == nz + 1 || j == 0 || j == ny + 1 ||
+                           i == 0 || i == nx + 1)
+                              ? static_cast<Float>(-5.0)
+                              : static_cast<Float>(-6.0);
         triplets.emplace_back(idx, idx, val);
       }
     }

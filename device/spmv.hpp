@@ -1,8 +1,8 @@
-// spmv.hpp 
+// spmv.hpp
 #include "pragmas.hpp"
-// also includes relevant headers for now; no linking -- we just generate huge binaries for now
+// also includes relevant headers for now; no linking -- we just generate huge
+// binaries for now
 // TODO: refactor and introduce a nice build process
-
 
 template <typename T> class DeviceSpMV {
 private:
@@ -51,7 +51,7 @@ public:
 
     CHECK_CUSPARSE(cusparseCreateDnVec(&vec_x_, n, d_x_, cuda_data_type()));
     CHECK_CUSPARSE(cusparseCreateDnVec(&vec_y_, n, d_y_, cuda_data_type()));
-     size_t buffer_size;
+    size_t buffer_size;
     T alpha{1}, beta{0};
     CHECK_CUSPARSE(cusparseSpMV_bufferSize(
         handle_, CUSPARSE_OPERATION_NON_TRANSPOSE,
@@ -92,7 +92,3 @@ public:
     // a comparable amount of time)
   }
 };
-
-
-
-

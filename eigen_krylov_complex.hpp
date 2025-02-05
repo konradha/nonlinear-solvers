@@ -4,7 +4,7 @@
 #define DEBUG 0
 
 #if DEBUG
-  #include <iostream>
+#include <iostream>
 #endif
 
 template <typename Float>

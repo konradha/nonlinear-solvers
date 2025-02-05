@@ -1,10 +1,9 @@
 // pragmas.hpp
 
-#include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
-#include <cusparse.h>
+#include <cuda_runtime_api.h>
 #include <cusolverDn.h>
-
+#include <cusparse.h>
 
 #define CHECK_CUDA(func)                                                       \
   {                                                                            \
@@ -16,8 +15,6 @@
     }                                                                          \
   }
 
-
-
 #define CHECK_CUSPARSE(func)                                                   \
   {                                                                            \
     cusparseStatus_t status = (func);                                          \
@@ -27,4 +24,3 @@
       throw std::runtime_error("cuSPARSE API Error");                          \
     }                                                                          \
   }
-
