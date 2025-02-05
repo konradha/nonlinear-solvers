@@ -1,5 +1,23 @@
-// lanczos.hpp
+#ifndef LANCZOS_HPP
+#define LANCZOS_HPP
+
 #include "pragmas.hpp"
+#include "spmv.hpp"
+
+#define NUM_BLOCKS 256
+#define BLOCK_SIZE 256
+
+struct KrylovInfo {
+  double *__restrict__ T;
+  double *__restrict__ V;
+  double *__restrict__ buf1;
+  double *__restrict__ buf2;
+  double beta;
+
+  uint32_t n;
+  uint32_t m;
+};
+
 
 __global__ void dot_product_kernel(const double *x, const double *y,
                                    double *result, const uint32_t n) {
@@ -45,7 +63,8 @@ __global__ void lanczos_update_kernel(double *w, const double *v,
   }
 }
 
-void lanczos_iteration(DeviceSpMV *spmv, KrylovInfo *krylov) {
+template <typename T>
+void lanczos_iteration(DeviceSpMV<T> *spmv, KrylovInfo *krylov) {
   cudaMemset(krylov->buf1, 0, sizeof(double));
   dot_product_kernel<<<NUM_BLOCKS, BLOCK_SIZE>>>(krylov->V, krylov->V,
                                                  krylov->buf1, krylov->n);
@@ -79,3 +98,4 @@ void lanczos_iteration(DeviceSpMV *spmv, KrylovInfo *krylov) {
                sizeof(double), cudaMemcpyDeviceToDevice);
   }
 }
+#endif

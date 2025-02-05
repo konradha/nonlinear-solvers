@@ -8,8 +8,9 @@
 #include <random>
 #include <vector>
 
-void test_spmv(const Eigen::SparseMatrix<double> &A, uint32_t num_trials = 20) {
+void test_spmv(const Eigen::SparseMatrix<double> &A, uint32_t num_trials = 10) {
   const uint32_t n = A.rows();
+  std::cout << "n = " << n << "\n";
   const int *row_ptr = A.outerIndexPtr();
   const int *col_ind = A.innerIndexPtr();
   const double *values = A.valuePtr();
@@ -64,23 +65,22 @@ void test_spmv(const Eigen::SparseMatrix<double> &A, uint32_t num_trials = 20) {
     cudaEventElapsedTime(&milliseconds, start, stop);
     avg_gpu_time += milliseconds;
 
-    std::vector<double> y_gpu(n);
-    cudaMemcpy(y_gpu.data(), d_y, n * sizeof(double), cudaMemcpyDeviceToHost);
-
-    cudaMemcpy(y_gpu_vec.data(), d_y, n * sizeof(double),
-               cudaMemcpyDeviceToHost);
+    std::vector<double> y_gpu_vec(n);
+    cudaMemcpy(y_gpu_vec.data(), d_y, n * sizeof(double), cudaMemcpyDeviceToHost);
 
     Eigen::Map<Eigen::VectorXd> y_gpu(y_gpu_vec.data(), n);
     Eigen::VectorXd diff = y_eigen - y_gpu;
 
-    std::cout << "L1 diff: " << diff.template lpNorm<1>() << "\n";
-    std::cout << "L2 diff: " << diff.template lpNorm<2>() << "\n";
+    if (trial == 0) {
+      std::cout << "L1 diff: " << diff.template lpNorm<1>() << "\n";
+      std::cout << "L2 diff: " << diff.template lpNorm<2>() << "\n";
+    }
   }
 
   avg_eigen_time /= num_trials;
   avg_gpu_time /= num_trials;
 
-  std::cout << std::scientific << std::setprecision(3);
+  std::cout << std::scientific << std::setprecision(4);
 
   std::cout << "Average Eigen time: " << avg_eigen_time << " us\n";
   std::cout << "Average GPU time:   " << avg_gpu_time * 1000.0 << " us\n";
@@ -95,14 +95,16 @@ void test_spmv(const Eigen::SparseMatrix<double> &A, uint32_t num_trials = 20) {
   cudaFree(d_y);
 }
 
-int main(int argc, char **argv) {
-  uint32_t nx = 128, ny = 128;
-  uint32_t n = nx * ny;
-  double Lx = 5., Ly = 5.;
-  double dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
-
-  Eigen::SparseMatrix<double> A = build_laplacian_noflux<c_ty>(nx - 2, ny - 2, dx, dy);
-  test_spmv(A);
-
+int main(int argc, char **argv) { 
+  auto ns = {128, 256, 512, 1024};
+  for (auto ni : ns) {
+    const uint32_t nx = ni;
+    const uint32_t ny = ni;
+    uint32_t n = nx * ny;
+    double Lx = 5., Ly = 5.;
+    double dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
+    Eigen::SparseMatrix<double> A = build_laplacian_noflux<double>(nx - 2, ny - 2, dx, dy);
+    test_spmv(A);
+  }
   return 0;
 }

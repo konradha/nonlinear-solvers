@@ -1,4 +1,6 @@
-// spmv.hpp
+#ifndef DEVICE_SPMV_HPP
+#define DEVICE_SPMV_HPP
+
 #include "pragmas.hpp"
 // also includes relevant headers for now; no linking -- we just generate huge
 // binaries for now
@@ -86,9 +88,10 @@ public:
         cusparseSpMV(handle_, CUSPARSE_OPERATION_NON_TRANSPOSE,
                      reinterpret_cast<cuda_scalar_t *>(&alpha), mat_desc_,
                      vec_x_, reinterpret_cast<cuda_scalar_t *>(&beta), vec_y_,
-                     cuda_data_type(), CUSPARSE_SPMV_CSR_ALG1, buffer_));
+                     cuda_data_type(), CUSPARSE_SPMV_CSR_ALG2, buffer_));
     // ALG1 seems to perform close-to-perfect
     // (hand-optimized kernel for 2d no-flux Laplacian with 5 diagonals takes
     // a comparable amount of time)
   }
 };
+#endif
