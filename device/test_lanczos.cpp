@@ -147,9 +147,9 @@ int main(int argc, char **argv) {
     double Lx = 5., Ly = 5.;
     double dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
     Eigen::SparseMatrix<double> A =
-        build_laplacian_noflux<double>(nx - 2, ny - 2,  dx, dy);
-    	// the 3d finite differences matrix is huge. long walltime needed
-	//build_laplacian_noflux_3d<double>(nx - 2, ny - 2, nx - 2,  dx, dy, dx);
+        build_laplacian_noflux<double>(nx - 2, ny - 2, dx, dy);
+    // the 3d finite differences matrix is huge. long walltime needed
+    // build_laplacian_noflux_3d<double>(nx - 2, ny - 2, nx - 2,  dx, dy, dx);
 
     for (auto m : krylov_dims) {
       test_lanczos(A, m);

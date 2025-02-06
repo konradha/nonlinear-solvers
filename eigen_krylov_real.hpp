@@ -31,11 +31,11 @@ lanczos_L(const Eigen::SparseMatrix<Float> &L, const Eigen::VectorX<Float> &u,
     T(j + 1, j) = w.norm();
     // use symmetry
     T(j, j + 1) = T(j + 1, j);
-    //if (std::abs(T(j + 1, j)) < 1e-8) {
-    //  V.conservativeResize(Eigen::NoChange, j + 1);
-    //  T.conservativeResize(j + 1, j + 1);
-    //  break;
-    //}
+    // if (std::abs(T(j + 1, j)) < 1e-8) {
+    //   V.conservativeResize(Eigen::NoChange, j + 1);
+    //   T.conservativeResize(j + 1, j + 1);
+    //   break;
+    // }
     V.col(j + 1) = w / T(j + 1, j);
   }
   return {V, T, beta};

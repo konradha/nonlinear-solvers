@@ -9,10 +9,11 @@
 #include <random>
 #include <vector>
 
-template<typename T>
+template <typename T>
 void test_spmv(const Eigen::SparseMatrix<T> &A, uint32_t num_trials = 10) {
-  using device_type = std::conditional_t<std::is_same_v<T, double>, double, thrust::complex<double>>;
-  
+  using device_type = std::conditional_t<std::is_same_v<T, double>, double,
+                                         thrust::complex<double>>;
+
   const uint32_t n = A.rows();
   std::cout << "n = " << n << "\n";
   const int *row_ptr = A.outerIndexPtr();
@@ -29,8 +30,10 @@ void test_spmv(const Eigen::SparseMatrix<T> &A, uint32_t num_trials = 10) {
   cudaMalloc(&d_y, n * sizeof(device_type));
 
   cudaMemcpy(d_row_ptr, row_ptr, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_col_ind, col_ind, A.nonZeros() * sizeof(int), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_values, values, A.nonZeros() * sizeof(device_type), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_col_ind, col_ind, A.nonZeros() * sizeof(int),
+             cudaMemcpyHostToDevice);
+  cudaMemcpy(d_values, values, A.nonZeros() * sizeof(device_type),
+             cudaMemcpyHostToDevice);
 
   DeviceSpMV<device_type> spmv(d_row_ptr, d_col_ind, d_values, n, A.nonZeros());
 
@@ -48,7 +51,8 @@ void test_spmv(const Eigen::SparseMatrix<T> &A, uint32_t num_trials = 10) {
   for (uint32_t trial = 0; trial < num_trials; trial++) {
     Eigen::Vector<T, Eigen::Dynamic> x(n);
     if constexpr (std::is_same_v<T, double>) {
-      x = Eigen::VectorXd::NullaryExpr(n, [&gen, &dist](Eigen::Index) { return dist(gen); });
+      x = Eigen::VectorXd::NullaryExpr(
+          n, [&gen, &dist](Eigen::Index) { return dist(gen); });
     } else {
       for (uint32_t i = 0; i < n; i++) {
         x[i] = std::complex<double>(dist(gen), dist(gen));
@@ -59,7 +63,8 @@ void test_spmv(const Eigen::SparseMatrix<T> &A, uint32_t num_trials = 10) {
     Eigen::Vector<T, Eigen::Dynamic> y_eigen = A * x;
     auto cpu_end = std::chrono::high_resolution_clock::now();
     avg_eigen_time += std::chrono::duration_cast<std::chrono::microseconds>(
-                          cpu_end - cpu_start).count();
+                          cpu_end - cpu_start)
+                          .count();
 
     cudaMemcpy(d_x, x.data(), n * sizeof(device_type), cudaMemcpyHostToDevice);
 
@@ -111,12 +116,12 @@ int main(int argc, char **argv) {
     uint32_t n = nx * ny;
     double Lx = 5., Ly = 5.;
     double dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
-    
+
     std::cout << "\nReal SpMV:\n";
     Eigen::SparseMatrix<double> A_real =
         build_laplacian_noflux<double>(nx - 2, ny - 2, dx, dy);
     test_spmv(A_real);
-    
+
     std::cout << "\nUnreal SpMV:\n";
     Eigen::SparseMatrix<std::complex<double>> A_complex =
         build_laplacian_noflux<std::complex<double>>(nx - 2, ny - 2, dx, dy);

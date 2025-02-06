@@ -19,7 +19,7 @@ struct KrylovInfoComplex {
 };
 
 __global__ void norm_complex(const thrust::complex<double> *__restrict__ vec,
-                           double *__restrict__ result, const uint32_t n) {
+                             double *__restrict__ result, const uint32_t n) {
   __shared__ double shared_mem[BLOCK_SIZE];
   const uint32_t tid = threadIdx.x;
   const uint32_t gid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -52,18 +52,18 @@ __global__ void scalar_sqrt_complex(double *__restrict__ x) {
 }
 
 __global__ void inv_scale_complex(thrust::complex<double> *__restrict__ vec,
-                                const double scalar, const uint32_t n) {
+                                  const double scalar, const uint32_t n) {
   const uint32_t gid = blockIdx.x * blockDim.x + threadIdx.x;
-  
+
   for (uint32_t i = gid; i < n; i += gridDim.x * blockDim.x) {
     vec[i] = vec[i] / scalar;
   }
 }
 
 __global__ void dot_complex(const thrust::complex<double> *__restrict__ v1,
-                          const thrust::complex<double> *__restrict__ v2,
-                          thrust::complex<double> *__restrict__ result,
-                          const uint32_t n) {
+                            const thrust::complex<double> *__restrict__ v2,
+                            thrust::complex<double> *__restrict__ result,
+                            const uint32_t n) {
   __shared__ thrust::complex<double> shared_mem[BLOCK_SIZE];
   const uint32_t tid = threadIdx.x;
   const uint32_t gid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -84,17 +84,17 @@ __global__ void dot_complex(const thrust::complex<double> *__restrict__ v1,
   }
 
   if (tid == 0) {
-    double* result_ptr = reinterpret_cast<double*>(result);
+    double *result_ptr = reinterpret_cast<double *>(result);
     atomicAdd(&result_ptr[0], shared_mem[0].real());
     atomicAdd(&result_ptr[1], shared_mem[0].imag());
   }
 }
 
 __global__ void axpby_complex(thrust::complex<double> *__restrict__ v1,
-                           const thrust::complex<double> *__restrict__ v2,
-                           const thrust::complex<double> alpha,
-                           const thrust::complex<double> beta,
-                           const uint32_t n) {
+                              const thrust::complex<double> *__restrict__ v2,
+                              const thrust::complex<double> alpha,
+                              const thrust::complex<double> beta,
+                              const uint32_t n) {
   const uint32_t gid = blockIdx.x * blockDim.x + threadIdx.x;
 
   for (uint32_t i = gid; i < n; i += gridDim.x * blockDim.x) {
@@ -102,11 +102,11 @@ __global__ void axpby_complex(thrust::complex<double> *__restrict__ v1,
   }
 }
 
-void lanczos_iteration_complex(const Eigen::SparseMatrix<std::complex<double>> &L,
-                            DeviceSpMV<thrust::complex<double>> *spmv,
-                            KrylovInfoComplex *krylov,
-                            const thrust::complex<double> *__restrict__ u,
-                            const Eigen::VectorX<std::complex<double>> u_cpu) {
+void lanczos_iteration_complex(
+    const Eigen::SparseMatrix<std::complex<double>> &L,
+    DeviceSpMV<thrust::complex<double>> *spmv, KrylovInfoComplex *krylov,
+    const thrust::complex<double> *__restrict__ u,
+    const Eigen::VectorX<std::complex<double>> u_cpu) {
   const uint32_t n = krylov->n;
   const uint32_t m = krylov->m;
   dim3 grid(NUM_BLOCKS);
@@ -124,57 +124,53 @@ void lanczos_iteration_complex(const Eigen::SparseMatrix<std::complex<double>> &
 
   Eigen::MatrixX<std::complex<double>> T(m, m);
   cudaMemset(krylov->T, 0, m * m * sizeof(thrust::complex<double>));
-  
+
   for (uint32_t j = 0; j < m - 1; j++) {
     spmv->multiply(&krylov->V[j * n], krylov->buf1);
-                   
+
     if (j > 0) {
-      axpby_complex<<<grid, block>>>(krylov->buf1, &krylov->V[(j - 1) * n],
-                                    thrust::complex<double>(1.0, 0.0),
-                                    thrust::complex<double>(-T(j - 1, j).real(),
-                                                         -T(j - 1, j).imag()),
-                                    n);
+      axpby_complex<<<grid, block>>>(
+          krylov->buf1, &krylov->V[(j - 1) * n],
+          thrust::complex<double>(1.0, 0.0),
+          thrust::complex<double>(-T(j - 1, j).real(), -T(j - 1, j).imag()), n);
     }
 
     cudaMemset(&krylov->T[m * j + j], 0, sizeof(thrust::complex<double>));
     dot_complex<<<grid, block>>>(krylov->buf1, &krylov->V[j * n],
-                                &krylov->T[m * j + j], n);
+                                 &krylov->T[m * j + j], n);
     cudaMemcpy(&T(j, j), &krylov->T[m * j + j], sizeof(std::complex<double>),
                cudaMemcpyDeviceToHost);
-               
-    axpby_complex<<<grid, block>>>(krylov->buf1, &krylov->V[j * n],
-                                  thrust::complex<double>(1.0, 0.0),
-                                  thrust::complex<double>(-T(j, j).real(),
-                                                       -T(j, j).imag()),
-                                  n);
+
+    axpby_complex<<<grid, block>>>(
+        krylov->buf1, &krylov->V[j * n], thrust::complex<double>(1.0, 0.0),
+        thrust::complex<double>(-T(j, j).real(), -T(j, j).imag()), n);
 
     for (uint32_t i = 0; i <= j; i++) {
       cudaMemset(krylov->buf2, 0, sizeof(thrust::complex<double>));
       dot_complex<<<grid, block>>>(krylov->buf1, &krylov->V[i * n],
-                                  krylov->buf2, n);
+                                   krylov->buf2, n);
       thrust::complex<double> coeff;
       cudaMemcpy(&coeff, krylov->buf2, sizeof(thrust::complex<double>),
                  cudaMemcpyDeviceToHost);
-      axpby_complex<<<grid, block>>>(krylov->buf1, &krylov->V[i * n],
-                                    thrust::complex<double>(1.0, 0.0),
-                                    thrust::complex<double>(-coeff.real(),
-                                                         -coeff.imag()),
-                                    n);
+      axpby_complex<<<grid, block>>>(
+          krylov->buf1, &krylov->V[i * n], thrust::complex<double>(1.0, 0.0),
+          thrust::complex<double>(-coeff.real(), -coeff.imag()), n);
     }
 
     cudaMemset(krylov->d_beta, 0, sizeof(double));
     norm_complex<<<grid, block>>>(krylov->buf1, krylov->d_beta, n);
     scalar_sqrt_complex<<<1, 1>>>(krylov->d_beta);
     cudaDeviceSynchronize();
-    
+
     double norm_val;
-    cudaMemcpy(&norm_val, krylov->d_beta, sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&norm_val, krylov->d_beta, sizeof(double),
+               cudaMemcpyDeviceToHost);
     T(j + 1, j) = std::complex<double>(norm_val, 0.0);
     T(j, j + 1) = T(j + 1, j);
-    cudaMemcpy(&krylov->T[m * j + j + 1], &T(j + 1, j), sizeof(thrust::complex<double>),
-               cudaMemcpyHostToDevice);
-    cudaMemcpy(&krylov->T[m * (j + 1) + j], &T(j + 1, j), sizeof(thrust::complex<double>),
-               cudaMemcpyHostToDevice);
+    cudaMemcpy(&krylov->T[m * j + j + 1], &T(j + 1, j),
+               sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
+    cudaMemcpy(&krylov->T[m * (j + 1) + j], &T(j + 1, j),
+               sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
 
     inv_scale_complex<<<grid, block>>>(krylov->buf1, norm_val, n);
     cudaMemcpy(&krylov->V[(j + 1) * n], krylov->buf1,

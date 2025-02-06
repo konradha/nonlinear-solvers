@@ -11,8 +11,8 @@
 #include <random>
 #include <vector>
 
-void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A, 
-                         const uint32_t m, uint32_t num_trials = 10) {
+void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
+                          const uint32_t m, uint32_t num_trials = 10) {
   const uint32_t n = A.rows();
   std::cout << std::scientific << std::setprecision(4);
   std::cout << "n = " << n << ", m = " << m << "\n";
@@ -29,10 +29,13 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
   cudaMalloc(&d_values, A.nonZeros() * sizeof(thrust::complex<double>));
 
   cudaMemcpy(d_row_ptr, row_ptr, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_col_ind, col_ind, A.nonZeros() * sizeof(int), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_values, values, A.nonZeros() * sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_col_ind, col_ind, A.nonZeros() * sizeof(int),
+             cudaMemcpyHostToDevice);
+  cudaMemcpy(d_values, values, A.nonZeros() * sizeof(thrust::complex<double>),
+             cudaMemcpyHostToDevice);
 
-  DeviceSpMV<thrust::complex<double>> spmv(d_row_ptr, d_col_ind, d_values, n, A.nonZeros());
+  DeviceSpMV<thrust::complex<double>> spmv(d_row_ptr, d_col_ind, d_values, n,
+                                           A.nonZeros());
 
   KrylovInfoComplex krylov;
   cudaMalloc((void **)&krylov.V, n * m * sizeof(thrust::complex<double>));
@@ -64,7 +67,8 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
     auto [V_eigen, T_eigen, beta_eigen] = lanczos_L(A, u, m);
     auto cpu_end = std::chrono::high_resolution_clock::now();
     avg_eigen_time += std::chrono::duration_cast<std::chrono::microseconds>(
-                          cpu_end - cpu_start).count();
+                          cpu_end - cpu_start)
+                          .count();
 
     cudaMemcpy(krylov.buf1, u.data(), n * sizeof(thrust::complex<double>),
                cudaMemcpyHostToDevice);
@@ -82,16 +86,21 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
       std::vector<std::complex<double>> V_gpu(n * m);
       std::vector<std::complex<double>> T_gpu(m * m);
 
-      cudaMemcpy(V_gpu.data(), krylov.V, n * m * sizeof(thrust::complex<double>),
+      cudaMemcpy(V_gpu.data(), krylov.V,
+                 n * m * sizeof(thrust::complex<double>),
                  cudaMemcpyDeviceToHost);
-      cudaMemcpy(T_gpu.data(), krylov.T, m * m * sizeof(thrust::complex<double>),
+      cudaMemcpy(T_gpu.data(), krylov.T,
+                 m * m * sizeof(thrust::complex<double>),
                  cudaMemcpyDeviceToHost);
 
-      Eigen::Map<Eigen::MatrixX<std::complex<double>>> V_gpu_map(V_gpu.data(), n, m);
-      Eigen::Map<Eigen::MatrixX<std::complex<double>>> T_gpu_map(T_gpu.data(), m, m);
+      Eigen::Map<Eigen::MatrixX<std::complex<double>>> V_gpu_map(V_gpu.data(),
+                                                                 n, m);
+      Eigen::Map<Eigen::MatrixX<std::complex<double>>> T_gpu_map(T_gpu.data(),
+                                                                 m, m);
 
       if (V_gpu_map.hasNaN() || T_gpu_map.hasNaN()) {
-        std::cout << "First column of V norm: " << V_gpu_map.col(0).norm() << "\n";
+        std::cout << "First column of V norm: " << V_gpu_map.col(0).norm()
+                  << "\n";
         std::cout << "T diagonal elements:\n";
         for (int i = 0; i < std::min(5, (int)m); ++i) {
           std::cout << T_gpu_map(i, i) << " ";
@@ -115,7 +124,8 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
 
   std::cout << "Average Eigen time: " << avg_eigen_time << " us\n";
   std::cout << "Average GPU time:   " << avg_gpu_time * 1000.0 << " us\n";
-  std::cout << "Speedup: " << avg_eigen_time / (avg_gpu_time * 1000.0) << "x\n\n";
+  std::cout << "Speedup: " << avg_eigen_time / (avg_gpu_time * 1000.0)
+            << "x\n\n";
 
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
@@ -142,9 +152,9 @@ int main(int argc, char **argv) {
     double dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
     Eigen::SparseMatrix<std::complex<double>> A =
         build_laplacian_noflux<std::complex<double>>(nx - 2, ny - 2, dx, dy);
-    
+
     // Another nice test case
-    //for (int k = 0; k < A.nonZeros(); k++) {
+    // for (int k = 0; k < A.nonZeros(); k++) {
     //  A.valuePtr()[k] *= std::complex<double>(1.0, 1.0);
     //}
 

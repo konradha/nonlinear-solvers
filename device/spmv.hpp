@@ -15,10 +15,14 @@ private:
   uint32_t nnz_;
 
   cudaDataType cuda_data_type() const {
-    if constexpr (std::is_same_v<T, float>) return CUDA_R_32F;
-    if constexpr (std::is_same_v<T, double>) return CUDA_R_64F;
-    if constexpr (std::is_same_v<T, thrust::complex<float>>) return CUDA_C_32F;
-    if constexpr (std::is_same_v<T, thrust::complex<double>>) return CUDA_C_64F;
+    if constexpr (std::is_same_v<T, float>)
+      return CUDA_R_32F;
+    if constexpr (std::is_same_v<T, double>)
+      return CUDA_R_64F;
+    if constexpr (std::is_same_v<T, thrust::complex<float>>)
+      return CUDA_C_32F;
+    if constexpr (std::is_same_v<T, thrust::complex<double>>)
+      return CUDA_C_64F;
     throw std::runtime_error("Unsupported type");
   }
 
@@ -48,7 +52,8 @@ public:
   }
 
   ~DeviceSpMV() {
-    if (buffer_) CHECK_CUDA(cudaFree(buffer_));
+    if (buffer_)
+      CHECK_CUDA(cudaFree(buffer_));
     CHECK_CUDA(cudaFree(d_x_));
     CHECK_CUDA(cudaFree(d_y_));
     CHECK_CUSPARSE(cusparseDestroyDnVec(vec_x_));
@@ -61,9 +66,9 @@ public:
     T alpha(1), beta(0);
     CHECK_CUSPARSE(cusparseDnVecSetValues(vec_x_, (void *)d_x));
     CHECK_CUSPARSE(cusparseDnVecSetValues(vec_y_, d_y));
-    CHECK_CUSPARSE(cusparseSpMV(handle_, CUSPARSE_OPERATION_NON_TRANSPOSE,
-                               &alpha, mat_desc_, vec_x_, &beta, vec_y_,
-                               cuda_data_type(), CUSPARSE_SPMV_CSR_ALG2, buffer_));
+    CHECK_CUSPARSE(cusparseSpMV(
+        handle_, CUSPARSE_OPERATION_NON_TRANSPOSE, &alpha, mat_desc_, vec_x_,
+        &beta, vec_y_, cuda_data_type(), CUSPARSE_SPMV_CSR_ALG2, buffer_));
   }
 };
 #endif
