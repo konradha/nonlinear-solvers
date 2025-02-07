@@ -130,13 +130,12 @@ public:
     Eigen::MatrixX<double> V = Eigen::MatrixX<double>::Zero(n_, m_);
     Eigen::MatrixX<double> T = Eigen::MatrixX<double>::Zero(m_, m_);
 
-    //double beta;
-    //Eigen::VectorX<double> eigenvalues(m_);
-    //Eigen::MatrixX<double> eigenvectors(m_, m_);
-    
+    // double beta;
+    // Eigen::VectorX<double> eigenvalues(m_);
+    // Eigen::MatrixX<double> eigenvectors(m_, m_);
+
     lanczos_iteration(spmv_, &krylov_, input);
     cudaDeviceSynchronize();
-
 
     compute_eigen_decomposition();
 
@@ -178,8 +177,8 @@ public:
     cudaMemcpy(result, res.data(), n_ * sizeof(double), cudaMemcpyHostToDevice);
     */
 
-    // TODO: figure out error in these kernels!    
-    compute_transform(t/2, type);    
+    // TODO: figure out error in these kernels!
+    compute_transform(t / 2, type);
     compute_matrix_function();
     apply_to_first_column(result);
   }

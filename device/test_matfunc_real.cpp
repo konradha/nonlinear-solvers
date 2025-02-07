@@ -63,7 +63,7 @@ void test_matfunc(const Eigen::SparseMatrix<double> &A, uint32_t m,
                cudaMemcpyHostToDevice);
 
     auto cpu_start = std::chrono::high_resolution_clock::now();
-    Eigen::VectorXd ref_sinc2 =  sinc2_sqrt_half<double>(A, input_vec, dt, m);
+    Eigen::VectorXd ref_sinc2 = sinc2_sqrt_half<double>(A, input_vec, dt, m);
     auto cpu_end = std::chrono::high_resolution_clock::now();
     avg_cpu_time += std::chrono::duration_cast<std::chrono::microseconds>(
                         cpu_end - cpu_start)

@@ -89,7 +89,7 @@ void test_lanczos(const Eigen::SparseMatrix<double> &A, const uint32_t m,
                  cudaMemcpyDeviceToHost);
       cudaMemcpy(T_gpu.data(), krylov.T, m * m * sizeof(double),
                  cudaMemcpyDeviceToHost);
-      cudaMemcpy(&beta, krylov.d_beta, sizeof(double), cudaMemcpyDeviceToHost); 
+      cudaMemcpy(&beta, krylov.d_beta, sizeof(double), cudaMemcpyDeviceToHost);
 
       Eigen::Map<Eigen::MatrixXd> V_gpu_map(V_gpu.data(), n, m);
       Eigen::Map<Eigen::MatrixXd> T_gpu_map(T_gpu.data(), m, m);
