@@ -5,6 +5,8 @@
 #include "pragmas.hpp"
 #include "spmv.hpp"
 
+#include <iostream>
+
 __global__ void transform_cos_sqrt(double *transform, const double *eigenvalues,
                                    double t, uint32_t m, double threshold) {
   uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -65,9 +67,10 @@ public:
   enum class FunctionType { COS_SQRT, SINC2_SQRT, ID_SQRT };
 
   struct Parameters {
-    uint32_t block_size_1d = 64;
-    uint32_t block_size_2d = 8;
-    double sinc_threshold = 1e-14;
+    uint32_t block_size_1d;
+    uint32_t block_size_2d;
+    double sinc_threshold;
+    Parameters() : block_size_1d(64), block_size_2d(8), sinc_threshold(1e-8) {}
   };
 
   MatrixFunctionApplicatorReal(const int *d_row_ptr, const int *d_col_ind,
@@ -124,16 +127,19 @@ public:
   }
 
   void apply(double *result, const double *input, double t, FunctionType type) {
-    lanczos_iteration(*spmv_, &krylov_, input);
-    compute_eigen_decomposition();
-
-    // Working on porting this to device
     Eigen::MatrixX<double> V = Eigen::MatrixX<double>::Zero(n_, m_);
     Eigen::MatrixX<double> T = Eigen::MatrixX<double>::Zero(m_, m_);
     double beta;
     Eigen::VectorX<double> eigenvalues(m_);
     Eigen::MatrixX<double> eigenvectors(m_, m_);
+    
+    lanczos_iteration(spmv_, &krylov_, input);
+    cudaDeviceSynchronize();
 
+
+    compute_eigen_decomposition();
+
+    // Working on porting this to device
     cudaMemcpy(&beta, krylov_.d_beta, sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(V.data(), krylov_.V, n_ * m_ * sizeof(double),
                cudaMemcpyDeviceToHost);
@@ -143,6 +149,11 @@ public:
                cudaMemcpyDeviceToHost);
     cudaMemcpy(eigenvectors.data(), d_eigenvectors_, m_ * m_ * sizeof(double),
                cudaMemcpyDeviceToHost);
+
+    std::cout << "V.col(0) device\n";
+    std::cout << V.col(0) << "\n";
+
+
 
     Eigen::MatrixX<double> sinc_sqrt_T =
         (eigenvectors *

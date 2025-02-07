@@ -63,7 +63,7 @@ void test_matfunc(const Eigen::SparseMatrix<double> &A, uint32_t m,
                cudaMemcpyHostToDevice);
 
     auto cpu_start = std::chrono::high_resolution_clock::now();
-    Eigen::VectorXd ref_sinc2 = sinc2_sqrt_multiply(A, input_vec, dt, m);
+    Eigen::VectorXd ref_sinc2 =  sinc2_sqrt_half<double>(A, input_vec, dt, m);
     auto cpu_end = std::chrono::high_resolution_clock::now();
     avg_cpu_time += std::chrono::duration_cast<std::chrono::microseconds>(
                         cpu_end - cpu_start)
@@ -83,7 +83,7 @@ void test_matfunc(const Eigen::SparseMatrix<double> &A, uint32_t m,
     Eigen::Map<Eigen::VectorXd> gpu_sinc2(result.data(), n);
     Eigen::VectorXd diff_sinc2 = ref_sinc2 - gpu_sinc2;
 
-    if (trial == 0) {
+    /*if (trial == 0)*/ {
       std::cout << "sinc2_sqrt diff: L1 = " << diff_sinc2.lpNorm<1>()
                 << ", L2 = " << diff_sinc2.norm() << "\n";
     }
@@ -107,8 +107,8 @@ void test_matfunc(const Eigen::SparseMatrix<double> &A, uint32_t m,
 
 int main(int argc, char **argv) {
   setbuf(stdout, NULL);
-  auto ns = {50, 100, 200};
-  std::vector<uint32_t> krylov_dims = {10, 20, 30};
+  auto ns = {50};
+  std::vector<uint32_t> krylov_dims = {10};
 
   for (auto ni : ns) {
     const uint32_t nx = ni;
@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
         build_laplacian_noflux<double>(nx - 2, ny - 2, dx, dy);
 
     for (auto m : krylov_dims) {
-      test_matfunc(A, m);
+      test_matfunc(-A, m);
     }
   }
   return 0;

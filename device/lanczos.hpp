@@ -4,6 +4,8 @@
 #include "pragmas.hpp"
 #include "spmv.hpp"
 
+#include <iostream>
+
 #define NUM_BLOCKS 256
 #define BLOCK_SIZE 256
 
@@ -95,10 +97,8 @@ __global__ void scalar_sqrt(double *__restrict__ x) {
     x[0] = sqrt(x[0]);
 }
 
-void lanczos_iteration(const Eigen::SparseMatrix<double> &L,
-                       DeviceSpMV<double> *spmv, KrylovInfo *krylov,
-                       const double *__restrict__ u,
-                       const Eigen::VectorX<double> u_cpu) {
+void lanczos_iteration(DeviceSpMV<double> *spmv, KrylovInfo *krylov,
+                       const double *__restrict__ u) {
 
   const uint32_t n = krylov->n;
   const uint32_t m = krylov->m;
@@ -118,8 +118,9 @@ void lanczos_iteration(const Eigen::SparseMatrix<double> &L,
 
   // this small matrix will disappear after some optimization such that this
   // entire function runs on device only
-  Eigen::MatrixX<double> T(m, m);
+  Eigen::MatrixX<double> T = Eigen::MatrixX<double>::Zero(m, m);
   cudaMemset(krylov->T, 0, m * m * sizeof(double));
+  cudaMemset(krylov->V, 0, n * m * sizeof(double));
   for (uint32_t j = 0; j < m - 1; j++) {
     spmv->multiply(&krylov->V[j * n], krylov->buf1);
     if (j > 0) {
@@ -151,12 +152,18 @@ void lanczos_iteration(const Eigen::SparseMatrix<double> &L,
                sizeof(double), cudaMemcpyDeviceToDevice);
     cudaMemcpy(&T(j + 1, j), krylov->T + m * j + j + 1, sizeof(double),
                cudaMemcpyDeviceToHost);
+    cudaMemcpy(&T(j, j + 1), krylov->T + m * j + j + 1, sizeof(double),
+               cudaMemcpyDeviceToHost);
 
     // V.col(j + 1) = w / T(j + 1, j);
     inv_scale<<<grid, block>>>(krylov->buf1, T(j + 1, j), n);
     cudaMemcpy(&krylov->V[(j + 1) * n], krylov->buf1, n * sizeof(double),
                cudaMemcpyDeviceToHost);
   }
+  Eigen::MatrixX<double> V = Eigen::MatrixX<double>::Zero(n, m);
+  cudaMemcpy(V.data(), krylov->V, n * m * sizeof(double), cudaMemcpyDeviceToHost); 
+  std::cout << "Device V.col(0) after Lanczos done:\n";
+  std::cout << V.col(0) << "\n";
 }
 
 #endif
