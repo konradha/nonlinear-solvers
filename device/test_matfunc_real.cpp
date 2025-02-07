@@ -70,7 +70,7 @@ void test_matfunc(const Eigen::SparseMatrix<double> &A, uint32_t m,
                         .count();
 
     cudaEventRecord(start);
-    matfunc.apply(d_result, d_input, dt / 2,
+    matfunc.apply(d_result, d_input, dt,
                   MatrixFunctionApplicatorReal::FunctionType::SINC2_SQRT);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -107,8 +107,8 @@ void test_matfunc(const Eigen::SparseMatrix<double> &A, uint32_t m,
 
 int main(int argc, char **argv) {
   setbuf(stdout, NULL);
-  auto ns = {50};
-  std::vector<uint32_t> krylov_dims = {10};
+  auto ns = {50, 100, 200};
+  std::vector<uint32_t> krylov_dims = {10, 20, 30};
 
   for (auto ni : ns) {
     const uint32_t nx = ni;

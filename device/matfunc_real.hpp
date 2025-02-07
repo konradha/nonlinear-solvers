@@ -8,7 +8,7 @@
 #include <iostream>
 
 __global__ void transform_cos_sqrt(double *transform, const double *eigenvalues,
-                                   double t, uint32_t m, double threshold) {
+                                   double t, uint32_t m) {
   uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < m) {
     transform[idx] = cos(t * sqrt(abs(eigenvalues[idx])));
@@ -107,7 +107,7 @@ public:
     grid_dim_2d_ = dim3((m + block_dim_2d_.x - 1) / block_dim_2d_.x,
                         (m + block_dim_2d_.y - 1) / block_dim_2d_.y);
     block_dim_1d_ = dim3(params_.block_size_1d);
-    grid_dim_1d_ = dim3((n + block_dim_1d_.x - 1) / block_dim_1d_.x);
+    grid_dim_1d_ = dim3(block_dim_1d_.x);
   }
 
   ~MatrixFunctionApplicatorReal() {
@@ -129,9 +129,10 @@ public:
   void apply(double *result, const double *input, double t, FunctionType type) {
     Eigen::MatrixX<double> V = Eigen::MatrixX<double>::Zero(n_, m_);
     Eigen::MatrixX<double> T = Eigen::MatrixX<double>::Zero(m_, m_);
-    double beta;
-    Eigen::VectorX<double> eigenvalues(m_);
-    Eigen::MatrixX<double> eigenvectors(m_, m_);
+
+    //double beta;
+    //Eigen::VectorX<double> eigenvalues(m_);
+    //Eigen::MatrixX<double> eigenvectors(m_, m_);
     
     lanczos_iteration(spmv_, &krylov_, input);
     cudaDeviceSynchronize();
@@ -139,6 +140,7 @@ public:
 
     compute_eigen_decomposition();
 
+    /*
     // Working on porting this to device
     cudaMemcpy(&beta, krylov_.d_beta, sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(V.data(), krylov_.V, n_ * m_ * sizeof(double),
@@ -150,10 +152,15 @@ public:
     cudaMemcpy(eigenvectors.data(), d_eigenvectors_, m_ * m_ * sizeof(double),
                cudaMemcpyDeviceToHost);
 
-    std::cout << "V.col(0) device\n";
-    std::cout << V.col(0) << "\n";
+    //std::cout << "V.col(0) device\n";
+    //std::cout << V.col(0) << "\n";
+    //std::cout << "T device\n";
+    //std::cout << T << "\n";
 
-
+    //eigenvectors = eigenvectors.transpose();
+    //Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<double>> es(T);
+    //eigenvalues = es.eigenvalues();
+    //eigenvectors = es.eigenvectors();
 
     Eigen::MatrixX<double> sinc_sqrt_T =
         (eigenvectors *
@@ -169,12 +176,12 @@ public:
     e1(0) = 1.0;
     Eigen::VectorX<double> res = beta * V * sinc_sqrt_T * e1;
     cudaMemcpy(result, res.data(), n_ * sizeof(double), cudaMemcpyHostToDevice);
+    */
 
-    /*
-    compute_transform(t, type);
+    // TODO: figure out error in these kernels!    
+    compute_transform(t/2, type);    
     compute_matrix_function();
     apply_to_first_column(result);
-    */
   }
 
 private:
@@ -191,16 +198,16 @@ private:
     switch (type) {
     case FunctionType::COS_SQRT:
       transform_cos_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(
-          d_transform_, d_eigenvalues_, t, m_, params_.sinc_threshold);
-      break;
+          d_transform_, d_eigenvalues_, t, m_);
+      return;
     case FunctionType::SINC2_SQRT:
       transform_sinc2_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(
           d_transform_, d_eigenvalues_, t, m_, params_.sinc_threshold);
-      break;
+      return;
     case FunctionType::ID_SQRT:
       transform_id_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(d_transform_,
                                                          d_eigenvalues_, t, m_);
-      break;
+      return;
     }
   }
 
@@ -210,8 +217,10 @@ private:
   }
 
   void apply_to_first_column(double *result) {
+    double beta;
+    cudaMemcpy(&beta, (krylov_.d_beta), sizeof(double), cudaMemcpyDeviceToHost);
     apply_to_first_column_kernel<<<grid_dim_1d_, block_dim_1d_>>>(
-        result, krylov_.V, d_work_, *krylov_.d_beta, n_, m_);
+        result, krylov_.V, d_work_, beta, n_, m_);
   }
 
   DeviceSpMV<double> *spmv_;

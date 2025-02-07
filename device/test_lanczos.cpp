@@ -71,7 +71,7 @@ void test_lanczos(const Eigen::SparseMatrix<double> &A, const uint32_t m,
                cudaMemcpyHostToDevice);
 
     cudaEventRecord(start);
-    lanczos_iteration(A, &spmv, &krylov, krylov.buf1, u);
+    lanczos_iteration(&spmv, &krylov, krylov.buf1);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
@@ -83,11 +83,13 @@ void test_lanczos(const Eigen::SparseMatrix<double> &A, const uint32_t m,
     if (trial == 0) {
       std::vector<double> V_gpu(n * m);
       std::vector<double> T_gpu(m * m);
+      double beta;
 
       cudaMemcpy(V_gpu.data(), krylov.V, n * m * sizeof(double),
                  cudaMemcpyDeviceToHost);
       cudaMemcpy(T_gpu.data(), krylov.T, m * m * sizeof(double),
                  cudaMemcpyDeviceToHost);
+      cudaMemcpy(&beta, krylov.d_beta, sizeof(double), cudaMemcpyDeviceToHost); 
 
       Eigen::Map<Eigen::MatrixXd> V_gpu_map(V_gpu.data(), n, m);
       Eigen::Map<Eigen::MatrixXd> T_gpu_map(T_gpu.data(), m, m);
@@ -112,6 +114,9 @@ void test_lanczos(const Eigen::SparseMatrix<double> &A, const uint32_t m,
                 << ", L2 = " << V_diff.norm() << "\n";
       std::cout << "T diff: L1 = " << T_diff.lpNorm<1>()
                 << ", L2 = " << T_diff.norm() << "\n";
+
+      std::cout << "beta Eigen: " << beta_eigen << "\n";
+      std::cout << "beta dev:   " << beta << "\n";
       std::cout << "\n";
     }
   }

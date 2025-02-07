@@ -98,10 +98,10 @@ __global__ void scalar_sqrt(double *__restrict__ x) {
 }
 
 void lanczos_iteration(DeviceSpMV<double> *spmv, KrylovInfo *krylov,
-                       const double *__restrict__ u) {
-
+                       const double *__restrict__ u) { 
   const uint32_t n = krylov->n;
   const uint32_t m = krylov->m;
+  cudaMemset(krylov->V, 0, n * m * sizeof(double));
   dim3 grid(NUM_BLOCKS);
   dim3 block(BLOCK_SIZE);
   cudaMemcpy(krylov->V, (void *)u, n * sizeof(double),
@@ -119,8 +119,7 @@ void lanczos_iteration(DeviceSpMV<double> *spmv, KrylovInfo *krylov,
   // this small matrix will disappear after some optimization such that this
   // entire function runs on device only
   Eigen::MatrixX<double> T = Eigen::MatrixX<double>::Zero(m, m);
-  cudaMemset(krylov->T, 0, m * m * sizeof(double));
-  cudaMemset(krylov->V, 0, n * m * sizeof(double));
+  cudaMemset(krylov->T, 0, m * m * sizeof(double)); 
   for (uint32_t j = 0; j < m - 1; j++) {
     spmv->multiply(&krylov->V[j * n], krylov->buf1);
     if (j > 0) {
@@ -158,12 +157,12 @@ void lanczos_iteration(DeviceSpMV<double> *spmv, KrylovInfo *krylov,
     // V.col(j + 1) = w / T(j + 1, j);
     inv_scale<<<grid, block>>>(krylov->buf1, T(j + 1, j), n);
     cudaMemcpy(&krylov->V[(j + 1) * n], krylov->buf1, n * sizeof(double),
-               cudaMemcpyDeviceToHost);
+               cudaMemcpyDeviceToDevice);
   }
-  Eigen::MatrixX<double> V = Eigen::MatrixX<double>::Zero(n, m);
-  cudaMemcpy(V.data(), krylov->V, n * m * sizeof(double), cudaMemcpyDeviceToHost); 
-  std::cout << "Device V.col(0) after Lanczos done:\n";
-  std::cout << V.col(0) << "\n";
+  //Eigen::MatrixX<double> V = Eigen::MatrixX<double>::Zero(n, m);
+  //cudaMemcpy(V.data(), krylov->V, n * m * sizeof(double), cudaMemcpyDeviceToHost); 
+  //std::cout << "Device V.col(0) after Lanczos done:\n";
+  //std::cout << V.col(0) << "\n";
 }
 
 #endif
