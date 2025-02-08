@@ -107,7 +107,7 @@ void test_matfunc(const Eigen::SparseMatrix<double> &A, uint32_t m,
 
 int main(int argc, char **argv) {
   setbuf(stdout, NULL);
-  auto ns = {50, 100, 200};
+  auto ns = {50, 100};
   std::vector<uint32_t> krylov_dims = {10, 20, 30};
 
   for (auto ni : ns) {

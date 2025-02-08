@@ -102,9 +102,17 @@ Eigen::VectorX<Float> sinc2_sqrt_half(const Eigen::SparseMatrix<Float> &L,
                                       const Eigen::VectorX<Float> &u, Float t,
                                       const uint32_t m = 10) {
   const auto [V, T, beta] = lanczos_L(L, u, m);
-  //std::cout << "T Eigen host:\n";
-  //std::cout << T << "\n";
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
+
+  //std::cout << "Eigen host beta\n";
+  //std::cout << beta << "\n";
+  //std::cout << "Eigen host eigenvectors\n";
+  //std::cout << es.eigenvectors() << "\n";
+  //std::cout << "Eigen host eigenvalues\n";
+  //std::cout << es.eigenvalues() << "\n"; 
+  //std::cout << "Eigen host V.row(0)\n";
+  //std::cout << V.row(0) << "\n";
+
   Eigen::MatrixX<Float> sinc_sqrt_T =
       (es.eigenvectors() *
        (t / 2. * es.eigenvalues().array().abs().sqrt())
