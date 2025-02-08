@@ -131,9 +131,18 @@ public:
     cudaMemset(d_diag_, 0.0, m_ * sizeof(double));
     //cudaMemset(result, 0.0, n_ * sizeof(double));
     //cudaMemset(d_small_result_, 0.0, m_ * m_ * sizeof(double));
+    block_dim_1d_ = dim3(256);
+    grid_dim_1d_ = dim3((n_ + block_dim_1d_.x - 1) / block_dim_1d_.x);
+    block_dim_2d_ = dim3(16, 16);
+    grid_dim_2d_ = dim3((m_ + block_dim_2d_.x - 1) / block_dim_2d_.x,
+                      (m_ + block_dim_2d_.y - 1) / block_dim_2d_.y);
+
     
     transform_eigenvals<<<grid_dim_1d_, block_dim_1d_>>>(d_diag_, d_eigenvalues_, t / 2, m_);
+
+      
     eigvec_transform<<<grid_dim_2d_, block_dim_2d_>>>(d_small_result_, d_eigenvectors_, d_diag_, m_);
+
     final_multiply<<<grid_dim_1d_, block_dim_1d_>>>(result, krylov_.V, d_small_result_, beta, n_, m_);
 
      
@@ -235,6 +244,9 @@ private:
   dim3 block_dim_2d_;
   dim3 grid_dim_1d_;
   dim3 block_dim_1d_;
+
+  dim3 block_dim_large_;
+  dim3 grid_dim_large_;
   Parameters params_;
 };
 
