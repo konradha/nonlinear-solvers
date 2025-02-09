@@ -40,11 +40,27 @@ __global__ void transform_eigenvals_id_sqrt(double *out, const double *eigvals,
 }
 
 // K2: Q f(λ) Q^T
+/*
 __global__ void eigvec_transform(double *out, const double *Q,
                                  const double *f_lambda, const uint32_t m) {
   // let's take a single block -- might become problematic for large m!
   int i = threadIdx.x;
   int j = threadIdx.y;
+  if (i < m && j < m) {
+    double sum = 0.0;
+    for (int k = 0; k < m; k++) {
+      sum += Q[k * m + i] * f_lambda[k] * Q[k * m + j];
+    }
+    out[i * m + j] = sum;
+  }
+}
+// taking the single thread block might be problematic, let's try the other approach below
+*/
+
+__global__ void eigvec_transform(double *out, const double *Q,
+                               const double *f_lambda, const uint32_t m) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  const int j = blockIdx.y * blockDim.y + threadIdx.y;
   if (i < m && j < m) {
     double sum = 0.0;
     for (int k = 0; k < m; k++) {
