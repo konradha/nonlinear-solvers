@@ -8,12 +8,34 @@
 #include <iostream>
 
 // K1: f(t sqrt(λ_i))
-__global__ void transform_eigenvals(double *out, const double *eigvals,
+
+// sinc²
+__global__ void transform_eigenvals_sinc2_sqrt(double *out, const double *eigvals,
                                     const double t, const uint32_t m) {
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   if (i < m) {
     double x = t * sqrt(abs(eigvals[i]));
     out[i] = (abs(x) < 1e-8) ? 1.0 : pow(sin(x) / x, 2);
+  }
+}
+
+// cos
+__global__ void transform_eigenvals_cos_sqrt(double *out, const double *eigvals,
+                                    const double t, const uint32_t m) {
+  int i = threadIdx.x + blockIdx.x * blockDim.x;
+  if (i < m) {
+    double x = t * sqrt(abs(eigvals[i]));
+    out[i] = cos(x);
+  }
+}
+
+// Id
+__global__ void transform_eigenvals_id_sqrt(double *out, const double *eigvals,
+                                    const double t, const uint32_t m) {
+  int i = threadIdx.x + blockIdx.x * blockDim.x;
+  if (i < m) {
+    double x = t * sqrt(abs(eigvals[i]));
+    out[i] = x;
   }
 }
 
@@ -53,6 +75,22 @@ __global__ void final_multiply(double *result, const double *V,
 class MatrixFunctionApplicatorReal {
 public:
   enum class FunctionType { COS_SQRT, SINC2_SQRT, ID_SQRT };
+
+  void print_type(FunctionType t) const {
+	  switch (t) {
+		  case FunctionType::COS_SQRT:
+			  std::cout << "type is cos sqrt\n";
+			  break;
+		  case FunctionType::SINC2_SQRT:
+			  std::cout << "type is sinc2 sqrt\n";
+			  break;
+		  case FunctionType::ID_SQRT:
+			  std::cout << "type is Id sqrt\n";
+			  break;
+		  default:
+			  throw std::runtime_error("Invalid matrix func call");
+	  }
+  }
 
   struct Parameters {
     uint32_t block_size_1d;
@@ -120,78 +158,49 @@ public:
   }
 
   void apply(double *result, const double *input, double t, FunctionType type) {
-
     lanczos_iteration(spmv_, &krylov_, input);
     cudaDeviceSynchronize();
+
     double beta;
     cudaMemcpy(&beta, krylov_.d_beta, sizeof(double), cudaMemcpyDeviceToHost);
     compute_eigen_decomposition();
 
-    cudaMemset(d_diag_, 0.0, m_ * sizeof(double));
-    // cudaMemset(result, 0.0, n_ * sizeof(double));
-    // cudaMemset(d_small_result_, 0.0, m_ * m_ * sizeof(double));
+    cudaMemset(d_diag_, 0.0, m_ * sizeof(double)); 
     block_dim_1d_ = dim3(256);
+    // TODO this might need better parametrization depending on sqrt(n) or even n^(1/3) (if 3d case)
     grid_dim_1d_ = dim3((n_ + block_dim_1d_.x - 1) / block_dim_1d_.x);
     block_dim_2d_ = dim3(16, 16);
     grid_dim_2d_ = dim3((m_ + block_dim_2d_.x - 1) / block_dim_2d_.x,
                         (m_ + block_dim_2d_.y - 1) / block_dim_2d_.y);
 
-    transform_eigenvals<<<grid_dim_1d_, block_dim_1d_>>>(
-        d_diag_, d_eigenvalues_, t / 2, m_);
+    // TODO check if the values _actually_ check out -- ie. if time stepping agrees let's just keep it at first
+    // and optimize kernels and kernel tuning later
+
+    // print_type(type);
+    switch (type) {
+	    case FunctionType::SINC2_SQRT:
+		transform_eigenvals_sinc2_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(
+        	d_diag_, d_eigenvalues_, t, m_);
+		break;
+	    case FunctionType::COS_SQRT:
+		transform_eigenvals_cos_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(
+        	d_diag_, d_eigenvalues_, t, m_);
+		break;	
+	    case FunctionType::ID_SQRT:
+		transform_eigenvals_id_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(
+        	d_diag_, d_eigenvalues_, t, m_);
+		break;
+
+	default:
+		throw std::runtime_error("Invalid Matfunc call");
+    }
+    
 
     eigvec_transform<<<grid_dim_2d_, block_dim_2d_>>>(
         d_small_result_, d_eigenvectors_, d_diag_, m_);
 
     final_multiply<<<grid_dim_1d_, block_dim_1d_>>>(
         result, krylov_.V, d_small_result_, beta, n_, m_);
-
-    /*
-
-
-    // Working on porting this to device
-    cudaMemcpy(&beta, krylov_.d_beta, sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(V.data(), krylov_.V, n_ * m_ * sizeof(double),
-               cudaMemcpyDeviceToHost);
-    cudaMemcpy(T.data(), krylov_.T, m_ * m_ * sizeof(double),
-               cudaMemcpyDeviceToHost);
-    cudaMemcpy(eigenvalues.data(), d_eigenvalues_, m_ * sizeof(double),
-               cudaMemcpyDeviceToHost);
-    cudaMemcpy(eigenvectors.data(), d_eigenvectors_, m_ * m_ * sizeof(double),
-               cudaMemcpyDeviceToHost);
-
-    std::cout << "device beta:\n";
-    std::cout << beta << "\n";
-    std::cout << "device eigenvectors:\n";
-    std::cout << eigenvectors << "\n";
-    std::cout << "device eigenvalues:\n";
-    std::cout << eigenvalues << "\n";
-
-
-    std::cout << "device V.row(0)\n";
-    std::cout << V.row(0) << "\n";
-
-
-
-    //eigenvectors = eigenvectors.transpose();
-    //Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<double>> es(T);
-    //eigenvalues = es.eigenvalues();
-    //eigenvectors = es.eigenvectors();
-
-    Eigen::MatrixX<double> sinc_sqrt_T =
-        (eigenvectors *
-         (t / 2. * eigenvalues.array().abs().sqrt())
-             .unaryExpr([](double x) {
-               return std::abs(x) < 1e-8 ? 1.0 : std::sin(x) / x;
-             })
-             .square()
-             .matrix()
-             .asDiagonal() *
-         eigenvectors.transpose());
-    Eigen::VectorX<double> e1 = Eigen::VectorX<double>::Zero(T.rows());
-    e1(0) = 1.0;
-    Eigen::VectorX<double> res = beta * V * sinc_sqrt_T * e1;
-    cudaMemcpy(result, res.data(), n_ * sizeof(double), cudaMemcpyHostToDevice);
-    */
   }
 
 private:
@@ -204,23 +213,6 @@ private:
                      d_info_);
   }
 
-  // void compute_transform(double t, FunctionType type) {
-  //   switch (type) {
-  //   case FunctionType::COS_SQRT:
-  //     transform_cos_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(
-  //         d_transform_, d_eigenvalues_, t, m_);
-  //     return;
-  //   case FunctionType::SINC2_SQRT:
-  //     transform_sinc2_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(
-  //         d_transform_, d_eigenvalues_, t, m_, params_.sinc_threshold);
-  //     return;
-  //   case FunctionType::ID_SQRT:
-  //     transform_id_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(d_transform_,
-  //                                                        d_eigenvalues_, t,
-  //                                                        m_);
-  //     return;
-  //   }
-  // }
   double *d_diag_;
   double *d_small_result_;
 

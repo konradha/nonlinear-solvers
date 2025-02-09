@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=real_matfunc_test  
-#SBATCH --time=00:03:00         
+#SBATCH --time=00:12:00         
 #SBATCH --mem-per-cpu=4G                          
 #SBATCH --gpus=1    
 #SBATCH --output=real_matfunc_test_%j.out     
