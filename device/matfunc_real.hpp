@@ -174,12 +174,24 @@ public:
   }
 
   void apply(double *result, const double *input, double t, FunctionType type) {
+    std::vector<double> input_vec(n_);
+    cudaMemcpy(input_vec.data(), input, n_ * sizeof(double), cudaMemcpyDeviceToHost);
+
     lanczos_iteration(spmv_, &krylov_, input);
     cudaDeviceSynchronize();
 
     double beta;
     cudaMemcpy(&beta, krylov_.d_beta, sizeof(double), cudaMemcpyDeviceToHost);
     compute_eigen_decomposition();
+
+    std::vector<double> eigenvals(m_);
+    cudaMemcpy(eigenvals.data(), d_eigenvalues_, m_ * sizeof(double), cudaMemcpyDeviceToHost);
+    std::cout << "Device eigenvalues: ";
+    for(uint32_t i = 0; i < m_; ++i)
+        std::cout << eigenvals[i] << " ";
+    std::cout << "\n";
+
+
 
     cudaMemset(d_diag_, 0.0, m_ * sizeof(double)); 
     block_dim_1d_ = dim3(256);
@@ -214,6 +226,13 @@ public:
 
     eigvec_transform<<<grid_dim_2d_, block_dim_2d_>>>(
         d_small_result_, d_eigenvectors_, d_diag_, m_);
+
+    std::vector<double> transformed(m_);
+    cudaMemcpy(transformed.data(), d_diag_, m_ * sizeof(double), cudaMemcpyDeviceToHost);
+    std::cout << "Device transformed eigenvalues (first 5): ";
+    for(uint32_t i = 0; i < std::min(5u, m_); ++i)
+        std::cout << transformed[i] << " ";
+    std::cout << "\n";
 
     final_multiply<<<grid_dim_1d_, block_dim_1d_>>>(
         result, krylov_.V, d_small_result_, beta, n_, m_);

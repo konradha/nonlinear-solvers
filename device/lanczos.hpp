@@ -24,6 +24,32 @@ __global__ void norm(const double *__restrict__ vec,
   __shared__ double shared_mem[BLOCK_SIZE];
   const uint32_t tid = threadIdx.x;
   const uint32_t gid = blockIdx.x * blockDim.x + threadIdx.x;
+  double sum = 0.0;
+  for (uint32_t i = gid; i < n; i += gridDim.x * blockDim.x) {
+    const double val = vec[i];
+    sum += val * val;
+  }
+  shared_mem[tid] = sum;
+  __syncthreads();
+  for (uint32_t s = blockDim.x/2; s > 0; s >>= 1) {
+    if (tid < s) {
+      shared_mem[tid] += shared_mem[tid + s];
+    }
+    __syncthreads();
+  }
+
+  if (tid == 0) {
+    atomicAdd(result, shared_mem[0]);
+  }
+}
+
+
+/*
+__global__ void norm(const double *__restrict__ vec,
+                     double *__restrict__ result, const uint32_t n) {
+  __shared__ double shared_mem[BLOCK_SIZE];
+  const uint32_t tid = threadIdx.x;
+  const uint32_t gid = blockIdx.x * blockDim.x + threadIdx.x;
 
   double sum = 0.0;
   for (uint32_t i = gid; i < n; i += gridDim.x * blockDim.x) {
@@ -45,6 +71,7 @@ __global__ void norm(const double *__restrict__ vec,
     atomicAdd(result, shared_mem[0]);
   }
 }
+*/
 
 __global__ void inv_scale(double *__restrict__ vec, const double scalar,
                           const uint32_t n) {
@@ -114,6 +141,7 @@ void lanczos_iteration(DeviceSpMV<double> *spmv, KrylovInfo *krylov,
   double beta;
   cudaMemcpy(&beta, krylov->d_beta, sizeof(double), cudaMemcpyDeviceToHost);
   beta = std::sqrt(beta);
+  std::cout << "Device beta (in Lanczos): " << beta << "\n";
   inv_scale<<<grid, block>>>(krylov->V, beta, n);
 
   // this small matrix will disappear after some optimization such that this
@@ -159,10 +187,10 @@ void lanczos_iteration(DeviceSpMV<double> *spmv, KrylovInfo *krylov,
     cudaMemcpy(&krylov->V[(j + 1) * n], krylov->buf1, n * sizeof(double),
                cudaMemcpyDeviceToDevice);
   }
-  // Eigen::MatrixX<double> V = Eigen::MatrixX<double>::Zero(n, m);
-  // cudaMemcpy(V.data(), krylov->V, n * m * sizeof(double),
-  // cudaMemcpyDeviceToHost); std::cout << "Device V.col(0) after Lanczos
-  // done:\n"; std::cout << V.col(0) << "\n";
+  Eigen::MatrixX<double> V = Eigen::MatrixX<double>::Zero(n, m);
+  cudaMemcpy(V.data(), krylov->V, n * m * sizeof(double),
+  cudaMemcpyDeviceToHost); std::cout << "Device V.row(0) after Lanczos done:\n";
+  std::cout << V.row(0) << "\n";
 }
 
 #endif
