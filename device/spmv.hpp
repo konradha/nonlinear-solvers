@@ -23,7 +23,7 @@ private:
       return CUDA_C_32F;
     if constexpr (std::is_same_v<T, thrust::complex<double>>)
       return CUDA_C_64F;
-    throw std::runtime_error("Unsupported type");
+    throw std::runtime_error("Unsupported dtype");
   }
 
 public:

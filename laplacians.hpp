@@ -1,3 +1,6 @@
+#ifndef LAPLACIANS_HPP
+#define LAPLACIANS_HPP
+
 #include <Eigen/Sparse>
 
 // TODO: finish both Sommerfeld radiation BCs and PBCs
@@ -195,3 +198,5 @@ Eigen::SparseMatrix<Float> build_xxxx_noflux(uint32_t nx, uint32_t ny,
 
   return L4;
 }
+
+#endif
