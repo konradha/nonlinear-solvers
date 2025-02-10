@@ -1,11 +1,11 @@
 #!/bin/bash
 
-#SBATCH --job-name=matfunc_tester  
+#SBATCH --job-name=sg_driver_test  
 #SBATCH --time=00:12:00         
 #SBATCH --mem-per-cpu=4G                          
 #SBATCH --gpus=1    
-#SBATCH --output=matfunc_tester_%j.out     
-#SBATCH --error=matfunc_tester_%j.err       
+#SBATCH --output=sg_driver_test_%j.out     
+#SBATCH --error=sg_driver_test_%j.err       
 
 
-./to_precise_matfunc_tester
+./to_sg_driver_dev

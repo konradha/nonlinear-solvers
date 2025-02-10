@@ -141,7 +141,8 @@ void lanczos_iteration(DeviceSpMV<double> *spmv, KrylovInfo *krylov,
   double beta;
   cudaMemcpy(&beta, krylov->d_beta, sizeof(double), cudaMemcpyDeviceToHost);
   beta = std::sqrt(beta);
-  std::cout << "Device beta (in Lanczos): " << beta << "\n";
+  cudaMemcpy(krylov->d_beta, &beta, sizeof(double), cudaMemcpyHostToDevice);
+  //std::cout << "Device beta (in Lanczos): " << beta << "\n";
   inv_scale<<<grid, block>>>(krylov->V, beta, n);
 
   // this small matrix will disappear after some optimization such that this
@@ -187,10 +188,10 @@ void lanczos_iteration(DeviceSpMV<double> *spmv, KrylovInfo *krylov,
     cudaMemcpy(&krylov->V[(j + 1) * n], krylov->buf1, n * sizeof(double),
                cudaMemcpyDeviceToDevice);
   }
-  Eigen::MatrixX<double> V = Eigen::MatrixX<double>::Zero(n, m);
-  cudaMemcpy(V.data(), krylov->V, n * m * sizeof(double),
-  cudaMemcpyDeviceToHost); std::cout << "Device V.row(0) after Lanczos done:\n";
-  std::cout << V.row(0) << "\n";
+  //Eigen::MatrixX<double> V = Eigen::MatrixX<double>::Zero(n, m);
+  //cudaMemcpy(V.data(), krylov->V, n * m * sizeof(double),
+  //cudaMemcpyDeviceToHost); std::cout << "Device V.row(0) after Lanczos done:\n";
+  //std::cout << V.row(0) << "\n";
 }
 
 #endif

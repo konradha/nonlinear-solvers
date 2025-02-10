@@ -39,54 +39,46 @@ __global__ void transform_eigenvals_id_sqrt(double *out, const double *eigvals,
   }
 }
 
-// K2: Q f(λ) Q^T
-/*
-__global__ void eigvec_transform(double *out, const double *Q,
-                                 const double *f_lambda, const uint32_t m) {
-  // let's take a single block -- might become problematic for large m!
-  int i = threadIdx.x;
-  int j = threadIdx.y;
-  if (i < m && j < m) {
-    double sum = 0.0;
-    for (int k = 0; k < m; k++) {
-      sum += Q[k * m + i] * f_lambda[k] * Q[k * m + j];
+// V x K multiplication (n x m) * (m x m)
+__global__ void matrix_multiply_VK(const double* V, const double* K, double* result,
+                                 const uint32_t n, const uint32_t m) {
+    const int row = blockIdx.y * blockDim.y + threadIdx.y;
+    const int col = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (row < n && col < m) {
+        double sum = 0.0;
+        for (int k = 0; k < m; k++) {
+            sum += V[k * n + row] * K[col * m + k];
+        }
+        result[col * n + row] = sum;
     }
-    out[i * m + j] = sum;
-  }
-}
-// taking the single thread block might be problematic, let's try the other approach below
-*/
-
-__global__ void eigvec_transform(double *out, const double *Q,
-                               const double *f_lambda, const uint32_t m) {
-  const int i = blockIdx.x * blockDim.x + threadIdx.x;
-  const int j = blockIdx.y * blockDim.y + threadIdx.y;
-  if (i < m && j < m) {
-    double sum = 0.0;
-    for (int k = 0; k < m; k++) {
-      sum += Q[k * m + i] * f_lambda[k] * Q[k * m + j];
-    }
-    out[i * m + j] = sum;
-  }
 }
 
-// K3: β V(Q f(λ) Q^T)e_1
-__global__ void final_multiply(double *result, const double *V,
-                               const double *transform, const double beta,
-                               const uint32_t n, const uint32_t m) {
-  int i = threadIdx.x + blockIdx.x * blockDim.x;
-  if (i < n) {
-    double sum = 0.0;
-    for (int j = 0; j < m; j++) {
-      double v_sum = 0.0;
-      for (int k = 0; k < m; k++) {
-        v_sum += V[k * n + i] * transform[k * m + j];
-      }
-      sum = (j == 0) ? v_sum : sum;
+// Q * diag(f(D)) * Q^T
+__global__ void matrix_multiply_QDQ(const double* Q, const double* D, double* result,
+                                  const uint32_t m) {
+    const int row = blockIdx.y * blockDim.y + threadIdx.y;
+    const int col = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    if (row < m && col < m) {
+        double sum = 0.0;
+        for (int k = 0; k < m; k++) {
+            sum += Q[k * m + row] * D[k] * Q[k * m + col];
+        }
+        result[col * m + row] = sum;
     }
-    result[i] = beta * sum;
-  }
 }
+
+// beta * X[0, :]
+__global__ void scale_first_col(const double* X, double* result,
+                                 const double beta, const uint32_t n) {
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x; 
+    if (idx < n) {
+        result[idx] = beta * X[idx];
+    }
+}
+
+
 
 class MatrixFunctionApplicatorReal {
 public:
@@ -138,6 +130,7 @@ public:
     cudaMalloc((void **)&d_eigenvectors_, m * m * sizeof(double));
     cudaMalloc((void **)&d_transform_, m * sizeof(double));
     cudaMalloc((void **)&d_work_, m * m * sizeof(double));
+    cudaMalloc((void **)&d_work_large_, n * m * sizeof(double));
     cudaMalloc((void **)&d_info_, sizeof(int));
 
     cusolverDnCreate(&solver_handle_);
@@ -170,6 +163,7 @@ public:
     cudaFree(d_work_);
     cudaFree(d_solver_work_);
     cudaFree(d_info_);
+    cudaFree(d_work_large_);
     cusolverDnDestroy(solver_handle_);
   }
 
@@ -184,22 +178,25 @@ public:
     cudaMemcpy(&beta, krylov_.d_beta, sizeof(double), cudaMemcpyDeviceToHost);
     compute_eigen_decomposition();
 
-    std::vector<double> eigenvals(m_);
-    cudaMemcpy(eigenvals.data(), d_eigenvalues_, m_ * sizeof(double), cudaMemcpyDeviceToHost);
-    std::cout << "Device eigenvalues: ";
-    for(uint32_t i = 0; i < m_; ++i)
-        std::cout << eigenvals[i] << " ";
-    std::cout << "\n";
+    //std::vector<double> eigenvals(m_);
+    //cudaMemcpy(eigenvals.data(), d_eigenvalues_, m_ * sizeof(double), cudaMemcpyDeviceToHost);
+    //std::cout << "Device eigenvalues: ";
+    //for(uint32_t i = 0; i < m_; ++i)
+    //    std::cout << eigenvals[i] << " ";
+    //std::cout << "\n";
 
 
 
     cudaMemset(d_diag_, 0.0, m_ * sizeof(double)); 
     block_dim_1d_ = dim3(256);
     // TODO this might need better parametrization depending on sqrt(n) or even n^(1/3) (if 3d case)
-    grid_dim_1d_ = dim3((n_ + block_dim_1d_.x - 1) / block_dim_1d_.x);
-    block_dim_2d_ = dim3(16, 16);
-    grid_dim_2d_ = dim3((m_ + block_dim_2d_.x - 1) / block_dim_2d_.x,
-                        (m_ + block_dim_2d_.y - 1) / block_dim_2d_.y);
+    dim3 block_2d(16, 16);
+    dim3 grid_VK((m_ + block_2d.x - 1) / block_2d.x,
+                 (n_ + block_2d.y - 1) / block_2d.y);
+    dim3 grid_QDQ((m_ + block_2d.x - 1) / block_2d.x,
+                  (m_ + block_2d.y - 1) / block_2d.y);
+    dim3 block_1d(256);
+    dim3 grid_1d((n_ + block_1d.x - 1) / block_1d.x);
 
     // TODO check if the values _actually_ check out -- ie. if time stepping agrees let's just keep it at first
     // and optimize kernels and kernel tuning later
@@ -207,35 +204,28 @@ public:
     // print_type(type);
     switch (type) {
 	    case FunctionType::SINC2_SQRT:
-		transform_eigenvals_sinc2_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(
+		transform_eigenvals_sinc2_sqrt<<<grid_1d, block_1d>>>(
         	d_diag_, d_eigenvalues_, t, m_);
 		break;
 	    case FunctionType::COS_SQRT:
-		transform_eigenvals_cos_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(
+		transform_eigenvals_cos_sqrt<<<grid_1d, block_1d>>>(
         	d_diag_, d_eigenvalues_, t, m_);
 		break;	
 	    case FunctionType::ID_SQRT:
-		transform_eigenvals_id_sqrt<<<grid_dim_1d_, block_dim_1d_>>>(
+		transform_eigenvals_id_sqrt<<<grid_1d, block_1d>>>(
         	d_diag_, d_eigenvalues_, t, m_);
 		break;
 
 	default:
 		throw std::runtime_error("Invalid Matfunc call");
     }
-    
-
-    eigvec_transform<<<grid_dim_2d_, block_dim_2d_>>>(
-        d_small_result_, d_eigenvectors_, d_diag_, m_);
-
-    std::vector<double> transformed(m_);
-    cudaMemcpy(transformed.data(), d_diag_, m_ * sizeof(double), cudaMemcpyDeviceToHost);
-    std::cout << "Device transformed eigenvalues (first 5): ";
-    for(uint32_t i = 0; i < std::min(5u, m_); ++i)
-        std::cout << transformed[i] << " ";
-    std::cout << "\n";
-
-    final_multiply<<<grid_dim_1d_, block_dim_1d_>>>(
-        result, krylov_.V, d_small_result_, beta, n_, m_);
+		
+     // project matrix back from diagonalized space
+     matrix_multiply_QDQ<<<grid_QDQ, block_2d>>>(d_eigenvectors_, d_diag_, d_work_, m_);
+     // apply V to Q f(t sqrt(L)) Q.T
+     matrix_multiply_VK<<<grid_VK, block_2d>>>(krylov_.V, d_work_, d_work_large_, n_, m_);
+     // scale with beta
+     scale_first_col<<<grid_1d, block_1d>>>(d_work_large_, result, beta, n_); 
   }
 
 private:
@@ -258,6 +248,7 @@ private:
   double *d_eigenvectors_;
   double *d_transform_;
   double *d_work_;
+  double *d_work_large_;
   double *d_solver_work_;
   int *d_info_;
   int solver_work_size_;

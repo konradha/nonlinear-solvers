@@ -63,9 +63,9 @@ void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
   // x g(\phi(tau \Omega)u_{n}))
 
   Eigen::VectorX<Scalar_t> buf2 = id_sqrt_multiply(L, u, tau);
-  std::cout << "host: intermediate vals after id_sqrt\n";
-  for(uint32_t i=0;i<10;++i) std::cout << buf2(i) << " ";
-  std::cout << "\n";
+  //std::cout << "host: intermediate vals after id_sqrt\n";
+  //for(uint32_t i=0;i<10;++i) std::cout << buf2(i) << " ";
+  //std::cout << "\n";
   buf2 = buf2.unaryExpr([](Scalar_t x) { return -std::sin(x); });
   buf2 = sinc2_sqrt_half(L, buf2, tau);
   Eigen::VectorX<Scalar_t> u_cpy = u;
