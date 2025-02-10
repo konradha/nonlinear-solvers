@@ -25,8 +25,8 @@ int main() {
    const uint32_t nx = 256, ny = 256;
    const f_ty Lx = 3., Ly = 3.;
    const f_ty dx = 2 * Lx / (nx - 1), dy = 2 * Ly / (ny - 1);
-   const f_ty T = 1.;
-   const uint32_t nt = 100;
+   const f_ty T = 5.;
+   const uint32_t nt = 500;
    const uint32_t num_snapshots = 100;
    const auto freq = nt / num_snapshots;
    const auto dt = T / nt;
@@ -66,7 +66,6 @@ int main() {
        v_save_mat.row(0) = v0.transpose();
 
        for (uint32_t i = 1; i < nt; ++i) {
-	   //std::cout << "host: step " << i << "\n";
            SGESolver::step<f_ty>(u, u_past, buf, L, c, m, dt);
 	   v = (u - u_past) / dt;
            if (i % freq == 0) {

@@ -25,7 +25,7 @@ __global__ void curr_velocity_2d(double* v, const double* u, const double * u_pa
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
     if(x < nx && y < ny) {
         const int idx = y * nx + x;
-        v[idx] = (u - u_past) / tau; 
+        v[idx] = (u[idx] - u_past[idx]) / tau; 
     }
 }
 
@@ -130,18 +130,11 @@ public:
 	// AND of course: actual dimension if we want to push this into 3d
 	nx_ = sqrt(n);
 	ny_ = nx_;
-
 	uint32_t threads = 256;
 	block_dim_ = dim3(threads/16, threads/16);
         grid_dim_ = dim3((nx_ + block_dim_.x - 1) / block_dim_.x,
                         (ny_ + block_dim_.y - 1) / block_dim_.y);
 
-
-	//printf("dev: u0[100 * nx + ny / 2] %f \n", host_u0[100 * nx + ny / 2]);
-        //printf("dev: v0[100 * nx + ny / 2] %f \n", host_v0[100 * nx + ny / 2]);
-	//printf("dev: Got %d num_snapshots\n", params.num_snapshots);
-	//printf("dev: Got %d freq\n", params.snapshot_freq);
-	//printf("dev: Storing initial condition on device\n");
 	store_snapshot(0);
         verify_domain_coverage();
     }
@@ -167,17 +160,11 @@ public:
 
 
     void step(const double tau, const uint32_t step_number) {
-      reset_buffers();
+      //reset_buffers();
       cudaMemcpy(d_buf_, d_u_, n_ * sizeof(double), cudaMemcpyDeviceToDevice);
 
-      double * intermediate_vals = (double*)malloc(sizeof(double) * n_);
       matfunc_->apply(d_work_buffer_, d_u_, tau,
                      MatrixFunctionApplicatorReal::FunctionType::ID_SQRT);
-      //cudaMemcpy(intermediate_vals, d_work_buffer_, n_ * sizeof(double), cudaMemcpyDeviceToHost);
-      //std::cout << "device: intermediate vals after id_sqrt\n";
-      //for(uint32_t i=0;i<10;++i) std::cout << intermediate_vals[i] << " ";
-      //std::cout << "\n";
-
       neg_sin_kernel_2d<<<grid_dim_, block_dim_>>>(d_work_buffer_, d_work_buffer_,
                                                   nx_, ny_);
       matfunc_->apply(d_buf2_, d_work_buffer_, tau,
@@ -195,79 +182,6 @@ public:
       if (step_number % params_.snapshot_freq == 0) {
           store_snapshot(step_number);
       }
-
-      
-      // u_tt + Au = g(u)
-      // u_{n+1} =
-      // 2 cos (tau \Omega) u_{n} - u_{n-1} + tau² sinc²(tau / 2 \Omega)
-      // x g(\phi(tau \Omega)u_{n}))
-
-      /*
-          Eigen::VectorX<Scalar_t> buf2 = id_sqrt_multiply(L, u, tau);
-          buf2 = buf2.unaryExpr([](Scalar_t x) { return -std::sin(x); });
-          buf2 = sinc2_sqrt_half(L, buf2, tau);
-          Eigen::VectorX<Scalar_t> u_cpy = u;
-          u = 2 * cos_sqrt_multiply(L, u, tau) - u_past + tau * tau * buf2;
-          u_past = u_cpy;
-      */
-
-      /*
-      int* d_has_nan;
-      cudaMalloc(&d_has_nan, sizeof(int));
-      cudaMemset(d_has_nan, 0, sizeof(int));
-      int has_nan;
-      
-      // copy to swap with u_past
-      cudaMemcpy(d_buf_, d_u_, n_ * sizeof(double), cudaMemcpyDeviceToDevice);
-
-      // out, in, dt, fun
-      // dt sqrt(L) u_n in d_work_buffer_
-      matfunc_->apply(d_work_buffer_, d_u_, tau, MatrixFunctionApplicatorReal::FunctionType::ID_SQRT);
-      check_nans_kernel<<<grid_dim_, block_dim_>>>(d_has_nan, d_work_buffer_, n_);
-      cudaMemcpy(&has_nan, d_has_nan, sizeof(int), cudaMemcpyDeviceToHost);
-      if(has_nan > 0) printf("After id_sqrt: Found %d NaNs\n", has_nan);
-      cudaMemset(d_has_nan, 0, sizeof(int));
-
-
-      // sin 
-      neg_sin_kernel<<<grid_dim_, block_dim_>>>(d_work_buffer_, d_work_buffer_, n_);
-      check_nans_kernel<<<grid_dim_, block_dim_>>>(d_has_nan, d_work_buffer_, n_);
-      cudaMemcpy(&has_nan, d_has_nan, sizeof(int), cudaMemcpyDeviceToHost);
-      if(has_nan > 0) printf("After sin kernel: Found %d NaNs\n", has_nan);
-       cudaMemset(d_has_nan, 0, sizeof(int));
-      // sinc
-      matfunc_->apply(d_buf2_, d_work_buffer_, tau, MatrixFunctionApplicatorReal::FunctionType::SINC2_SQRT);
-      check_nans_kernel<<<grid_dim_, block_dim_>>>(d_has_nan, d_work_buffer_, n_);
-      cudaMemcpy(&has_nan, d_has_nan, sizeof(int), cudaMemcpyDeviceToHost);
-      if(has_nan > 0) printf("After sinc2_sqrt: Found %d NaNs\n", has_nan);
-      cudaMemset(d_has_nan, 0, sizeof(int));
-
-      // cos
-      matfunc_->apply(d_buf3_, d_u_, tau, MatrixFunctionApplicatorReal::FunctionType::COS_SQRT);
-      check_nans_kernel<<<grid_dim_, block_dim_>>>(d_has_nan, d_work_buffer_, n_);
-      cudaMemcpy(&has_nan, d_has_nan, sizeof(int), cudaMemcpyDeviceToHost);
-      if(has_nan > 0) printf("After cos_sqrt: Found %d NaNs\n", has_nan);
-       cudaMemset(d_has_nan, 0, sizeof(int));
-      
-      // putting it together for new step
-      // gautschi_kernel(double* u_next, const double* u_past, const double* costu, const double* filtered_sinc,
-      //                               const double tau, const uint32_t n)
-      gautschi_kernel<<<grid_dim_, block_dim_>>>(d_u_, d_u_past_, d_buf3_, d_buf2_, tau, n_); 
-      check_nans_kernel<<<grid_dim_, block_dim_>>>(d_has_nan, d_work_buffer_, n_);
-      cudaMemcpy(&has_nan, d_has_nan, sizeof(int), cudaMemcpyDeviceToHost);
-      if(has_nan > 0) printf("After Gautschi kernel: Found %d NaNs\n", has_nan);
-       cudaMemset(d_has_nan, 0, sizeof(int));
-      cudaMemcpy(d_u_past_, d_buf_, n_ * sizeof(double), cudaMemcpyDeviceToDevice);
-
-      // v update
-      // TODO
-      if (step_number % params_.snapshot_freq == 0) {
-          store_snapshot(step_number);
-
-	  printf("dev: Storing snapshot, step=%d\n", step_number);
-      }
-      cudaFree(d_has_nan);
-      */
     }
 
     void transfer_snapshots(double * dst, char which='u') {

@@ -6,14 +6,16 @@
 #include <thrust/complex.h>
 
 #define NUM_BLOCKS 256
-#define BLOCK_SIZE 256
+#define BLOCK_SIZE 1024
+#define MAX_BLOCKS_PER_DIM 65535
 
 struct KrylovInfoComplex {
-  thrust::complex<double> *__restrict__ T;
-  thrust::complex<double> *__restrict__ V;
-  thrust::complex<double> *__restrict__ buf1;
-  thrust::complex<double> *__restrict__ buf2;
-  double *__restrict__ d_beta;
+  thrust::complex<double> * T;
+  thrust::complex<double> * V;
+  thrust::complex<double> * buf1;
+  thrust::complex<double> * buf2;
+  double * d_beta;
+  double * reconstruct_beta;
   uint32_t n;
   uint32_t m;
 };
@@ -96,11 +98,11 @@ __global__ void axpby_complex(thrust::complex<double> *__restrict__ v1,
                               const thrust::complex<double> beta,
                               const uint32_t n) {
   const uint32_t gid = blockIdx.x * blockDim.x + threadIdx.x;
-
   for (uint32_t i = gid; i < n; i += gridDim.x * blockDim.x) {
     v1[i] = alpha * v1[i] + beta * v2[i];
   }
 }
+
 
 void lanczos_iteration_complex(
     const Eigen::SparseMatrix<std::complex<double>> &L,
@@ -109,8 +111,17 @@ void lanczos_iteration_complex(
     const Eigen::VectorX<std::complex<double>> u_cpu) {
   const uint32_t n = krylov->n;
   const uint32_t m = krylov->m;
-  dim3 grid(NUM_BLOCKS);
+  //dim3 grid(NUM_BLOCKS);
+  //dim3 block(BLOCK_SIZE);
+  const uint32_t total_threads_needed = (n + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  const uint32_t blocks_x = std::min(total_threads_needed,
+                                   static_cast<uint32_t>(MAX_BLOCKS_PER_DIM));
+  const uint32_t blocks_y = (total_threads_needed + blocks_x - 1) / blocks_x;
+  
+  dim3 grid(blocks_x, blocks_y);
   dim3 block(BLOCK_SIZE);
+
+
   cudaMemcpy(krylov->V, u, n * sizeof(thrust::complex<double>),
              cudaMemcpyDeviceToDevice);
 
@@ -176,6 +187,9 @@ void lanczos_iteration_complex(
     cudaMemcpy(&krylov->V[(j + 1) * n], krylov->buf1,
                n * sizeof(thrust::complex<double>), cudaMemcpyDeviceToDevice);
   }
+  cudaMemcpy(krylov->reconstruct_beta, &beta,
+               sizeof(double), cudaMemcpyHostToDevice);
+
 }
 
 #endif

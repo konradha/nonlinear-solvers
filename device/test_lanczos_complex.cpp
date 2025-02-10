@@ -43,6 +43,7 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
   cudaMalloc((void **)&krylov.buf1, n * sizeof(thrust::complex<double>));
   cudaMalloc((void **)&krylov.buf2, n * sizeof(thrust::complex<double>));
   cudaMalloc((void **)&krylov.d_beta, sizeof(double));
+  cudaMalloc((void **)&krylov.reconstruct_beta, sizeof(double));
   krylov.n = n;
   krylov.m = m;
 
@@ -61,7 +62,7 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
     for (uint32_t i = 0; i < n; i++) {
       u[i] = std::complex<double>(dist(gen), dist(gen));
     }
-    u.normalize();
+    //u.normalize();
 
     auto cpu_start = std::chrono::high_resolution_clock::now();
     auto [V_eigen, T_eigen, beta_eigen] = lanczos_L(A, u, m);
@@ -86,11 +87,16 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
       std::vector<std::complex<double>> V_gpu(n * m);
       std::vector<std::complex<double>> T_gpu(m * m);
 
+      double beta_dev;
+
       cudaMemcpy(V_gpu.data(), krylov.V,
                  n * m * sizeof(thrust::complex<double>),
                  cudaMemcpyDeviceToHost);
       cudaMemcpy(T_gpu.data(), krylov.T,
                  m * m * sizeof(thrust::complex<double>),
+                 cudaMemcpyDeviceToHost);
+      cudaMemcpy(&beta_dev, krylov.reconstruct_beta,
+                 sizeof(double),
                  cudaMemcpyDeviceToHost);
 
       Eigen::Map<Eigen::MatrixX<std::complex<double>>> V_gpu_map(V_gpu.data(),
@@ -111,6 +117,8 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
       Eigen::MatrixX<std::complex<double>> V_diff = V_eigen - V_gpu_map;
       Eigen::MatrixX<std::complex<double>> T_diff = T_eigen - T_gpu_map;
 
+      std::cout << "beta Eigen: " << beta_eigen << "\n";
+      std::cout << "beta dev:   " << beta_dev << "\n";
       std::cout << "V diff: L1 = " << V_diff.lpNorm<1>()
                 << ", L2 = " << V_diff.norm() << "\n";
       std::cout << "T diff: L1 = " << T_diff.lpNorm<1>()
@@ -141,8 +149,8 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
 
 int main(int argc, char **argv) {
   setbuf(stdout, NULL);
-  auto ns = {50, 100, 200};
-  std::vector<uint32_t> krylov_dims = {10, 20, 30};
+  auto ns = {50, 100, 200, 500, 1000};
+  std::vector<uint32_t> krylov_dims = {10, 20};
 
   for (auto ni : ns) {
     const uint32_t nx = ni;
