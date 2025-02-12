@@ -1,12 +1,13 @@
 #!/bin/bash
 
-#SBATCH --job-name=complex_lanczos_test  
+#SBATCH --job-name=lanczos_complex_test  
 #SBATCH --time=00:12:00         
 #SBATCH --mem-per-cpu=4G                          
 #SBATCH --gpus=1    
-#SBATCH --output=complex_lanczos_test_%j.out     
-#SBATCH --error=complex_lanczos_test_%j.err       
+#SBATCH --output=lanczos_complex_test_%j.out     
+#SBATCH --error=lanczos_complex_test_%j.err       
 
 
-cmd="./to_lanczos_complex_test"
-nvprof ${cmd}
+#cmd="./to_lanczos_complex_test"
+#nvprof ${cmd}
+./to_lanczos_complex_test

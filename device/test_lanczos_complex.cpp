@@ -46,6 +46,7 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
   cudaMalloc((void **)&krylov.reconstruct_beta, sizeof(double));
   krylov.n = n;
   krylov.m = m;
+   
 
   std::mt19937 gen(42);
   std::normal_distribution<double> dist(0.0, 1.0);
@@ -56,7 +57,7 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
-
+  cublasCreate(&krylov.handle);
   for (uint32_t trial = 0; trial < num_trials; trial++) {
     Eigen::VectorX<std::complex<double>> u(n);
     for (uint32_t i = 0; i < n; i++) {
@@ -74,8 +75,9 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
     cudaMemcpy(krylov.buf1, u.data(), n * sizeof(thrust::complex<double>),
                cudaMemcpyHostToDevice);
 
+    
     cudaEventRecord(start);
-    lanczos_iteration_complex(A, &spmv, &krylov, krylov.buf1, u);
+    lanczos_iteration_complex(&spmv, &krylov, krylov.buf1);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
@@ -83,7 +85,7 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
     cudaEventElapsedTime(&milliseconds, start, stop);
     avg_gpu_time += milliseconds;
 
-    /*if (trial == 0)*/ {
+    if (trial == 0) {
       std::vector<std::complex<double>> V_gpu(n * m);
       std::vector<std::complex<double>> T_gpu(m * m);
 
@@ -151,6 +153,9 @@ int main(int argc, char **argv) {
   setbuf(stdout, NULL);
   auto ns = {50, 100, 200, 500, 1000};
   std::vector<uint32_t> krylov_dims = {10, 20};
+
+  //auto ns = {50};
+  //std::vector<uint32_t> krylov_dims = {10};
 
   for (auto ni : ns) {
     const uint32_t nx = ni;
