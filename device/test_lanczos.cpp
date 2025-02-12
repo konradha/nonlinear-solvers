@@ -58,7 +58,7 @@ void test_lanczos(const Eigen::SparseMatrix<double> &A, const uint32_t m,
   for (uint32_t trial = 0; trial < num_trials; trial++) {
     Eigen::VectorXd u = Eigen::VectorXd::NullaryExpr(
         n, [&gen, &dist](Eigen::Index) { return dist(gen); });
-    //u.normalize();
+    // u.normalize();
 
     auto cpu_start = std::chrono::high_resolution_clock::now();
     auto [V_eigen, T_eigen, beta_eigen] = lanczos_L(A, u, m);

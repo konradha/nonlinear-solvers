@@ -53,62 +53,60 @@ void test_matfunc(const Eigen::SparseMatrix<double> &A, uint32_t m,
   cudaEventCreate(&stop);
 
   auto fun_types = {MatrixFunctionApplicatorReal::FunctionType::SINC2_SQRT,
-	  MatrixFunctionApplicatorReal::FunctionType::COS_SQRT,
-	  MatrixFunctionApplicatorReal::FunctionType::ID_SQRT};
-  for (const auto & fun : fun_types) {
-  for (uint32_t trial = 0; trial < num_trials; trial++) {
-    for (uint32_t i = 0; i < n; i++) {
-      input[i] = dist(gen);
+                    MatrixFunctionApplicatorReal::FunctionType::COS_SQRT,
+                    MatrixFunctionApplicatorReal::FunctionType::ID_SQRT};
+  for (const auto &fun : fun_types) {
+    for (uint32_t trial = 0; trial < num_trials; trial++) {
+      for (uint32_t i = 0; i < n; i++) {
+        input[i] = dist(gen);
+      }
+      Eigen::Map<Eigen::VectorXd> input_vec(input.data(), n);
+      input_vec.normalize();
+
+      cudaMemcpy(d_input, input.data(), n * sizeof(double),
+                 cudaMemcpyHostToDevice);
+
+      Eigen::VectorXd ref_fun(n);
+      auto cpu_start = std::chrono::high_resolution_clock::now();
+      switch (fun) {
+      case MatrixFunctionApplicatorReal::FunctionType::SINC2_SQRT:
+        ref_fun = sinc2_sqrt_half<double>(A, input_vec, dt, m);
+        break;
+      case MatrixFunctionApplicatorReal::FunctionType::COS_SQRT:
+        ref_fun = cos_sqrt_multiply<double>(A, input_vec, dt, m);
+        break;
+      case MatrixFunctionApplicatorReal::FunctionType::ID_SQRT:
+        ref_fun = id_sqrt_multiply<double>(A, input_vec, dt, m);
+        break;
+      }
+      auto cpu_end = std::chrono::high_resolution_clock::now();
+      avg_cpu_time += std::chrono::duration_cast<std::chrono::microseconds>(
+                          cpu_end - cpu_start)
+                          .count();
+
+      cudaEventRecord(start);
+      if (fun == MatrixFunctionApplicatorReal::FunctionType::SINC2_SQRT)
+        matfunc.apply(d_result, d_input, dt / 2, fun);
+      else
+        matfunc.apply(d_result, d_input, dt, fun);
+
+      cudaEventRecord(stop);
+      cudaEventSynchronize(stop);
+      float milliseconds = 0;
+      cudaEventElapsedTime(&milliseconds, start, stop);
+      avg_gpu_time += milliseconds * 1000.0;
+
+      cudaMemcpy(result.data(), d_result, n * sizeof(double),
+                 cudaMemcpyDeviceToHost);
+      Eigen::Map<Eigen::VectorXd> gpu_result(result.data(), n);
+      Eigen::VectorXd diff = ref_fun - gpu_result;
+
+      /*if (trial == 0)*/ {
+        matfunc.print_type(fun);
+        std::cout << "L1 = " << diff.lpNorm<1>() << ", L2 = " << diff.norm()
+                  << "\n";
+      }
     }
-    Eigen::Map<Eigen::VectorXd> input_vec(input.data(), n);
-    input_vec.normalize();
-
-    cudaMemcpy(d_input, input.data(), n * sizeof(double),
-               cudaMemcpyHostToDevice);
-
-    Eigen::VectorXd ref_fun(n);
-    auto cpu_start = std::chrono::high_resolution_clock::now(); 
-    switch (fun) {
-	    case MatrixFunctionApplicatorReal::FunctionType::SINC2_SQRT:
-    	 	ref_fun = sinc2_sqrt_half<double>(A, input_vec, dt, m);
-		break;
-	    case MatrixFunctionApplicatorReal::FunctionType::COS_SQRT:
-		ref_fun = cos_sqrt_multiply<double>(A, input_vec, dt, m);
-		break;
-	    case MatrixFunctionApplicatorReal::FunctionType::ID_SQRT:
-		ref_fun = id_sqrt_multiply<double>(A, input_vec, dt, m);
-		break;
-    }
-    auto cpu_end = std::chrono::high_resolution_clock::now();
-    avg_cpu_time += std::chrono::duration_cast<std::chrono::microseconds>(
-                        cpu_end - cpu_start)
-                        .count();
-
-    cudaEventRecord(start);
-    if (fun == MatrixFunctionApplicatorReal::FunctionType::SINC2_SQRT)
-        matfunc.apply(d_result, d_input, dt/2,
-                  fun);
-    else
-	matfunc.apply(d_result, d_input, dt,
-                  fun);
-
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
-    avg_gpu_time += milliseconds * 1000.0;
-
-    cudaMemcpy(result.data(), d_result, n * sizeof(double),
-               cudaMemcpyDeviceToHost);
-    Eigen::Map<Eigen::VectorXd> gpu_result(result.data(), n);
-    Eigen::VectorXd diff = ref_fun - gpu_result;
-
-    /*if (trial == 0)*/ {
-	    matfunc.print_type(fun);
-      std::cout << "L1 = " << diff.lpNorm<1>()
-                << ", L2 = " << diff.norm() << "\n";
-    }
-  }
   }
 
   avg_cpu_time /= (num_trials * 3);

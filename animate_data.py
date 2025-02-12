@@ -33,10 +33,11 @@ def animate(X, Y, data, nt, save=None):
     def update(frame):
         ax.clear()
         ax.plot_surface(X, Y,
+                data[frame],
                 #np.real(data[frame]),
-                np.abs(data[frame]),
-                cmap='viridis')
-    fps = 1
+                #np.abs(data[frame]),
+                cmap='coolwarm')
+    fps = 10
     ani = FuncAnimation(fig, update, frames=nt, interval=nt / fps, )
 
     if save and save == "gif":

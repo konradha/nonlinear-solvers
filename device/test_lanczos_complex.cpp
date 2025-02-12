@@ -46,7 +46,6 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
   cudaMalloc((void **)&krylov.reconstruct_beta, sizeof(double));
   krylov.n = n;
   krylov.m = m;
-   
 
   std::mt19937 gen(42);
   std::normal_distribution<double> dist(0.0, 1.0);
@@ -63,7 +62,7 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
     for (uint32_t i = 0; i < n; i++) {
       u[i] = std::complex<double>(dist(gen), dist(gen));
     }
-    //u.normalize();
+    // u.normalize();
 
     auto cpu_start = std::chrono::high_resolution_clock::now();
     auto [V_eigen, T_eigen, beta_eigen] = lanczos_L(A, u, m);
@@ -75,7 +74,6 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
     cudaMemcpy(krylov.buf1, u.data(), n * sizeof(thrust::complex<double>),
                cudaMemcpyHostToDevice);
 
-    
     cudaEventRecord(start);
     lanczos_iteration_complex(&spmv, &krylov, krylov.buf1);
     cudaEventRecord(stop);
@@ -97,8 +95,7 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
       cudaMemcpy(T_gpu.data(), krylov.T,
                  m * m * sizeof(thrust::complex<double>),
                  cudaMemcpyDeviceToHost);
-      cudaMemcpy(&beta_dev, krylov.reconstruct_beta,
-                 sizeof(double),
+      cudaMemcpy(&beta_dev, krylov.reconstruct_beta, sizeof(double),
                  cudaMemcpyDeviceToHost);
 
       Eigen::Map<Eigen::MatrixX<std::complex<double>>> V_gpu_map(V_gpu.data(),
@@ -154,8 +151,8 @@ int main(int argc, char **argv) {
   auto ns = {50, 100, 244, 547, 832};
   std::vector<uint32_t> krylov_dims = {10, 20};
 
-  //auto ns = {50};
-  //std::vector<uint32_t> krylov_dims = {10};
+  // auto ns = {50};
+  // std::vector<uint32_t> krylov_dims = {10};
 
   for (auto ni : ns) {
     const uint32_t nx = ni;
