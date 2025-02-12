@@ -8,6 +8,6 @@
 #SBATCH --error=lanczos_complex_test_%j.err       
 
 
-#cmd="./to_lanczos_complex_test"
-#nvprof ${cmd}
-./to_lanczos_complex_test
+cmd="./to_lanczos_complex_test"
+nvprof ${cmd}
+#./to_lanczos_complex_test

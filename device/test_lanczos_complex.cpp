@@ -151,7 +151,7 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
 
 int main(int argc, char **argv) {
   setbuf(stdout, NULL);
-  auto ns = {50, 100, 200, 500, 1000};
+  auto ns = {50, 100, 244, 547, 832};
   std::vector<uint32_t> krylov_dims = {10, 20};
 
   //auto ns = {50};
