@@ -388,11 +388,11 @@ void lanczos_iteration_complex(
     cuDoubleComplex zero = make_cuDoubleComplex(0.0, 0.0);
     cuDoubleComplex neg_one = make_cuDoubleComplex(-1.0, 0.0);
 
-    const int THREADS_PER_BLOCK = 256;
-    const int GRID_SIZE = (n + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK; 
-    dim3 grid(GRID_SIZE);
-    dim3 block(THREADS_PER_BLOCK);
-    const size_t SHARED_MEM_SIZE = 32 * (sizeof(cuDoubleComplex) + sizeof(double));
+    //const int THREADS_PER_BLOCK = 256;
+    //const int GRID_SIZE = (n + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK; 
+    //dim3 grid(GRID_SIZE);
+    //dim3 block(THREADS_PER_BLOCK);
+    //const size_t SHARED_MEM_SIZE = 32 * (sizeof(cuDoubleComplex) + sizeof(double));
 
     for (uint32_t j = 0; j < m - 1; j++) {
 	//cudaDeviceSynchronize();
