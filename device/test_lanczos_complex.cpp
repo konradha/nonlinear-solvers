@@ -83,7 +83,7 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
     cudaEventElapsedTime(&milliseconds, start, stop);
     avg_gpu_time += milliseconds;
 
-    if (trial == 0) {
+    /*if (trial == 0)*/ {
       std::vector<std::complex<double>> V_gpu(n * m);
       std::vector<std::complex<double>> T_gpu(m * m);
 
@@ -102,6 +102,8 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
                                                                  n, m);
       Eigen::Map<Eigen::MatrixX<std::complex<double>>> T_gpu_map(T_gpu.data(),
                                                                  m, m);
+      std::cout << "V_gpu_map: " << V_gpu_map << "\n";
+      std::cout << "T_gpu_map: " << T_gpu_map << "\n";
 
       if (V_gpu_map.hasNaN() || T_gpu_map.hasNaN()) {
         std::cout << "First column of V norm: " << V_gpu_map.col(0).norm()
@@ -148,8 +150,8 @@ void test_lanczos_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
 
 int main(int argc, char **argv) {
   setbuf(stdout, NULL);
-  auto ns = {50, 100, 244, 547, 832};
-  std::vector<uint32_t> krylov_dims = {10, 20};
+  auto ns = {5};
+  std::vector<uint32_t> krylov_dims = {2};
 
   // auto ns = {50};
   // std::vector<uint32_t> krylov_dims = {10};

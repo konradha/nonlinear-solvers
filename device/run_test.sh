@@ -10,4 +10,5 @@
 
 #cmd="./to_lanczos_complex_test"
 #nvprof ${cmd}
-./to_matfunc_complex_test
+compute-sanitizer ./to_matfunc_complex_test
+#compute-sanitizer --tool memcheck ./to_lanczos_complex_test

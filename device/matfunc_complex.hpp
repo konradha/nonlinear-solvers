@@ -20,6 +20,7 @@ __global__ void transform_eigenvals_exp(thrust::complex<double> *out,
   }
 }
 
+
 class MatrixFunctionApplicatorComplex {
 public:
   struct Parameters {
@@ -27,20 +28,26 @@ public:
     Parameters() : block_size_1d(256) {}
   };
 
-  MatrixFunctionApplicatorComplex(const int *d_row_ptr, const int *d_col_ind,
-                                  const cuDoubleComplex *d_values, uint32_t n,
+  MatrixFunctionApplicatorComplex(const Eigen::SparseMatrix<std::complex<double>> & A,
+		                  uint32_t n,
                                   uint32_t m, uint32_t nnz,
                                   const Parameters &params = Parameters())
-      : n_(n), m_(m), params_(params) {
+      : n_(n), m_(m), params_(params) { 
+    const int *row_ptr = A.outerIndexPtr();
+    const int *col_ind = A.innerIndexPtr();
+    const std::complex<double> *values = A.valuePtr(); 
+    cudaMalloc(&d_row_ptr_, (n + 1) * sizeof(int));
+    cudaMalloc(&d_col_ind_, A.nonZeros() * sizeof(int));
+    cudaMalloc(&d_values_, A.nonZeros() * sizeof(thrust::complex<double>));
 
-    thrust::complex<double> *thrust_values;
-    cudaMalloc(&thrust_values, nnz * sizeof(thrust::complex<double>));
-    cudaMemcpy(thrust_values, d_values, nnz * sizeof(cuDoubleComplex),
-               cudaMemcpyDeviceToDevice);
+    cudaMemcpy(d_row_ptr_, row_ptr, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_col_ind_, col_ind, A.nonZeros() * sizeof(int),
+               cudaMemcpyHostToDevice);
+    cudaMemcpy(d_values_, values, A.nonZeros() * sizeof(thrust::complex<double>),
+               cudaMemcpyHostToDevice);
 
-    spmv_ = new DeviceSpMV<thrust::complex<double>>(d_row_ptr, d_col_ind,
-                                                    thrust_values, n, nnz);
-    cudaFree(thrust_values);
+    spmv_ = new DeviceSpMV<thrust::complex<double>>(d_row_ptr_, d_col_ind_,
+                                                    d_values_, n, nnz);
 
     cudaMalloc(&krylov_.V, n * m * sizeof(thrust::complex<double>));
     cudaMalloc(&krylov_.T, m * m * sizeof(thrust::complex<double>));
@@ -53,7 +60,7 @@ public:
     krylov_.m = m;
 
     cudaMalloc(&d_eigenvalues_, m * sizeof(double));
-    cudaMalloc(&d_eigenvectors_, m * m * sizeof(thrust::complex<double>));
+    
     cudaMalloc(&d_diag_, m * sizeof(thrust::complex<double>));
     cudaMalloc(&d_work_, m * m * sizeof(thrust::complex<double>));
     cudaMalloc(&d_work_large_, n * m * sizeof(thrust::complex<double>));
@@ -67,12 +74,15 @@ public:
         solver_handle_, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER, m,
         reinterpret_cast<cuDoubleComplex *>(d_eigenvectors_), m, d_eigenvalues_,
         &lwork);
-    cudaMalloc(&d_solver_work_, lwork * sizeof(thrust::complex<double>));
+    cudaMalloc(&d_eigenvectors_, m * m * sizeof(cuDoubleComplex));
+    cudaMalloc(&d_solver_work_, lwork * sizeof(cuDoubleComplex)); 
     solver_work_size_ = lwork;
   }
 
   ~MatrixFunctionApplicatorComplex() {
-    delete spmv_;
+    cudaFree(d_row_ptr_); 
+    cudaFree(d_col_ind_);
+    cudaFree(d_values_);
     cudaFree(krylov_.V);
     cudaFree(krylov_.T);
     cudaFree(krylov_.buf1);
@@ -89,64 +99,70 @@ public:
     cudaFree(d_info_);
     cusolverDnDestroy(solver_handle_);
     cublasDestroy(cublas_handle_);
+    delete spmv_;
   }
 
-  void apply(cuDoubleComplex *result, const cuDoubleComplex *input,
-             thrust::complex<double> dt) {
-    auto input_thrust =
-        reinterpret_cast<const thrust::complex<double> *>(input);
-    lanczos_iteration_complex(spmv_, &krylov_, input_thrust);
+  void apply(thrust::complex<double> *result, const thrust::complex<double> *input,
+             thrust::complex<double> dt) { 
+    reset_data();
+    cudaDeviceSynchronize();
+    lanczos_iteration_complex(spmv_, &krylov_, input); 
+    cudaDeviceSynchronize();
+
     double beta;
     cudaMemcpy(&beta, krylov_.reconstruct_beta, sizeof(double),
                cudaMemcpyDeviceToHost);
-    compute_eigen_decomposition();
+    std::cout << "Device beta (transferred to host): " << beta << "\n";
 
-    Eigen::MatrixX<std::complex<double>> T =
-        Eigen::MatrixX<std::complex<double>>::Zero(m_, m_);
-    Eigen::MatrixX<std::complex<double>> V =
-        Eigen::MatrixX<std::complex<double>>::Zero(n_, m_);
 
-    cudaMemcpy(T.data(), krylov_.T, m_ * m_ * sizeof(std::complex<double>),
+    Eigen::MatrixX<std::complex<double>> T(m_, m_);
+    cudaMemcpy(T.data(), krylov_.T,
+               m_ * m_ * sizeof(std::complex<double>),
                cudaMemcpyDeviceToHost);
-    cudaMemcpy(V.data(), krylov_.V, n_ * m_ * sizeof(std::complex<double>),
+    std::cout << "Device T (transferred to host): " << T << "\n";
+
+    thrust::complex<double> * T_thrust = new thrust::complex<double>[m_ * m_]; 
+    cudaMemcpy(T_thrust, krylov_.T,
+               m_ * m_ * sizeof(thrust::complex<double>),
                cudaMemcpyDeviceToHost);
 
-    Eigen::MatrixX<std::complex<double>> evs =
-        Eigen::MatrixX<std::complex<double>>::Zero(m_, m_);
-    Eigen::VectorX<std::complex<double>> lambdas =
-        Eigen::VectorX<std::complex<double>>::Zero(T.rows());
+    std::cout << "Device T (host, thrust):\n";
+    for(uint32_t i=0;i<m_;++i){
+      for(uint32_t j=0;j<m_;++j) {
+        std::cout << T_thrust[m_ * i + j] << " ";
+      }
+      std::cout << "\n";
+    }
+    delete [] T_thrust;
 
-    cudaMemcpy(evs.data(), d_eigenvectors_,
-               m_ * m_ * sizeof(std::complex<double>), cudaMemcpyDeviceToHost);
-    cudaMemcpy(lambdas.data(), d_eigenvalues_,
-               m_ * sizeof(std::complex<double>), cudaMemcpyDeviceToHost);
+
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<std::complex<double>>> es(T);
+
+
+
     std::complex<double> tau(dt.real(), dt.imag());
     Eigen::MatrixX<std::complex<double>> exp_T =
-        evs *
-        (tau * lambdas.array().abs().unaryExpr(
-                   [](std::complex<double> x) { return std::exp(x); }))
+        es.eigenvectors() * (tau * es.eigenvalues().array().abs().unaryExpr(
+                   [](double x) { return std::exp(x); }))
             .matrix()
             .asDiagonal() *
-        evs.transpose();
-    Eigen::VectorX<std::complex<double>> e1 =
-        Eigen::VectorX<std::complex<double>>::Zero(T.rows());
+        es.eigenvectors().adjoint();
+
+    Eigen::MatrixX<std::complex<double>> V(n_, m_);
+    cudaMemcpy(V.data(), krylov_.V,
+               n_ * m_ * sizeof(std::complex<double>),
+               cudaMemcpyDeviceToHost);
+    std::cout << "Device V (transferred to host): " << V << "\n";
+
+    Eigen::VectorX<std::complex<double>> e1 = 
+        Eigen::VectorX<std::complex<double>>::Zero(m_);
     e1(0) = 1.0;
     e1 = beta * V * exp_T * e1;
-    cudaMemcpy(result, e1.data(), n_ * sizeof(std::complex<double>),
-               cudaMemcpyHostToDevice);
 
-    /*
-     * Eigen::MatrixX<Float> exp_T =
-          (es.eigenvectors() *
-           (t * es.eigenvalues().array().abs())
-               .unaryExpr([](Float x) { return std::exp(x); })
-               .matrix()
-               .asDiagonal() *
-           es.eigenvectors().transpose());
-      Eigen::VectorX<Float> e1 = Eigen::VectorX<Float>::Zero(T.rows());
-      e1(0) = 1.0;
-      return beta * V * exp_T * e1;
-      */
+    cudaMemcpy(result, e1.data(), 
+               n_ * sizeof(thrust::complex<double>),
+               cudaMemcpyHostToDevice);
+    
   }
 
 private:
@@ -160,7 +176,23 @@ private:
         solver_work_size_, d_info_);
   }
 
+  void reset_data() {
+    cudaMemset(krylov_.T, 0, m_ * m_ * sizeof(thrust::complex<double>));
+    cudaMemset(krylov_.V, 0, n_ * m_ * sizeof(thrust::complex<double>));
+    cudaMemset(krylov_.buf1, 0, n_ * sizeof(thrust::complex<double>));
+    cudaMemset(krylov_.buf2, 0, n_ * sizeof(thrust::complex<double>));
+
+    cudaMemset(krylov_.d_beta, 0, sizeof(double));
+    cudaMemset(krylov_.reconstruct_beta, 0, sizeof(double));
+    //cudaMemset(d_eigenvectors_, 0, m_ * m_ * sizeof(thrust::complex<double>));
+    //cudaMemset(d_eigenvalues_, 0, n_ * sizeof(double));
+  }
+
   DeviceSpMV<thrust::complex<double>> *spmv_;
+  int *d_row_ptr_, *d_col_ind_;
+  thrust::complex<double> *d_values_;
+
+
   KrylovInfoComplex krylov_;
   cusolverDnHandle_t solver_handle_;
   cublasHandle_t cublas_handle_;

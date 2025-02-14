@@ -15,34 +15,20 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
   std::cout << std::scientific << std::setprecision(4);
   std::cout << "n = " << n << ", m = " << m << "\n";
 
-  const int *row_ptr = A.outerIndexPtr();
-  const int *col_ind = A.innerIndexPtr();
-  const std::complex<double> *values = A.valuePtr();
 
-  int *d_row_ptr, *d_col_ind;
-  cuDoubleComplex *d_values;
-
-  cudaMalloc(&d_row_ptr, (n + 1) * sizeof(int));
-  cudaMalloc(&d_col_ind, A.nonZeros() * sizeof(int));
-  cudaMalloc(&d_values, A.nonZeros() * sizeof(cuDoubleComplex));
-
-  cudaMemcpy(d_row_ptr, row_ptr, (n + 1) * sizeof(int), cudaMemcpyHostToDevice);
-  cudaMemcpy(d_col_ind, col_ind, A.nonZeros() * sizeof(int),
-             cudaMemcpyHostToDevice);
-  cudaMemcpy(d_values, reinterpret_cast<const cuDoubleComplex *>(values),
-             A.nonZeros() * sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
 
   MatrixFunctionApplicatorComplex::Parameters params;
-  MatrixFunctionApplicatorComplex matfunc(d_row_ptr, d_col_ind, d_values, n, m,
+  MatrixFunctionApplicatorComplex matfunc(A, n, m,
                                           A.nonZeros(), params);
 
   std::mt19937 gen(42);
   std::normal_distribution<double> dist(0.0, 1.0);
 
-  cuDoubleComplex *d_input, *d_result;
-  cudaMalloc(&d_input, n * sizeof(cuDoubleComplex));
-  cudaMalloc(&d_result, n * sizeof(cuDoubleComplex));
-
+  thrust::complex<double> *d_input, *d_result;
+  cudaMalloc(&d_input, n * sizeof(thrust::complex<double>));
+  cudaMalloc(&d_result, n * sizeof(thrust::complex<double>));
+  cudaMemset(d_input, 0, n * sizeof(thrust::complex<double>));
+  
   std::vector<std::complex<double>> input(n), result(n);
   double dt = 1e-2;
 
@@ -57,11 +43,9 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
     for (uint32_t i = 0; i < n; i++) {
       input[i] = std::complex<double>(dist(gen), dist(gen));
     }
-    Eigen::Map<Eigen::VectorXcd> input_vec(input.data(), n);
-    // input_vec.normalize();
+    Eigen::Map<Eigen::VectorX<std::complex<double>>> input_vec(input.data(), n);
 
-    cudaMemcpy(d_input, reinterpret_cast<const cuDoubleComplex *>(input.data()),
-               n * sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
+    
 
     Eigen::VectorXcd ref_fun;
     auto cpu_start = std::chrono::high_resolution_clock::now();
@@ -71,6 +55,7 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
                         cpu_end - cpu_start)
                         .count();
 
+    cudaMemcpy(d_input, input_vec.data(), n * sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
     cudaEventRecord(start);
     matfunc.apply(d_result, d_input, dt);
     cudaEventRecord(stop);
@@ -97,17 +82,15 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
 
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
-  cudaFree(d_row_ptr);
-  cudaFree(d_col_ind);
-  cudaFree(d_values);
+
   cudaFree(d_input);
   cudaFree(d_result);
 }
 
 int main(int argc, char **argv) {
   setbuf(stdout, NULL);
-  auto ns = {50, 97};
-  std::vector<uint32_t> krylov_dims = {10, 20};
+  auto ns = {5};
+  std::vector<uint32_t> krylov_dims = {2};
 
   for (auto ni : ns) {
     const uint32_t nx = ni;
