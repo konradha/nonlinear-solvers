@@ -57,10 +57,10 @@ Eigen::VectorX<Float> expm_multiply(const Eigen::SparseMatrix<Float> &L,
                                     const Eigen::VectorX<Float> &u, Float t,
                                     const uint32_t m = 10) {
   const auto [V, T, beta] = lanczos_L(L, u, m);
-  std::cout << "Host beta\n" << beta << "\n";
-  std::cout << "Host T\n" << T << "\n";
-  std::cout << "Host V\n" << V << "\n";
-  std::cout << "Host dt: " << t << "\n";
+  //std::cout << "Host beta\n" << beta << "\n";
+  //std::cout << "Host T\n" << T << "\n";
+  //std::cout << "Host V\n" << V << "\n";
+  //std::cout << "Host dt: " << t << "\n";
 //#if DEBUG
 //  std::cout << "V: " << V << "\n";
 //  std::cout << "T: " << T << "\n";

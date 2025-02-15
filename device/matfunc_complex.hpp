@@ -16,7 +16,7 @@ __global__ void transform_eigenvals_exp(thrust::complex<double> *out,
                                         const uint32_t m) {
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   if (i < m) {
-    out[i] = thrust::exp(dt * eigvals[i]);
+    out[i] = thrust::exp(dt * (eigvals[i]));
   }
 }
 
@@ -149,56 +149,61 @@ public:
     double beta;
     cudaMemcpy(&beta, krylov_.reconstruct_beta, sizeof(double),
                cudaMemcpyDeviceToHost);
-    Eigen::MatrixX<std::complex<double>> T(m_, m_);
-    cudaMemcpy(T.data(), krylov_.T,
-               m_ * m_ * sizeof(std::complex<double>),
-               cudaMemcpyDeviceToHost); 
-    Eigen::MatrixX<std::complex<double>> V(n_, m_);
-    cudaMemcpy(V.data(), krylov_.V,
-               n_ * m_ * sizeof(std::complex<double>),
-               cudaMemcpyDeviceToHost);
+    //Eigen::MatrixX<std::complex<double>> T(m_, m_);
+    //cudaMemcpy(T.data(), krylov_.T,
+    //           m_ * m_ * sizeof(std::complex<double>),
+    //           cudaMemcpyDeviceToHost); 
+    //Eigen::MatrixX<std::complex<double>> V(n_, m_);
+    //cudaMemcpy(V.data(), krylov_.V,
+    //           n_ * m_ * sizeof(std::complex<double>),
+    //           cudaMemcpyDeviceToHost);
 
-    std::cout << "Device beta (hostcpy):\n" << beta << "\n";
-    std::cout << "Device T (hostcpy):\n" << T << "\n";
-    std::cout << "Device V (hostcpy):\n" << V << "\n";
+    //std::cout << "Device beta (hostcpy):\n" << beta << "\n";
+    //std::cout << "Device T (hostcpy):\n" << T << "\n";
+    //std::cout << "Device V (hostcpy):\n" << V << "\n";
 
     
-    //compute_eigen_decomposition();
-    //dim3 block_dim_1d_ = dim3(256);    
-    //dim3 block_2d(16, 16);
-    //dim3 grid_VK((m_ + block_2d.x - 1) / block_2d.x,
-    //             (n_ + block_2d.y - 1) / block_2d.y);
-    //dim3 grid_QDQ((m_ + block_2d.x - 1) / block_2d.x,
-    //              (m_ + block_2d.y - 1) / block_2d.y);
-    //dim3 block_1d(256);
-    //dim3 grid_1d((n_ + block_1d.x - 1) / block_1d.x);
-    //matrix_multiply_QDQ<<<grid_QDQ, block_2d>>>(d_eigenvectors_, d_eigenvalues_,
-    //                                            d_work_, m_);
-    //matrix_multiply_VK<<<grid_VK, block_2d>>>(krylov_.V, d_work_, d_work_large_,
-    //                                          n_, m_);
-    //scale_first_col<<<grid_1d, block_1d>>>(d_work_large_, result, beta, n_);
+    compute_eigen_decomposition();
+
+    dim3 block_dim_1d_ = dim3(256);    
+    dim3 block_2d(16, 16);
+    dim3 grid_VK((m_ + block_2d.x - 1) / block_2d.x,
+                 (n_ + block_2d.y - 1) / block_2d.y);
+    dim3 grid_QDQ((m_ + block_2d.x - 1) / block_2d.x,
+                  (m_ + block_2d.y - 1) / block_2d.y);
+    dim3 block_1d(256);
+    dim3 grid_1d((n_ + block_1d.x - 1) / block_1d.x);
+
+    transform_eigenvals_exp<<<grid_1d, block_1d>>>(
+          d_diag_, d_eigenvalues_, dt, m_);
+
+ 
+    matrix_multiply_QDQ<<<grid_QDQ, block_2d>>>(d_eigenvectors_, d_eigenvalues_,
+                                                d_work_, m_);
+    matrix_multiply_VK<<<grid_VK, block_2d>>>(krylov_.V, d_work_, d_work_large_,
+                                              n_, m_);
+    scale_first_col<<<grid_1d, block_1d>>>(d_work_large_, result, beta, n_);
 
 
-    std::cout << "Device dt: " << dt << "\n";
-
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<std::complex<double>>> es(T);
-    //std::cout << "Device T eigenvalues\n";
-    //std::cout << es.eigenvalues() << "\n";
-    cudaDeviceSynchronize();
-    Eigen::MatrixX<std::complex<double>> exp_T =
-           (es.eigenvectors() *
-            (dt * es.eigenvalues().array().abs())
-                .unaryExpr([](std::complex<double> x) { return std::exp(x); })
-                .matrix()
-                .asDiagonal() *
-            es.eigenvectors().transpose());
-    Eigen::VectorX<std::complex<double>> e1 = Eigen::VectorX<std::complex<double>>::Zero(T.rows());
-    e1(0) = 1.0;
-    Eigen::VectorX<std::complex<double>> r = beta * V * exp_T * e1;
-    cudaDeviceSynchronize(); 
-    cudaMemcpy(result, r.data(), 
-               n_ * sizeof(thrust::complex<double>),
-               cudaMemcpyHostToDevice);
+    //std::cout << "Device dt: " << dt << "\n";
+    //Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<std::complex<double>>> es(T);
+    ////std::cout << "Device T eigenvalues\n";
+    ////std::cout << es.eigenvalues() << "\n";
+    //cudaDeviceSynchronize();
+    //Eigen::MatrixX<std::complex<double>> exp_T =
+    //       (es.eigenvectors() *
+    //        (dt * es.eigenvalues().array().abs())
+    //            .unaryExpr([](std::complex<double> x) { return std::exp(x); })
+    //            .matrix()
+    //            .asDiagonal() *
+    //        es.eigenvectors().transpose());
+    //Eigen::VectorX<std::complex<double>> e1 = Eigen::VectorX<std::complex<double>>::Zero(T.rows());
+    //e1(0) = 1.0;
+    //Eigen::VectorX<std::complex<double>> r = beta * V * exp_T * e1;
+    //cudaDeviceSynchronize(); 
+    //cudaMemcpy(result, r.data(), 
+    //           n_ * sizeof(thrust::complex<double>),
+    //           cudaMemcpyHostToDevice);
 
     /*
      * Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
