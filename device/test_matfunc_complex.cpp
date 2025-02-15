@@ -46,10 +46,11 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
     Eigen::Map<Eigen::VectorX<std::complex<double>>> input_vec(input.data(), n);
 
     
-
+    std::complex<double> tau(0, dt);
     Eigen::VectorXcd ref_fun;
+
     auto cpu_start = std::chrono::high_resolution_clock::now();
-    ref_fun = expm_multiply<std::complex<double>>(A, input_vec, dt, m);
+    ref_fun = expm_multiply<std::complex<double>>(A, input_vec, tau, m);
     auto cpu_end = std::chrono::high_resolution_clock::now();
     avg_cpu_time += std::chrono::duration_cast<std::chrono::microseconds>(
                         cpu_end - cpu_start)
@@ -57,7 +58,7 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
 
     cudaMemcpy(d_input, input_vec.data(), n * sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
     cudaEventRecord(start);
-    std::complex<double> tau(0, dt);
+    
     matfunc.apply(d_result, d_input, tau);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
