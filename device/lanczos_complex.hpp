@@ -318,7 +318,7 @@ fused_lanczos_step(const cuDoubleComplex *__restrict__ spmv_result,
 void lanczos_iteration_complex(DeviceSpMV<thrust::complex<double>> *spmv,
                                KrylovInfoComplex *krylov,
                                const thrust::complex<double> *__restrict__ u) {
-  //printf("Device: Lanczos iteration complex\n");
+  // printf("Device: Lanczos iteration complex\n");
 #if COUNTER
   cudaEvent_t start_data_mov, stop_data_mov;
   cudaEventCreate(&start_data_mov);
@@ -352,7 +352,7 @@ void lanczos_iteration_complex(DeviceSpMV<thrust::complex<double>> *spmv,
   cudaEventRecord(start_data_mov);
 #endif
   cudaMemcpy(krylov->buf1, u, n * sizeof(thrust::complex<double>),
-             cudaMemcpyDeviceToDevice); 
+             cudaMemcpyDeviceToDevice);
   cudaMemcpy(krylov->V, u, n * sizeof(thrust::complex<double>),
              cudaMemcpyDeviceToDevice);
   cudaMemset(krylov->T, 0, m * m * sizeof(thrust::complex<double>));
@@ -370,7 +370,7 @@ void lanczos_iteration_complex(DeviceSpMV<thrust::complex<double>> *spmv,
 #endif
   cudaMemcpy(krylov->d_beta, &beta, sizeof(double), cudaMemcpyHostToDevice);
   cudaMemcpy(krylov->reconstruct_beta, &beta, sizeof(double),
-                  cudaMemcpyHostToDevice);
+             cudaMemcpyHostToDevice);
 #if COUNTER
   cudaEventRecord(stop_data_mov);
   cudaEventElapsedTime(&t, start_data_mov, stop_data_mov);
@@ -388,14 +388,12 @@ void lanczos_iteration_complex(DeviceSpMV<thrust::complex<double>> *spmv,
   cuDoubleComplex zero = make_cuDoubleComplex(0.0, 0.0);
   cuDoubleComplex neg_one = make_cuDoubleComplex(-1.0, 0.0);
 
-
   cudaDeviceSynchronize();
   for (uint32_t j = 0; j < m - 1; j++) {
 #if COUNTER
     cudaEventRecord(start_spmv);
 #endif
     spmv->multiply(&krylov->V[j * n], krylov->buf1);
-
 
     // fused_lanczos_step<<<grid, block,
     // SHARED_MEM_SIZE>>>(reinterpret_cast<cuDoubleComplex*>(krylov->buf1),
@@ -419,8 +417,8 @@ void lanczos_iteration_complex(DeviceSpMV<thrust::complex<double>> *spmv,
 #if COUNTER
       cudaEventRecord(start_data_mov);
 #endif
-      cudaMemcpy(&krylov->T[m * (j-1) + j], &dot_result,
-      sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
+      cudaMemcpy(&krylov->T[m * (j - 1) + j], &dot_result,
+                 sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
 
 #if COUNTER
       cudaEventRecord(stop_data_mov);
@@ -443,7 +441,7 @@ void lanczos_iteration_complex(DeviceSpMV<thrust::complex<double>> *spmv,
     cudaEventRecord(start_data_mov);
 #endif
     cudaMemcpy(&krylov->T[m * j + j], &dot_result, sizeof(cuDoubleComplex),
-    cudaMemcpyHostToDevice);
+               cudaMemcpyHostToDevice);
 #if COUNTER
     cudaEventRecord(stop_data_mov);
     cudaEventElapsedTime(&t, start_data_mov, stop_data_mov);
@@ -486,9 +484,9 @@ void lanczos_iteration_complex(DeviceSpMV<thrust::complex<double>> *spmv,
     cudaEventRecord(start_data_mov);
 #endif
     cudaMemcpy(&krylov->T[m * j + j + 1], &beta_complex,
-                    sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
+               sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
     cudaMemcpy(&krylov->T[m * (j + 1) + j], &beta_complex,
-                    sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
+               sizeof(cuDoubleComplex), cudaMemcpyHostToDevice);
 #if COUNTER
     cudaEventRecord(stop_data_mov);
     cudaEventElapsedTime(&t, start_data_mov, stop_data_mov);
@@ -504,8 +502,7 @@ void lanczos_iteration_complex(DeviceSpMV<thrust::complex<double>> *spmv,
     cudaEventRecord(start_data_mov);
 #endif
     cudaMemcpy(&krylov->V[(j + 1) * n], krylov->buf1,
-                    n * sizeof(thrust::complex<double>),
-                    cudaMemcpyDeviceToDevice);
+               n * sizeof(thrust::complex<double>), cudaMemcpyDeviceToDevice);
 #if COUNTER
     cudaEventRecord(stop_data_mov);
     cudaEventElapsedTime(&t, start_data_mov, stop_data_mov);
@@ -527,31 +524,30 @@ void lanczos_iteration_complex(DeviceSpMV<thrust::complex<double>> *spmv,
          t_spmv / s, t_beg / s, t_inner / s, t_rest / s);
 #endif
 
-  //printf("Device: End of Lanczos iteration\n");
-  //thrust::complex<double> * T_host;
-  //T_host = (thrust::complex<double> *)malloc(sizeof(thrust::complex<double>) * m * m);
-  //cudaMemcpy(T_host, krylov->T, m * m * sizeof(thrust::complex<double>), cudaMemcpyDeviceToHost);
-  //std::cout << "T:\n";
-  //for(uint32_t i=0;i<m;++i)
+  // printf("Device: End of Lanczos iteration\n");
+  // thrust::complex<double> * T_host;
+  // T_host = (thrust::complex<double> *)malloc(sizeof(thrust::complex<double>)
+  // * m * m); cudaMemcpy(T_host, krylov->T, m * m *
+  // sizeof(thrust::complex<double>), cudaMemcpyDeviceToHost); std::cout <<
+  // "T:\n"; for(uint32_t i=0;i<m;++i)
   //{
-  //  for(uint32_t j=0;j<m;++j)
-  //         std::cout << T_host[m * i + j] << " ";
-  //  std::cout << "\n"; 
-  //}
-  //free(T_host);
+  //   for(uint32_t j=0;j<m;++j)
+  //          std::cout << T_host[m * i + j] << " ";
+  //   std::cout << "\n";
+  // }
+  // free(T_host);
 
-  //thrust::complex<double> * V_host;
-  //V_host = (thrust::complex<double> *)malloc(sizeof(thrust::complex<double>) * n * m);
-  //cudaMemcpy(V_host, krylov->V, n * m * sizeof(thrust::complex<double>), cudaMemcpyDeviceToHost);
-  //std::cout << "V:\n";
-  //for(uint32_t i=0;i<n;++i)
+  // thrust::complex<double> * V_host;
+  // V_host = (thrust::complex<double> *)malloc(sizeof(thrust::complex<double>)
+  // * n * m); cudaMemcpy(V_host, krylov->V, n * m *
+  // sizeof(thrust::complex<double>), cudaMemcpyDeviceToHost); std::cout <<
+  // "V:\n"; for(uint32_t i=0;i<n;++i)
   //{
-  //  for(uint32_t j=0;j<m;++j)
-  //         std::cout << V_host[m * i + j] << " ";
-  //  std::cout << "\n"; 
-  //}
-  //free(V_host);
-
+  //   for(uint32_t j=0;j<m;++j)
+  //          std::cout << V_host[m * i + j] << " ";
+  //   std::cout << "\n";
+  // }
+  // free(V_host);
 }
 
 #endif

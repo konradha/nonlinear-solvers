@@ -15,11 +15,8 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
   std::cout << std::scientific << std::setprecision(4);
   std::cout << "n = " << n << ", m = " << m << "\n";
 
-
-
   MatrixFunctionApplicatorComplex::Parameters params;
-  MatrixFunctionApplicatorComplex matfunc(A, n, m,
-                                          A.nonZeros(), params);
+  MatrixFunctionApplicatorComplex matfunc(A, n, m, A.nonZeros(), params);
 
   std::mt19937 gen(42);
   std::normal_distribution<double> dist(0.0, 1.0);
@@ -28,7 +25,7 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
   cudaMalloc(&d_input, n * sizeof(thrust::complex<double>));
   cudaMalloc(&d_result, n * sizeof(thrust::complex<double>));
   cudaMemset(d_input, 0, n * sizeof(thrust::complex<double>));
-  
+
   std::vector<std::complex<double>> input(n), result(n);
   double dt = 1e-2;
 
@@ -45,7 +42,6 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
     }
     Eigen::Map<Eigen::VectorX<std::complex<double>>> input_vec(input.data(), n);
 
-    
     std::complex<double> tau(0, dt);
     Eigen::VectorXcd ref_fun;
 
@@ -56,10 +52,12 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
                         cpu_end - cpu_start)
                         .count();
 
-    for(uint32_t k=0;k<10;++k) matfunc.apply(d_result, d_input, tau);
+    for (uint32_t k = 0; k < 10; ++k)
+      matfunc.apply(d_result, d_input, tau);
 
-    cudaMemcpy(d_input, input_vec.data(), n * sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
-    cudaEventRecord(start);    
+    cudaMemcpy(d_input, input_vec.data(), n * sizeof(thrust::complex<double>),
+               cudaMemcpyHostToDevice);
+    cudaEventRecord(start);
     matfunc.apply(d_result, d_input, tau);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -69,20 +67,20 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
 
     cudaMemcpy(result.data(), d_result, n * sizeof(std::complex<double>),
                cudaMemcpyDeviceToHost);
-    Eigen::Map<Eigen::VectorX<std::complex<double>>> gpu_result(result.data(), n);
+    Eigen::Map<Eigen::VectorX<std::complex<double>>> gpu_result(result.data(),
+                                                                n);
     Eigen::VectorXcd diff = ref_fun - gpu_result;
-
 
     std::cout << "L1 = " << diff.lpNorm<1>() << ", L2 = " << diff.norm()
               << "\n";
 
-    if (diff.lpNorm<1>() > 1e-1){
+    if (diff.lpNorm<1>() > 1e-1) {
       std::cout << "Correct values\n";
-      for(uint32_t i=0;i<5;++i)
+      for (uint32_t i = 0; i < 5; ++i)
         std::cout << ref_fun(i) << " ";
       std::cout << "\n";
       std::cout << "Device values\n";
-      for(uint32_t i=0;i<5;++i)
+      for (uint32_t i = 0; i < 5; ++i)
         std::cout << gpu_result(i) << " ";
       std::cout << "\n";
     }
@@ -109,7 +107,7 @@ int main(int argc, char **argv) {
   // std::vector<uint32_t> krylov_dims = {2};
 
   // benchmark sizes
-  //auto ns = {50, 132, 500, 877};
+  // auto ns = {50, 132, 500, 877};
   auto ns = {1000};
   std::vector<uint32_t> krylov_dims = {5, 10, 20};
 
