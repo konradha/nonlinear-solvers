@@ -57,8 +57,7 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
                         .count();
 
     cudaMemcpy(d_input, input_vec.data(), n * sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
-    cudaEventRecord(start);
-    
+    cudaEventRecord(start);    
     matfunc.apply(d_result, d_input, tau);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -104,12 +103,12 @@ void test_matfunc_complex(const Eigen::SparseMatrix<std::complex<double>> &A,
 int main(int argc, char **argv) {
   setbuf(stdout, NULL);
   // debug sizes
-  auto ns = {5};
-  std::vector<uint32_t> krylov_dims = {2};
+  // auto ns = {5};
+  // std::vector<uint32_t> krylov_dims = {2};
 
   // benchmark sizes
-  // auto ns = {50, 132, 500, 877};
-  // std::vector<uint32_t> krylov_dims = {5, 10, 20};
+  auto ns = {50, 132, 500, 877};
+  std::vector<uint32_t> krylov_dims = {5, 10, 20};
 
   for (auto ni : ns) {
     const uint32_t nx = ni;
