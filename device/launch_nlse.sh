@@ -8,7 +8,7 @@
 #SBATCH --gpus=1
 #SBATCH --output=nlse_mpi_%j.out
 #SBATCH --error=nlse_mpi_%j.err
-#SBATCH --ntasks=4
+#SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 
 mpirun -n $SLURM_NTASKS python submit_nlse.py
