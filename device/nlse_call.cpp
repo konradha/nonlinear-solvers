@@ -39,13 +39,13 @@ int main(int argc, char **argv) {
   const std::complex<double> dti(0, dt);
 
   auto get_norm = [&](const Eigen::VectorX<std::complex<double>> &x) {
-      return std::sqrt((x.conjugate().array() * x.array() * dx * dy).sum());
+    return std::sqrt((x.conjugate().array() * x.array() * dx * dy).sum());
   };
 
   std::vector<uint32_t> input_shape;
   Eigen::VectorXcd u0 =
       read_from_npy<std::complex<double>>(input_file, input_shape);
-  const auto Norm = get_norm(u0); 
+  const auto Norm = get_norm(u0);
   u0 = u0 / Norm;
 
   if (input_shape.size() != 2 || input_shape[0] != ny || input_shape[1] != nx) {

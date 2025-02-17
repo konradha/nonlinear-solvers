@@ -34,7 +34,7 @@ def animate(X, Y, data, nt, save=None):
         ax.clear()
         ax.plot_surface(X, Y,
                 #data[frame],
-                #np.real(data[frame]),
+                #np.imag(data[frame]),
                 np.abs(data[frame]),
                 cmap='coolwarm')
     fps = 10
