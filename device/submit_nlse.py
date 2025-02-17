@@ -86,8 +86,8 @@ if __name__ == '__main__':
     
     nx = ny = 256
     Lx = Ly = 10.0
-    T = 1.5
-    nt = 500
+    T = 3.
+    nt = 1000
     num_snapshots = 100
     
     cwd = Path.cwd()
@@ -106,7 +106,7 @@ if __name__ == '__main__':
     rng = np.random.default_rng(seed=rank)
     xn, yn = np.linspace(-Lx, Lx, nx), np.linspace(-Ly, Ly, ny) 
     X, Y = np.meshgrid(xn, yn)
-    ic = sampler_random_fourier_localized()  
+    ic = sampler_random_solitons(X, Y)  
     
     input_file = ic_dir / f"ic_{run_id}_{rank:04d}.npy"
     output_file = traj_dir / f"traj_{run_id}_{rank:04d}.npy"
@@ -125,7 +125,15 @@ if __name__ == '__main__':
     if rank == 0:
         print("Executing command:", " ".join(cmd))
     
+    t_start = MPI.Wtime()
     result = subprocess.run(cmd, capture_output=True, text=True)
+    t_end = MPI.Wtime()
+    t_elapsed = t_end - t_start
+    all_times = comm.gather(t_elapsed, root=0)
+
+    if rank == 0:
+        print("All timings:", all_times)
+
     if result.returncode != 0:
         print(f"Rank {rank}: Error - {result.stderr}")
     
