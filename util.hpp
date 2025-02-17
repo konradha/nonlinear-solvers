@@ -35,3 +35,16 @@ void save_to_npy(const std::string &filename, const Eigen::VectorX<Float> &data,
   //           << "shape size: " << shape.size() << "\n";
   npy::SaveArrayAsNumpy(filename, false, shape.size(), shape_ul.data(), vec);
 }
+
+template <typename Float>
+Eigen::VectorX<Float> read_from_npy(const std::string &filename, std::vector<uint32_t>& shape) {
+    std::vector<Float> data;
+    std::vector<uint64_t> shape_ul;
+    bool fortran_order;
+    npy::LoadArrayFromNumpy(filename, shape_ul, fortran_order, data);
+    shape.clear();
+    for (const auto dim : shape_ul) {
+        shape.push_back(static_cast<uint64_t>(dim));
+    }
+    return Eigen::Map<Eigen::VectorX<Float>>(data.data(), data.size());
+}
