@@ -44,7 +44,7 @@ def sampler_random_vortices(X, Y, num_vortices=10, core_size=0.3, seed=None):
         charge = np.random.choice([-1, 1])
         phase = charge * np.arctan2(Y - y0, X - x0)
         envelope = np.exp(-((X - x0)**2 + (Y - y0)**2) / (2 * core_size**2))
-        u *= (1 + envelope * (np.exp(1j * phase) - 1))
+        u *= (1 + envelope * (np.exp(np.random.random() * 1j * phase) - 1))
     return u
 
 def sampler_random_solitons(X, Y, num_solitons=5, soliton_width=0.5, amp_range=(0.5, 2.0), seed=None):
@@ -144,7 +144,16 @@ if __name__ == '__main__':
     rng = np.random.default_rng(seed=rank)
     xn, yn = np.linspace(-Lx, Lx, nx), np.linspace(-Ly, Ly, ny) 
     X, Y = np.meshgrid(xn, yn)
-    ic = sampler_random_solitons_with_velocities(X, Y)# sampler_random_solitons(X, Y)  
+    ic = None 
+    choice = np.random.randint(0, 4) 
+    if choice == 0:
+        ic = sampler_random_vortices(X, Y, num_vortices=np.random.randint(2, 15))
+    elif choice == 1:
+        ic = sampler_random_solitons_with_velocities(X, Y, num_solitons=np.random.randint(2, 10)) 
+    elif choice == 2:
+        ic = sampler_random_fourier_localized()
+    else:
+        ic = sampler_random_solitons(X, Y)   
     
     input_file = ic_dir / f"ic_{run_id}_{rank:04d}.npy"
     output_file = traj_dir / f"traj_{run_id}_{rank:04d}.npy"
@@ -181,5 +190,4 @@ if __name__ == '__main__':
     output_h5 = traj_dir / f"traj_{run_id}_{rank:04d}.h5"
     params = {'T': T}
     save_trajectory(trajectory, X, Y, params, filename=str(output_h5))
-    os.unlink(output_file)
-    
+    os.unlink(output_file) 
