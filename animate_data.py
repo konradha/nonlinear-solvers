@@ -4,29 +4,9 @@ from matplotlib.animation import FuncAnimation
 from sys import argv
 from PIL import Image as img
 
-def u_analytical(x, y, t):
-    a = [1., 0, 3, 2, 4, 0, 0, 6, 0]
-    a1, a2, a3, a4, a5, a6, a7, a8, a9 = a
+from pathlib import Path
 
-    c1 = a1*a5/a3
-    c2 = 0
-
-    x_shifted = x - c1*t
-    y_shifted = y - c2*t
-
-    term1 = a1 * x_shifted + a2 * x_shifted + a4
-    term2 = a5 * x_shifted
-
-    denom = (term1**2 + term2**2 +
-             6*a3**2*(a1**4 + 2*a1**2*a5**2 + a5**4)/(a5*(a1**2 - a3**2))**2)
-    num1 = 2*(2*a1**2 + 2*a5**2)
-    num2 = 2*(2*term1*a1 + 2*term2*a5)**2
-
-    return num1/denom - num2/denom**2
-
-
-
-def animate(X, Y, data, nt, save=None):
+def animate(X, Y, data, nt, save=None, fname=None):
     fig = plt.figure(figsize=(20, 20))
     ax = fig.add_subplot(111, projection='3d')
     surf = ax.plot_surface(X, Y, data[0], cmap='viridis',)
@@ -37,7 +17,7 @@ def animate(X, Y, data, nt, save=None):
                 #np.imag(data[frame]),
                 np.abs(data[frame]),
                 cmap='coolwarm')
-    fps = 10
+    fps = 2
     ani = FuncAnimation(fig, update, frames=nt, interval=nt / fps, )
 
     if save and save == "gif":
@@ -46,7 +26,8 @@ def animate(X, Y, data, nt, save=None):
         #img.open(fname).save(fname, optimize=True)
 
     elif save and save ==  "mp4":
-        fname = f"evolution.mp4"
+        if fname:
+            fname = f"{fname}.mp4"
         ani.save(fname,)
     else:
         plt.show()
@@ -76,8 +57,12 @@ if __name__ == '__main__':
     nx = int(argv[3])
     ny = int(argv[4])
     save_ani = str(argv[5])
+    fname_save = str(argv[6])
 
-    data = np.load(fname)
+    path_data = Path(fname)
+
+    data = np.load(path_data) if path_data.suffix == '.npy' else np.load(path_data)['arr_0']
+
     nt = data.shape[0]
     assert data.shape[1] == nx and data.shape[2] == ny
 
@@ -86,4 +71,4 @@ if __name__ == '__main__':
     X, Y = np.meshgrid(xn, yn)
 
     #animate_comparison(X, Y, data, nt)
-    animate(X, Y, data, nt, save_ani)
+    animate(X, Y, data, nt, save_ani, fname_save)
