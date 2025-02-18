@@ -1,10 +1,10 @@
-#ifndef NLSE_SOLVER_DEV_HPP
-#define NLSE_SOLVER_DEV_HPP
+#ifndef NLSE_CQ_SOLVER_HPP
+#define NLSE_CQ_SOLVER_HPP
 
 
 /*
  *
- * i u_t + (u_xx + u_yy) + |u|²u = 0
+ * i u_t + (u_xx + u_yy) + (\sigma_1 |u|² + \sigma_2 |u|⁴)u = 0
  * on rectangular domain with n_x x n_y gridpoints
  *
  */
@@ -15,13 +15,16 @@
 
 __global__ void density(thrust::complex<double> *out,
                         const thrust::complex<double> *in, const uint32_t nx,
-                        const uint32_t ny) {
+                        const uint32_t ny,
+			const thrust::complex<double> s1 = {0., .5}, const thrust::complex<double> s2 = {-.5, 0.}) {
   const int x = blockIdx.x * blockDim.x + threadIdx.x;
   const int y = blockIdx.y * blockDim.y + threadIdx.y;
   if (x < nx && y < ny) {
     const int idx = y * nx + x;
     const auto val = in[idx];
-    out[idx] = thrust::abs(val) * thrust::abs(val);
+    const auto d = thrust::abs(val) * thrust::abs(val);
+    const auto d2 = d * d;
+    out[idx] = s1 * d + s2 * d2;
   }
 }
 
@@ -38,7 +41,7 @@ __global__ void nonlin_part(thrust::complex<double> *out,
   }
 }
 
-class NLSESolverDevice {
+class NLSECubicQuinticSolver {
 public:
   struct Parameters {
     uint32_t block_size;
@@ -50,7 +53,7 @@ public:
           krylov_dim(m) {}
   };
 
-  NLSESolverDevice(const Eigen::SparseMatrix<std::complex<double>> &L,
+  NLSECubicQuinticSolver(const Eigen::SparseMatrix<std::complex<double>> &L,
                    const std::complex<double> *host_u0,
                    const Parameters &params = Parameters())
       : n_(L.rows()), current_snapshot_(0), params_(params) {
@@ -83,7 +86,7 @@ public:
     store_snapshot(0);
   }
 
-  ~NLSESolverDevice() {
+  ~NLSECubicQuinticSolver() {
     delete matfunc_;
     cudaFree(d_u_);
     cudaFree(d_buf_);
