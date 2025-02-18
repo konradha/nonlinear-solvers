@@ -11,9 +11,9 @@ $$ i u\_t + \Delta u + V(u; x, y, t) u = 0 $$
 The below trajectories show $|u|^2$ with random initial conditions (not fully random, this
 will be expanded on at a later point).
 
-![](content/traj_3b0f7251_0000.mp4)
-![](content/traj_7e40f6d2_0000.mp4)
-![](content/traj_dfdf666c_0000.mp4)
+![](content/traj_3b0f7251_0000.gif)
+![](content/traj_7e40f6d2_0000.gif)
+![](content/traj_dfdf666c_0000.gif)
 
 
 #### sine-Gordon
