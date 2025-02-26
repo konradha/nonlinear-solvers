@@ -23,18 +23,19 @@ def animate(X, Y, data, nt, name):
     def update(frame):
         ax.clear()
         ax.plot_surface(X, Y,
-                np.abs(data[frame]),
+                np.real(data[frame]),
                 cmap='coolwarm')
     fps = 2
     ani = FuncAnimation(fig, update, frames=nt, interval=nt / fps, )
-    ani.save(name,)
+    plt.show()
+    #ani.save(name,)
 
 def animate_diff(X, Y, data, nt, name):
     fig = plt.figure(figsize=(12, 8))
     
     def update(frame):
         plt.clf()
-        plt.imshow(np.abs(data[frame]), 
+        plt.imshow(np.real(data[frame]), 
                   extent=[X.min(), X.max(), Y.min(), Y.max()],
                   aspect='auto',
                   cmap='coolwarm')
@@ -45,7 +46,8 @@ def animate_diff(X, Y, data, nt, name):
                        frames=nt,
                        interval=1000/fps,
                        blit=False)
-    ani.save(name)
+    plt.show()
+    #ani.save(name)
     
 if __name__ == '__main__':
     fname = str(argv[1])
@@ -55,4 +57,5 @@ if __name__ == '__main__':
     
     fname_save = fname.replace(".h5", ".mp4")
     animate_diff(X, Y, u, nt, fname_save)
+    #animate(X, Y, u, nt, fname_save)
 
