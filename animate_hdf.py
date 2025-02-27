@@ -46,8 +46,8 @@ def animate_diff(X, Y, data, nt, name):
                        frames=nt,
                        interval=1000/fps,
                        blit=False)
-    plt.show()
-    #ani.save(name)
+    #plt.show()
+    ani.save(name)
     
 if __name__ == '__main__':
     fname = str(argv[1])
