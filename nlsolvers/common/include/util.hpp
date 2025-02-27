@@ -1,8 +1,8 @@
 #ifndef UTIL_HPP
 #define UTIL_HPP
 
-#include <npy.hpp>
 #include <iostream>
+#include <npy.hpp>
 
 #define PROGRESS_BAR(i, total)                                                 \
   if ((i + 1) % (total / 100 + 1) == 0 || i + 1 == total) {                    \
@@ -24,7 +24,6 @@
       std::cout << std::endl;                                                  \
   }
 
-
 template <typename Float>
 void save_to_npy(const std::string &filename, const Eigen::VectorX<Float> &data,
                  const std::vector<uint32_t> &shape) {
@@ -36,16 +35,17 @@ void save_to_npy(const std::string &filename, const Eigen::VectorX<Float> &data,
 }
 
 template <typename Float>
-Eigen::VectorX<Float> read_from_npy(const std::string &filename, std::vector<uint32_t>& shape) {
-    std::vector<Float> data;
-    std::vector<uint64_t> shape_ul;
-    bool fortran_order;
-    npy::LoadArrayFromNumpy(filename, shape_ul, fortran_order, data);
-    shape.clear();
-    for (const auto dim : shape_ul) {
-        shape.push_back(static_cast<uint64_t>(dim));
-    }
-    return Eigen::Map<Eigen::VectorX<Float>>(data.data(), data.size());
+Eigen::VectorX<Float> read_from_npy(const std::string &filename,
+                                    std::vector<uint32_t> &shape) {
+  std::vector<Float> data;
+  std::vector<uint64_t> shape_ul;
+  bool fortran_order;
+  npy::LoadArrayFromNumpy(filename, shape_ul, fortran_order, data);
+  shape.clear();
+  for (const auto dim : shape_ul) {
+    shape.push_back(static_cast<uint64_t>(dim));
+  }
+  return Eigen::Map<Eigen::VectorX<Float>>(data.data(), data.size());
 }
 
 #endif

@@ -56,15 +56,15 @@ void step_sv(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
 template <typename Scalar_t>
 void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
           Eigen::VectorX<Scalar_t> &buf, const Eigen::SparseMatrix<Scalar_t> &L,
-          const Eigen::VectorX<Scalar_t> &m,
-          const Scalar_t tau) {
+          const Eigen::VectorX<Scalar_t> &m, const Scalar_t tau) {
   // u_tt + Au = g(u)
   // u_{n+1} =
   // 2 cos (tau \Omega) u_{n} - u_{n-1} + tau² sinc²(tau / 2 \Omega)
   // x g(\phi(tau \Omega)u_{n}))
 
   Eigen::VectorX<Scalar_t> buf2 = id_sqrt_multiply(L, u, tau);
-  buf2 = m.cwiseProduct(buf2.unaryExpr([](Scalar_t x) { return -std::sin(x); }));
+  buf2 =
+      m.cwiseProduct(buf2.unaryExpr([](Scalar_t x) { return -std::sin(x); }));
   buf2 = sinc2_sqrt_half(L, buf2, tau);
   Eigen::VectorX<Scalar_t> u_cpy = u;
   u = 2 * cos_sqrt_multiply(L, u, tau) - u_past + tau * tau * buf2;

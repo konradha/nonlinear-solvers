@@ -16,9 +16,9 @@ lanczos_L(const Eigen::SparseMatrix<Float> &L, const Eigen::VectorX<Float> &u,
   Float beta = u.norm();
   V.col(0) = u / beta;
 
-  //std::cout << "Host Lanczos beta: " << beta << "\n";
+  // std::cout << "Host Lanczos beta: " << beta << "\n";
   V.col(0) = u / beta;
-  //std::cout << "Host V first col norm: " << V.col(0).norm() << "\n";
+  // std::cout << "Host V first col norm: " << V.col(0).norm() << "\n";
 
   for (uint32_t j = 0; j < m - 1; j++) {
     Eigen::VectorX<Float> w = L * V.col(j);
@@ -46,9 +46,9 @@ lanczos_L(const Eigen::SparseMatrix<Float> &L, const Eigen::VectorX<Float> &u,
     // }
     V.col(j + 1) = w / T(j + 1, j);
   }
-  //std::cout << "Host T diagonal: ";
-  //for(int i = 0; i < m; ++i) std::cout << T(i,i) << " ";
-  //std::cout << "\n";
+  // std::cout << "Host T diagonal: ";
+  // for(int i = 0; i < m; ++i) std::cout << T(i,i) << " ";
+  // std::cout << "\n";
 
   return {V, T, beta};
 }
@@ -59,21 +59,19 @@ Eigen::VectorX<Float> cos_sqrt_multiply(const Eigen::SparseMatrix<Float> &L,
                                         const uint32_t m = 10) {
   const auto [V, T, beta] = lanczos_L(L, u, m);
 
-  //std::cout << "Host (cos) V.row(0)\n";
-  //std::cout << V.row(0) << "\n";
-  //std::cout << "\n";
+  // std::cout << "Host (cos) V.row(0)\n";
+  // std::cout << V.row(0) << "\n";
+  // std::cout << "\n";
 
-  //std::cout << "Host (cos) T\n";
-  //std::cout << T << "\n";
-  //std::cout << "\n";
-
-
+  // std::cout << "Host (cos) T\n";
+  // std::cout << T << "\n";
+  // std::cout << "\n";
 
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
-  //std::cout << "Host (cos) eigenvalues of T\n";
-  //std::cout << es.eigenvalues() << "\n";
-  //std::cout << "Host (cos) Eigenvectors of T\n";
-  //std::cout << es.eigenvectors() << "\n";
+  // std::cout << "Host (cos) eigenvalues of T\n";
+  // std::cout << es.eigenvalues() << "\n";
+  // std::cout << "Host (cos) Eigenvectors of T\n";
+  // std::cout << es.eigenvectors() << "\n";
 
   Eigen::MatrixX<Float> cos_sqrt_T =
       (es.eigenvectors() *
@@ -95,20 +93,20 @@ Eigen::VectorX<Float> sinc2_sqrt_multiply(const Eigen::SparseMatrix<Float> &L,
     return std::abs(x) < 1e-8 ? Float(1) : std::sin(x) / x;
   };
   const auto [V, T, beta] = lanczos_L(L, u, m);
-  
-  //std::cout << "Host (sinc2) V.row(0)\n";
-  //std::cout << V.row(0) << "\n";
-  //std::cout << "\n";
 
-  //std::cout << "Host (sinc2) T\n";
-  //std::cout << T << "\n";
-  //std::cout << "\n";
+  // std::cout << "Host (sinc2) V.row(0)\n";
+  // std::cout << V.row(0) << "\n";
+  // std::cout << "\n";
+
+  // std::cout << "Host (sinc2) T\n";
+  // std::cout << T << "\n";
+  // std::cout << "\n";
 
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
-  //std::cout << "Host (sinc2) eigenvalues of T\n";
-  //std::cout << es.eigenvalues() << "\n";
-  //std::cout << "Host (sinc2) Eigenvectors of T\n";
-  //std::cout << es.eigenvectors() << "\n";
+  // std::cout << "Host (sinc2) eigenvalues of T\n";
+  // std::cout << es.eigenvalues() << "\n";
+  // std::cout << "Host (sinc2) Eigenvectors of T\n";
+  // std::cout << es.eigenvectors() << "\n";
 
   Eigen::MatrixX<Float> sinc2_sqrt_T =
       (es.eigenvectors() *
@@ -129,19 +127,19 @@ Eigen::VectorX<Float> id_sqrt_multiply(const Eigen::SparseMatrix<Float> &L,
                                        const uint32_t m = 10) {
   const auto [V, T, beta] = lanczos_L(L, u, m);
 
-  //std::cout << "Host (id) V.row(0)\n";
-  //std::cout << V.row(0) << "\n";
-  //std::cout << "\n";
- 
-  //std::cout << "Host (id) T\n";
-  //std::cout << T << "\n";
-  //std::cout << "\n";
-   
+  // std::cout << "Host (id) V.row(0)\n";
+  // std::cout << V.row(0) << "\n";
+  // std::cout << "\n";
+
+  // std::cout << "Host (id) T\n";
+  // std::cout << T << "\n";
+  // std::cout << "\n";
+
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
-  //std::cout << "Host (id) eigenvalues of T\n";
-  //std::cout << es.eigenvalues() << "\n";
-  //std::cout << "Host (id) Eigenvectors of T\n";
-  //std::cout << es.eigenvectors() << "\n";
+  // std::cout << "Host (id) eigenvalues of T\n";
+  // std::cout << es.eigenvalues() << "\n";
+  // std::cout << "Host (id) Eigenvectors of T\n";
+  // std::cout << es.eigenvectors() << "\n";
 
   Eigen::MatrixX<Float> id_T =
       (es.eigenvectors() *
@@ -159,14 +157,14 @@ Eigen::VectorX<Float> sinc2_sqrt_half(const Eigen::SparseMatrix<Float> &L,
   const auto [V, T, beta] = lanczos_L(L, u, m);
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
 
-  //std::cout << "Eigen host beta\n";
-  //std::cout << beta << "\n";
-  //std::cout << "Eigen host eigenvectors\n";
-  //std::cout << es.eigenvectors() << "\n";
-  //std::cout << "Eigen host eigenvalues\n";
-  //std::cout << es.eigenvalues() << "\n"; 
-  //std::cout << "Eigen host V.row(0)\n";
-  //std::cout << V.row(0) << "\n";
+  // std::cout << "Eigen host beta\n";
+  // std::cout << beta << "\n";
+  // std::cout << "Eigen host eigenvectors\n";
+  // std::cout << es.eigenvectors() << "\n";
+  // std::cout << "Eigen host eigenvalues\n";
+  // std::cout << es.eigenvalues() << "\n";
+  // std::cout << "Eigen host V.row(0)\n";
+  // std::cout << V.row(0) << "\n";
 
   Eigen::MatrixX<Float> sinc_sqrt_T =
       (es.eigenvectors() *

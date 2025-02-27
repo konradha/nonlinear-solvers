@@ -10,21 +10,22 @@ namespace NLSEQuinticSolver {
 template <typename Scalar_t>
 void step(Eigen::VectorX<Scalar_t> &buf, Eigen::VectorX<Scalar_t> &rho_buf,
           Eigen::VectorX<Scalar_t> &u, const Eigen::SparseMatrix<Scalar_t> &L,
-          const Eigen::VectorX<Scalar_t> & m,
-          const Scalar_t tau,
-          const Scalar_t s1, const Scalar_t s2)
-{
-  rho_buf = (u.real().cwiseProduct(u.real())) + (u.imag()).cwiseProduct(u.imag());
-  rho_buf = m.cwiseProduct(s1 * rho_buf + s2 * rho_buf.cwiseProduct(rho_buf))
+          const Eigen::VectorX<Scalar_t> &m, const Scalar_t tau,
+          const Scalar_t s1, const Scalar_t s2) {
+  rho_buf =
+      (u.real().cwiseProduct(u.real())) + (u.imag()).cwiseProduct(u.imag());
+  rho_buf =
+      m.cwiseProduct(s1 * rho_buf + s2 * rho_buf.cwiseProduct(rho_buf))
           .unaryExpr([&tau](Scalar_t x) { return std::exp(-.5 * tau * x); })
-          .cwiseProduct(u); 
+          .cwiseProduct(u);
 
   buf = expm_multiply(L, rho_buf, -tau);
-  rho_buf = (u.real().cwiseProduct(u.real())) + (u.imag()).cwiseProduct(u.imag());
+  rho_buf =
+      (u.real().cwiseProduct(u.real())) + (u.imag()).cwiseProduct(u.imag());
 
   u = m.cwiseProduct(s1 * rho_buf + s2 * rho_buf.cwiseProduct(rho_buf))
           .unaryExpr([&tau](Scalar_t x) { return std::exp(-.5 * tau * x); })
           .cwiseProduct(buf);
 }
-};
+}; // namespace NLSEQuinticSolver
 #endif

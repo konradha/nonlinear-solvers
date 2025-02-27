@@ -37,9 +37,9 @@ lanczos_L(const Eigen::SparseMatrix<Float> &L, const Eigen::VectorX<Float> &u,
     T(j, j + 1) = T(j + 1, j);
     V.col(j + 1) = w / T(j + 1, j);
   }
-  //std::cout << "Eigen beta: " << beta << "\n";
-  //std::cout << "Eigen T: " << T << "\n";
-  //std::cout << "Eigen V: " << V << "\n";
+  // std::cout << "Eigen beta: " << beta << "\n";
+  // std::cout << "Eigen T: " << T << "\n";
+  // std::cout << "Eigen V: " << V << "\n";
   return {V, T, beta};
 }
 
@@ -48,17 +48,17 @@ Eigen::VectorX<Float> expm_multiply(const Eigen::SparseMatrix<Float> &L,
                                     const Eigen::VectorX<Float> &u, Float t,
                                     const uint32_t m = 10) {
   const auto [V, T, beta] = lanczos_L(L, u, m);
-  //std::cout << "Host beta\n" << beta << "\n";
-  //std::cout << "Host T\n" << T << "\n";
-  //std::cout << "Host V\n" << V << "\n";
-  //std::cout << "Host dt: " << t << "\n";
-//#if DEBUG
-//  std::cout << "V: " << V << "\n";
-//  std::cout << "T: " << T << "\n";
-//  std::cin.get();
-//#endif
+  // std::cout << "Host beta\n" << beta << "\n";
+  // std::cout << "Host T\n" << T << "\n";
+  // std::cout << "Host V\n" << V << "\n";
+  // std::cout << "Host dt: " << t << "\n";
+  //#if DEBUG
+  //  std::cout << "V: " << V << "\n";
+  //  std::cout << "T: " << T << "\n";
+  //  std::cin.get();
+  //#endif
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
-  //std::cout << "Host eigenvalues\n" << es.eigenvalues() << "\n";
+  // std::cout << "Host eigenvalues\n" << es.eigenvalues() << "\n";
   Eigen::MatrixX<Float> exp_T =
       (es.eigenvectors() *
        (t * es.eigenvalues().array().abs())
@@ -67,9 +67,9 @@ Eigen::VectorX<Float> expm_multiply(const Eigen::SparseMatrix<Float> &L,
            .asDiagonal() *
        es.eigenvectors().adjoint());
   Eigen::VectorX<Float> e1 = Eigen::VectorX<Float>::Zero(T.rows());
-  //printf("Host beta=%f\n", beta);
-  //std::cout << "Host eigenvalues=" << es.eigenvalues() << "\n";
-  //std::cout << "Host eigenvectors=" << es.eigenvectors() << "\n";
+  // printf("Host beta=%f\n", beta);
+  // std::cout << "Host eigenvalues=" << es.eigenvalues() << "\n";
+  // std::cout << "Host eigenvectors=" << es.eigenvectors() << "\n";
   e1(0) = 1.0;
   return beta * V * exp_T * e1;
 }
