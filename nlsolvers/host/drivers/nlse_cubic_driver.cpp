@@ -1,3 +1,4 @@
+#include "boundaries.hpp"
 #include "eigen_krylov_complex.hpp"
 #include "laplacians.hpp"
 #include "nlse_cubic_solver.hpp"
@@ -94,6 +95,7 @@ int main(int argc, char **argv) {
 
   for (uint32_t i = 1; i < nt; ++i) {
     NLSESolver::step<std::complex<double>>(buf, rho_buf, u, L, m, dti);
+    neumann_bc_no_velocity<std::complex<double>>(u, nx, ny); 
     if (i % freq == 0) {
       uint32_t snapshot_idx = i / freq;
       if (snapshot_idx < num_snapshots) {

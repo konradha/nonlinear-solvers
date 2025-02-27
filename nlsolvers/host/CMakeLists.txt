@@ -1,5 +1,5 @@
 set(HOST_HEADERS 
-    #include/boundaries.hpp
+    include/boundaries.hpp
     # TODO: finish Laplacians (ie. Radiating Sommerfeld) and the boundary applications
     # - du/dn = 0 for no-flux
     # - Radiation application: Laplacian gets characteristic wave speed in beginning

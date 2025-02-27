@@ -1,4 +1,5 @@
 #include "eigen_krylov_real.hpp"
+#include "boundaries.hpp"
 #include "laplacians.hpp"
 #include "sg_single_solver.hpp"
 #include "util.hpp"
@@ -101,6 +102,7 @@ int main(int argc, char **argv) {
 
   for (uint32_t i = 1; i < nt; ++i) {
     SGESolver::step<double>(u, u_past, buf, L, m, dt);
+    neumann_bc_no_velocity<double>(u, nx, ny);
     if (i % freq == 0) {
       uint32_t snapshot_idx = i / freq;
       if (snapshot_idx < num_snapshots) {
