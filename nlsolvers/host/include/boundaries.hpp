@@ -43,9 +43,7 @@ template <typename Float>
 void neumann_bc_no_velocity(Eigen::VectorX<Float> & u,
                 const uint32_t nx, 
                 const uint32_t ny) {
-    // port of the Numpy-y
     // Used because we can save a lot of cycles that way.
-
     /*
      def neumann_bc(self, u, v, i, tau=None,):
         u[0, 1:-1] = u[1, 1:-1]

@@ -39,14 +39,8 @@ def save_to_hdf5(run_id, run_idx, args, u0, m, traj, X, Y, elapsed_time, kappa, 
         time_grp.attrs['num_snapshots'] = args.snapshots
         ic_grp = f.create_group('initial_condition')
         ic_grp.attrs['sampler'] = args.sampler
-        if args.sampler == 'solitons':
-            ic_grp.attrs['num_solitons'] = args.num_solitons
-        ic_grp.attrs['seed'] = actual_seed
         ic_grp.create_dataset('u0', data=u0) 
         m_grp = f.create_group('focusing')
-        m_grp.attrs['mean'] = args.m_mean
-        m_grp.attrs['std'] = args.m_std
-        m_grp.attrs['scale'] = args.m_scale
         m_grp.create_dataset('m', data=m)
         f.create_dataset('u', data=traj)
         f.create_dataset('X', data=X)
