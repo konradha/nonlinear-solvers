@@ -13,8 +13,12 @@ option(OPTIMIZE_SIZE "Optimize binaries for size" ON)
 option(BUILD_NLSE_CUBIC "Build NLSE with cubic nonlinearity" ON)
 option(BUILD_NLSE_CUBIC_QUINTIC "Build NLSE with cubic-quintic nonlinearity" ON) 
 option(BUILD_NLSE_SATURATING "Build NLSE with saturating nonlinearity" ON)
+option(BUILD_SG_SINGLE " Build sGE with a single term" ON)
+option(BUILD_SG_DOUBLE " Build sGE with sin(u) + sin(u/2)" ON)
+option(BUILD_SG_HYPERBOLIC " Build sGE with sinh(u)" ON)
+option(BUILD_KG " Build KGE" ON)
+option(BUILD_PHI4 " Build phi-4 model" ON)
 
-option(BUILD_SG_SINGLE "Build Sine-Gordon equation (single)" ON)
 
 if(OPTIMIZE_SIZE)
     add_compile_options(-Os)
