@@ -61,7 +61,8 @@ void step_sv(double *d_u, double *d_u_past, double *d_buf, double *d_buf2,
              DeviceSpMV<double> *spmv, const double *d_m, const double tau,
              const uint32_t n, const dim3 grid, const dim3 block) {
   sin_term_kernel<<<grid, block>>>(d_buf2, d_u, d_m, n);
-  spmv->apply(d_buf, d_u);
+  // TODO: This apparently is broken here. Needs fixing to test if this approach works as well in CUDA!
+  //spmv->multiply(d_buf, d_u);
   compute_lapl_sin_kernel<<<grid, block>>>(d_buf, d_buf, d_buf2, n);
   double *d_u_temp;
   cudaMalloc(&d_u_temp, n * sizeof(double));
