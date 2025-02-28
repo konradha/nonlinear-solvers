@@ -19,12 +19,10 @@ public:
     uint32_t num_snapshots;
     uint32_t snapshot_freq;
     uint32_t krylov_dim;
-    bool use_gautschi;
 
-    Parameters(uint32_t ns = 100, uint32_t freq = 5, uint32_t m = 10,
-               bool gautschi = true)
+    Parameters(uint32_t ns = 100, uint32_t freq = 5, uint32_t m = 10)
         : block_size(256), num_snapshots(ns), snapshot_freq(freq),
-          krylov_dim(m), use_gautschi(gautschi) {}
+          krylov_dim(m) {}
   };
 
   SGESolverDevice(const int *d_row_ptr, const int *d_col_ind,
@@ -81,13 +79,8 @@ public:
   }
 
   void step() {
-    if (params_.use_gautschi) {
       device::SGESolver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_,
                               matfunc_, d_m_, dt_, n_, grid_dim_, block_dim_);
-    } else {
-      device::SGESolver::step_sv(d_u_, d_u_past_, d_buf_, d_buf2_, spmv_, d_m_,
-                                 dt_, n_, grid_dim_, block_dim_);
-    }
   }
 
   void transfer_snapshots(double *dst) {
