@@ -4,8 +4,8 @@
 #SBATCH --time=00:05:00
 #SBATCH --mem-per-cpu=8G
 #SBATCH --gpus=1
-#SBATCH --output=sg_solver_%j.out
-#SBATCH --error=sg_solver_%j.err
+#SBATCH --output=/cluster/scratch/konradha/sg_solver_%j.out
+#SBATCH --error=/cluster/scratch/konradha/sg_solver_%j.err
 #SBATCH --ntasks=1
 #SBATCH --partition=gpu
 
