@@ -2,8 +2,8 @@
 #include "sg_single_solver.hpp"
 #include "util.hpp"
 
-#include "sg_single_dev.hpp"
 #include "boundaries.cuh"
+#include "sg_single_dev.hpp"
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
@@ -104,8 +104,9 @@ int main(int argc, char **argv) {
   auto start = std::chrono::high_resolution_clock::now();
 
   device::SGESolverDevice::Parameters params(num_snapshots, freq, 10, true);
-  device::SGESolverDevice solver(d_row_ptr, d_col_ind, d_values, m.data(), 
-                             nx * ny, L.nonZeros(), u0.data(), v0.data(), dt, params);
+  device::SGESolverDevice solver(d_row_ptr, d_col_ind, d_values, m.data(),
+                                 nx * ny, L.nonZeros(), u0.data(), v0.data(),
+                                 dt, params);
 
   for (uint32_t i = 1; i < nt; ++i) {
     solver.step();
@@ -126,11 +127,11 @@ int main(int argc, char **argv) {
 
   const std::vector<uint32_t> shape = {num_snapshots, ny, nx};
   save_to_npy(output_file, u_save, shape);
-  
+
   cudaFree(d_row_ptr);
   cudaFree(d_col_ind);
   cudaFree(d_values);
-  
+
   std::cout << "walltime: " << compute_time / (1.e6) << " seconds\n";
   return 0;
 }

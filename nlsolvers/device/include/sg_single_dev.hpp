@@ -1,9 +1,9 @@
 #ifndef SG_SINGLE_DEV_HPP
 #define SG_SINGLE_DEV_HPP
 
-#include "sg_single.cuh"
 #include "matfunc_real.hpp"
 #include "pragmas.hpp"
+#include "sg_single.cuh"
 #include "spmv.hpp"
 
 #include <cuda_runtime.h>
@@ -19,17 +19,17 @@ public:
     uint32_t snapshot_freq;
     uint32_t krylov_dim;
     bool use_gautschi;
-    
-    Parameters(uint32_t ns = 100, uint32_t freq = 5, uint32_t m = 10, bool gautschi = true)
+
+    Parameters(uint32_t ns = 100, uint32_t freq = 5, uint32_t m = 10,
+               bool gautschi = true)
         : block_size(256), num_snapshots(ns), snapshot_freq(freq),
           krylov_dim(m), use_gautschi(gautschi) {}
   };
 
   SGESolverDevice(const int *d_row_ptr, const int *d_col_ind,
-                const double *d_values, const double *h_m,
-                uint32_t n, uint32_t nnz, const double *host_u0,
-                const double *host_v0, double dt,
-                const Parameters &params = Parameters())
+                  const double *d_values, const double *h_m, uint32_t n,
+                  uint32_t nnz, const double *host_u0, const double *host_v0,
+                  double dt, const Parameters &params = Parameters())
       : n_(n), current_snapshot_(0), params_(params), dt_(dt) {
 
     cudaMalloc(&d_u_, n * sizeof(double));
@@ -37,22 +37,23 @@ public:
 
     cudaMemcpy(d_u_, host_u0, n * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_v_, host_v0, n * sizeof(double), cudaMemcpyHostToDevice);
-    
+
     cudaMalloc(&d_u_past_, n * sizeof(double));
-    
-    Eigen::VectorXd u_past = Eigen::Map<const Eigen::VectorXd>(host_u0, n) - 
-                           dt * Eigen::Map<const Eigen::VectorXd>(host_v0, n);
-    cudaMemcpy(d_u_past_, u_past.data(), n * sizeof(double), cudaMemcpyHostToDevice);
+
+    Eigen::VectorXd u_past = Eigen::Map<const Eigen::VectorXd>(host_u0, n) -
+                             dt * Eigen::Map<const Eigen::VectorXd>(host_v0, n);
+    cudaMemcpy(d_u_past_, u_past.data(), n * sizeof(double),
+               cudaMemcpyHostToDevice);
 
     cudaMalloc(&d_buf_, n * sizeof(double));
     cudaMalloc(&d_buf2_, n * sizeof(double));
     cudaMalloc(&d_buf3_, n * sizeof(double));
     cudaMalloc(&d_m_, n * sizeof(double));
-    
+
     cudaMemcpy(d_m_, h_m, n * sizeof(double), cudaMemcpyHostToDevice);
 
     cudaMalloc(&d_u_trajectory_, n * params_.num_snapshots * sizeof(double));
-    
+
     spmv_ = new DeviceSpMV<double>(d_row_ptr, d_col_ind, d_values, n, nnz);
     matfunc_ = new MatrixFunctionApplicatorReal(d_row_ptr, d_col_ind, d_values,
                                                 n, params_.krylov_dim, nnz);
@@ -79,11 +80,11 @@ public:
 
   void step() {
     if (params_.use_gautschi) {
-      device::SGESolver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_, 
-                    matfunc_, d_m_, dt_, n_, grid_dim_, block_dim_);
+      device::SGESolver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_,
+                              matfunc_, d_m_, dt_, n_, grid_dim_, block_dim_);
     } else {
-      device::SGESolver::step_sv(d_u_, d_u_past_, d_buf_, d_buf2_, 
-                       spmv_, d_m_, dt_, n_, grid_dim_, block_dim_);
+      device::SGESolver::step_sv(d_u_, d_u_past_, d_buf_, d_buf2_, spmv_, d_m_,
+                                 dt_, n_, grid_dim_, block_dim_);
     }
   }
 
@@ -93,14 +94,12 @@ public:
                cudaMemcpyDeviceToHost);
   }
 
-  double* get_solution_buffer() {
-    return d_u_;
-  }
-  
+  double *get_solution_buffer() { return d_u_; }
+
   void store_snapshot(const uint32_t snapshot_idx) {
     if (snapshot_idx < params_.num_snapshots) {
-      cudaMemcpy(d_u_trajectory_ + snapshot_idx * n_, d_u_,
-                 n_ * sizeof(double), cudaMemcpyDeviceToDevice);
+      cudaMemcpy(d_u_trajectory_ + snapshot_idx * n_, d_u_, n_ * sizeof(double),
+                 cudaMemcpyDeviceToDevice);
       current_snapshot_ = snapshot_idx + 1;
     }
   }
