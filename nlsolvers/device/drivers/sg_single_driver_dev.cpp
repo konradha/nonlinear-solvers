@@ -110,8 +110,7 @@ int main(int argc, char **argv) {
 
   for (uint32_t i = 1; i < nt; ++i) {
     solver.step();
-    // TODO think about how to make this design better
-    neumann_bc_no_velocity<double>(solver.get_solution_buffer(), nx, ny);
+    solver.apply_bc();
     if (i % freq == 0) {
       uint32_t snapshot_idx = i / freq;
       if (snapshot_idx < num_snapshots) {

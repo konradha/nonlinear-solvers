@@ -1,6 +1,7 @@
 #ifndef SG_SINGLE_DEV_HPP
 #define SG_SINGLE_DEV_HPP
 
+#include "boundaries.cuh"
 #include "matfunc_real.hpp"
 #include "pragmas.hpp"
 #include "sg_single.cuh"
@@ -32,6 +33,7 @@ public:
                   double dt, const Parameters &params = Parameters())
       : n_(n), current_snapshot_(0), params_(params), dt_(dt) {
 
+    nx_ = ny_ = std::sqrt(n);
     cudaMalloc(&d_u_, n * sizeof(double));
     cudaMalloc(&d_v_, n * sizeof(double));
 
@@ -94,7 +96,10 @@ public:
                cudaMemcpyDeviceToHost);
   }
 
-  double *get_solution_buffer() { return d_u_; }
+  void apply_bc() {
+    neumann_bc_no_velocity_blocking<double>(d_u_, nx_, ny_);
+  }
+
 
   void store_snapshot(const uint32_t snapshot_idx) {
     if (snapshot_idx < params_.num_snapshots) {
@@ -116,6 +121,8 @@ private:
   double *d_buf3_;
   double *d_u_trajectory_;
   uint32_t current_snapshot_;
+  uint32_t nx_;
+  uint32_t ny_;
   uint32_t n_;
   dim3 grid_dim_;
   dim3 block_dim_;
