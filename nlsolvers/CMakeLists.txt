@@ -59,6 +59,8 @@ include_directories(
 add_subdirectory(common)
 add_subdirectory(host)
 
+# cmake .. -DENABLE_GPU=ON -DCMAKE_CXX_COMPILER=nvcc
+
 if(ENABLE_GPU)
     if(CMAKE_CXX_COMPILER_ID MATCHES "NVIDIA")
         enable_language(CUDA)
