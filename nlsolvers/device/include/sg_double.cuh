@@ -1,5 +1,5 @@
-#ifndef SG_SINGLE_CUH
-#define SG_SINGLE_CUH
+#ifndef SG_DOUBLE_CUH
+#define SG_DOUBLE_CUH
 
 #include "matfunc_real.hpp"
 #include "pragmas.hpp"
@@ -9,14 +9,15 @@
 
 namespace device {
 
-namespace SGESolver {
+namespace SGEDoubleSolver {
 
 __global__ void neg_sin_kernel(double *out, const double *in,
                                const double * m,
                                const uint32_t n) {
+  // double sine term here!
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n) {
-    out[idx] = -m[idx] * sin(in[idx]);
+    out[idx] = -(m[idx] * (sin(in[idx]) + sin(0.5 * in[idx])));
   }
 }
 
@@ -47,8 +48,8 @@ void step(double *d_u, double *d_u_past, double *d_buf, double *d_buf2,
   cudaMemcpy(d_u_past, d_buf, n * sizeof(double), cudaMemcpyDeviceToDevice);
 }
 
-} // namespace SGESolver
+} // namespace SGEDoubleSolver
 
 } // namespace device
 
-#endif // SG_SINGLE_CUH
+#endif // SG_DOUBLE_CUH
