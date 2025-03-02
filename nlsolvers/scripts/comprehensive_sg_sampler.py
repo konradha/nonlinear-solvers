@@ -116,8 +116,13 @@ def sample_colliding_rings(X, Y, L, num_rings=2):
         direction = 1 if torch.rand(1) > 0.5 else -1
 
         r = torch.sqrt((X - x0)**2 + (Y - y0)**2)
-        u0 += 4 * torch.atan(torch.exp((r - r0)/width))
-        v0 += direction * torch.exp(-(r - r0)**2/(2*width**2))
+        if np.random.choice(2):
+            u0 += 4 * torch.atan(torch.exp((r - r0)/width))
+            v0 += direction * torch.exp(-(r - r0)**2/(2*width**2))
+        else:
+            u0 -= 4 * torch.atan(torch.exp((r - r0)/width))
+            v0 -= direction * torch.exp(-(r - r0)**2/(2*width**2))
+
 
     return u0, v0
 
@@ -211,7 +216,7 @@ def sample_sine_gordon_solution(Nx, Ny, L, solution_type='auto'):
         solution_info = f"Combined (nx={winding_x}, ny={winding_y}, breathers={num_breathers})"
 
     elif solution_type == 'rings':
-        u0, v0 = sample_colliding_rings(X, Y, L, num_rings=random.randint(1, 10)) 
+        u0, v0 = sample_colliding_rings(X, Y, L, num_rings=random.randint(1, 5)) 
         solution_info = f"Elliptical collision"
       
     anisotropy_ratio = 1.0 + 3.0 * torch.rand(1)
@@ -235,7 +240,7 @@ def main():
     
     fig = plt.figure(figsize=(20, 15))
     
-    solution_types = 4 * ['rings']# ['rings', 'kink', 'breather', 'combined']
+    solution_types = ['rings', 'kink', 'breather', 'combined']
     
     for i, solution_type in enumerate(solution_types):
         u0, v0, m, solution_info = sample_sine_gordon_solution(Nx, Ny, L, solution_type)
@@ -245,12 +250,12 @@ def main():
         X, Y = np.meshgrid(x, y, indexing='ij')
         
         ax1 = fig.add_subplot(3, 4, i+1)
-        im1 = ax1.pcolormesh(X, Y, u0.numpy(), cmap='coolwarm', shading='auto', vmin=-6, vmax=6)
+        im1 = ax1.pcolormesh(X, Y, v0.numpy(), cmap='coolwarm', shading='auto', vmin=-6, vmax=6)
         ax1.set_title(f'{solution_info}')
         plt.colorbar(im1, ax=ax1)
         
         ax2 = fig.add_subplot(3, 4, i+5)
-        im2 = ax2.pcolormesh(X, Y, v0.numpy(), cmap='coolwarm', shading='auto')
+        im2 = ax2.pcolormesh(X, Y, u0.numpy(), cmap='coolwarm', shading='auto')
         plt.colorbar(im2, ax=ax2)
         
         ax3 = fig.add_subplot(3, 4, i+9, projection='3d')
