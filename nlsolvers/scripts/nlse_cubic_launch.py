@@ -12,6 +12,7 @@ import datetime
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from complex_samplers import sampler_random_solitons, sampler_random_fourier_localized
 from real_samplers import generate_grf
+from general_nlse_soliton_samplers import sample_nlse_initial_condition
 
 def save_to_hdf5(run_id, run_idx, args, u0, m, traj, X, Y, elapsed_time, actual_seed=0):
     output_dir = Path(args.output_dir)
@@ -107,18 +108,23 @@ def main():
     X, Y = np.meshgrid(x, y, indexing='ij')
     
     for i in range(args.num_runs):
-        print(f"Run {i+1}/{args.num_runs}")
+        
         seed = args.seed + i if args.seed is not None else np.random.randint(0, 10000) 
-        if args.sampler == "solitons":
-            u0 = sampler_random_solitons(X, Y, args.num_solitons, seed=seed)
-        else:
-            u0 = sampler_random_fourier_localized(args.nx, args.ny, args.Lx, args.Ly, seed=seed)
+        #if args.sampler == "solitons":
+        #    u0 = sampler_random_solitons(X, Y, args.num_solitons, seed=seed)
+        #else:
+        #    u0 = sampler_random_fourier_localized(args.nx, args.ny, args.Lx, args.Ly, seed=seed)
+        u0, sample_type = sample_nlse_initial_condition(args.nx, args.ny, args.Lx)
+        u0 = u0.detach().numpy().astype(np.complex128)
+        print(f"Run {i+1}/{args.num_runs}, type={sample_type}")
+        
         norm = np.sqrt(np.sum(np.abs(u0)**2) * (2*args.Lx/(args.nx-1)) * (2*args.Ly/(args.ny-1)))
         u0 = u0 / norm
         ic_file = ic_dir / f"ic_{run_id}_{i:04d}.npy"
         np.save(ic_file, u0) 
-        m = generate_grf(args.nx, args.ny, args.Lx, args.Ly, 
-                       scale=args.m_scale, mean=args.m_mean, std=args.m_std, seed=seed)
+        #m = generate_grf(args.nx, args.ny, args.Lx, args.Ly, 
+        #               scale=args.m_scale, mean=args.m_mean, std=args.m_std, seed=seed)
+        m = np.ones_like(u0)
         
         m_file = focusing_dir / f"m_{run_id}_{i:04d}.npy"
         np.save(m_file, m) 
@@ -147,6 +153,7 @@ def main():
             print(f"Error: {e}")
             print(f"Output: {e.stdout}")
             print(f"Error: {e.stderr}")
+            print(f"Command: {' '.join(cmd)}")
             continue
         
         end_time = time.time()

@@ -141,7 +141,8 @@ def sample_initial_conditions(Nx, Ny, L):
     # L/4 correlation length
     W = sample_grf(Nx, Ny, L, length_scale=L/4, variance=0.5) 
     # typical soliton-like solution
-    u0 = 4 * torch.atan(torch.exp(3*W))  # some amplification 
+    #u0 = 4 * torch.atan(torch.exp(3*W))  # some amplification 
+    u0 = 1. / torch.cosh(W)
     # mixing scales
     v0 = sample_wavelet_superposition(Nx, Ny, L, n_wavelets=30, 
                                      scale_range=(0.1, 0.5), kappa=0.3)

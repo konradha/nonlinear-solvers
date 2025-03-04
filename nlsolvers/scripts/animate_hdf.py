@@ -38,7 +38,7 @@ def animate_diff(X, Y, data, nt, name, is_complex=False):
         plt.imshow(np.abs(data[frame]) if is_complex else data[frame], 
                   extent=[X.min(), X.max(), Y.min(), Y.max()],
                   aspect='auto',
-                  cmap='coolwarm')
+                  cmap='coolwarm' if not is_complex else 'viridis')
         plt.colorbar()
     
     fps = 7
@@ -51,11 +51,12 @@ def animate_diff(X, Y, data, nt, name, is_complex=False):
     
 if __name__ == '__main__':
     fname = str(argv[1])
+    is_complex = True if int(argv[2]) != 0 else False
     path_data = Path(fname)
     u, X, Y, params = load_trajectory(path_data)  
     nt = u.shape[0]
     
     fname_save = fname.replace(".h5", ".mp4")
-    animate_diff(X, Y, u, nt, fname_save)
+    animate_diff(X, Y, u, nt, fname_save, is_complex)
     #animate(X, Y, u, nt, fname_save)
 

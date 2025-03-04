@@ -282,6 +282,7 @@ def breather_state(X, Y, breather_type="kuznetsov", width=1.0, oscillation=2.0):
         
     else:  # akhmediev breather
         # (1 + a*cos(b*x)/cosh(c*x))
+        # similar to SGE
         a = 2.0
         b = oscillation
         c = 0.5 / width
@@ -383,7 +384,255 @@ def combined_state(X, Y, components=None, weights=None):
     
     return psi
 
+def true_vortex_state(X, Y, charge=1, width=1.0, vortex_radius=0.3, center=None):
+    if center is None:
+        L = torch.max(X).item()
+        x0, y0 = L * 0.5 * torch.randn(2)
+    else:
+        x0, y0 = center
 
+    r = torch.sqrt((X - x0)**2 + (Y - y0)**2)
+    theta = torch.atan2(Y - y0, X - x0)
+
+    amplitude = torch.tanh(r / vortex_radius) * torch.exp(-r**2/(2*width**2))
+    phase = charge * theta
+    psi = amplitude * torch.exp(1j * phase)
+
+    return psi
+
+
+def spiral_vortex_state(X, Y, charge=1, width=1.0, spiral_factor=2.0, center=None):
+    if center is None:
+        L = torch.max(X).item()
+        x0, y0 = L * 0.5 * torch.randn(2)
+    else:
+        x0, y0 = center
+
+    r = torch.sqrt((X - x0)**2 + (Y - y0)**2)
+    theta = torch.atan2(Y - y0, X - x0)
+
+    amplitude = torch.exp(-r**2/(2*width**2))
+    phase = charge * (theta + spiral_factor * r)
+    psi = amplitude * torch.exp(1j * phase)
+
+    return psi
+
+
+def multi_spiral_vortex(X, Y, num_vortices=3, arrangement="random", width=2.0, spiral_factor=2.0):
+    L = torch.max(X).item()
+    psi = torch.zeros_like(X, dtype=torch.complex128)
+
+    centers = []
+    charges = []
+
+    if arrangement == "random":
+        for _ in range(num_vortices):
+            centers.append(L * 0.6 * torch.randn(2))
+            charges.append(random.choice([-1, 1]))
+
+    elif arrangement == "ring":
+        radius = width * 0.4
+        for i in range(num_vortices):
+            angle = 2 * np.pi * i / num_vortices
+            centers.append([radius * np.cos(angle), radius * np.sin(angle)])
+            charges.append(1 if i % 2 == 0 else -1)
+
+    elif arrangement == "lattice":
+        side_length = int(np.ceil(np.sqrt(num_vortices)))
+        spacing = width * 0.6 / side_length
+
+        count = 0
+        for i in range(side_length):
+            for j in range(side_length):
+                if count < num_vortices:
+                    offset = spacing * 0.5 if i % 2 == 1 else 0
+                    centers.append([spacing * (j - side_length/2) + offset,
+                                   spacing * (i - side_length/2)])
+                    charges.append(1 if (i + j) % 2 == 0 else -1)
+                    count += 1
+
+    else:
+        raise ValueError(f"Unknown arrangement: {arrangement}")
+
+    for center, charge in zip(centers, charges):
+        spiral_variation = spiral_factor * (0.8 + 0.4 * torch.rand(1).item())
+        psi += spiral_vortex_state(X, Y, charge, width, spiral_variation, center)
+
+    r2 = X**2 + Y**2
+    envelope = torch.exp(-r2/(2*(width*1.2)**2))
+    psi = psi * envelope / torch.max(torch.abs(psi))
+
+    return psi
+
+
+def skyrmion_state(X, Y, width=1.0, skyrmion_radius=0.5, edge_width=0.1, center=None):
+    if center is None:
+        L = torch.max(X).item()
+        x0, y0 = L * 0.5 * torch.randn(2)
+    else:
+        x0, y0 = center
+
+    r = torch.sqrt((X - x0)**2 + (Y - y0)**2)
+    theta = torch.atan2(Y - y0, X - x0)
+
+    amplitude = torch.exp(-r**2/(2*width**2))
+
+    z_component = 2 * (0.5 - torch.exp(-(r - skyrmion_radius)**2 / (2*edge_width**2))) - 1
+    z_component = torch.clamp(z_component, min=-1.0, max=1.0)
+
+    xy_component = torch.sqrt(1 - z_component**2)
+
+    real_part = xy_component * torch.cos(theta)
+    imag_part = xy_component * torch.sin(theta)
+
+    psi = amplitude * (real_part + 1j * imag_part)
+
+    return psi
+
+
+def multi_skyrmion_state(X, Y, num_skyrmions=3, arrangement="random", width=2.0):
+    L = torch.max(X).item()
+    psi = torch.zeros_like(X, dtype=torch.complex128)
+
+    centers = []
+
+    if arrangement == "random":
+        for _ in range(num_skyrmions):
+            centers.append(L * 0.6 * torch.randn(2))
+
+    elif arrangement == "ring":
+        radius = width * 0.4
+        for i in range(num_skyrmions):
+            angle = 2 * np.pi * i / num_skyrmions
+            centers.append([radius * np.cos(angle), radius * np.sin(angle)])
+
+    elif arrangement == "lattice":
+        side_length = int(np.ceil(np.sqrt(num_skyrmions)))
+        spacing = width * 0.6 / side_length
+
+        count = 0
+        for i in range(side_length):
+            for j in range(side_length):
+                if count < num_skyrmions:
+                    offset = spacing * 0.5 if i % 2 == 1 else 0
+                    centers.append([spacing * (j - side_length/2) + offset,
+                                   spacing * (i - side_length/2)])
+                    count += 1
+
+    else:
+        raise ValueError(f"Unknown arrangement: {arrangement}")
+
+    for center in centers:
+        skyrmion_radius = 0.3 + 0.4 * torch.rand(1).item()
+        edge_width = 0.05 + 0.1 * torch.rand(1).item()
+        psi += skyrmion_state(X, Y, width, skyrmion_radius, edge_width, center)
+
+    r2 = X**2 + Y**2
+    envelope = torch.exp(-r2/(2*(width*1.2)**2))
+    psi = psi * envelope / torch.max(torch.abs(psi))
+
+    return psi
+
+
+def vortex_dipole(X, Y, separation=1.0, width=2.0, orientation=0, center=None):
+    if center is None:
+        L = torch.max(X).item()
+        x0, y0 = L * 0.3 * torch.randn(2)
+    else:
+        x0, y0 = center
+
+    dx = 0.5 * separation * np.cos(orientation)
+    dy = 0.5 * separation * np.sin(orientation)
+
+    center1 = [x0 + dx, y0 + dy]
+    center2 = [x0 - dx, y0 - dy]
+
+    psi1 = true_vortex_state(X, Y, charge=1, width=width, vortex_radius=0.2, center=center1)
+    psi2 = true_vortex_state(X, Y, charge=-1, width=width, vortex_radius=0.2, center=center2)
+
+    psi = psi1 + psi2
+    r2 = (X - x0)**2 + (Y - y0)**2
+    envelope = torch.exp(-r2/(2*(width*1.2)**2))
+    psi = psi * envelope / torch.max(torch.abs(psi))
+
+    return psi
+
+
+def vortex_lattice(X, Y, lattice_type="square", vortex_density=0.7, alternating=True, width=None):
+    L = torch.max(X).item()
+    if width is None:
+        width = L * 0.8
+
+    grid_size = int(np.sqrt(L * vortex_density))
+    spacing = 2 * L / grid_size
+
+    psi = torch.ones_like(X, dtype=torch.complex128)
+
+    centers = []
+    charges = []
+
+    if lattice_type == "square":
+        for i in range(grid_size):
+            for j in range(grid_size):
+                x = spacing * (j - grid_size/2 + 0.5)
+                y = spacing * (i - grid_size/2 + 0.5)
+                centers.append([x, y])
+                if alternating:
+                    charges.append(1 if (i + j) % 2 == 0 else -1)
+                else:
+                    charges.append(1)
+
+    elif lattice_type == "triangular":
+        for i in range(grid_size):
+            for j in range(grid_size):
+                offset = spacing * 0.5 if i % 2 == 1 else 0
+                x = spacing * (j - grid_size/2 + 0.5) + offset
+                y = spacing * (i - grid_size/2 + 0.5)
+                centers.append([x, y])
+                if alternating:
+                    charges.append(1 if (i + j) % 2 == 0 else -1)
+                else:
+                    charges.append(1)
+
+    elif lattice_type == "honeycomb":
+        for i in range(grid_size):
+            for j in range(grid_size):
+                offset = spacing * 0.5 if i % 2 == 1 else 0
+                x_base = spacing * (j - grid_size/2 + 0.5) + offset
+                y_base = spacing * (i - grid_size/2 + 0.5)
+
+                centers.append([x_base - spacing/4, y_base])
+                centers.append([x_base + spacing/4, y_base])
+
+                if alternating:
+                    charges.append(1)
+                    charges.append(-1)
+                else:
+                    charges.append(1)
+                    charges.append(1)
+
+    else:
+        raise ValueError(f"Unknown lattice type: {lattice_type}")
+
+    for center, charge in zip(centers, charges):
+        x0, y0 = center
+        r = torch.sqrt((X - x0)**2 + (Y - y0)**2)
+        theta = torch.atan2(Y - y0, X - x0)
+
+        core_size = 0.1 * spacing
+        amplitude_factor = torch.tanh(r / core_size)
+        phase_factor = torch.exp(1j * charge * theta)
+
+        psi = psi * (amplitude_factor * phase_factor + (1 - amplitude_factor))
+
+    r2 = X**2 + Y**2
+    envelope = torch.exp(-r2/(2*width**2))
+    psi = psi * envelope
+    psi = psi / torch.max(torch.abs(psi))
+
+    return psi
+
+"""
 def sample_nlse_initial_condition(Nx, Ny, L, condition_type='auto'):
     X, Y = make_grid(Nx, Ny, L)
     
@@ -485,9 +734,172 @@ def sample_nlse_initial_condition(Nx, Ny, L, condition_type='auto'):
     else:
         raise ValueError(f"Unknown condition type: {condition_type}")
     
-    psi = enforce_no_flux_boundary(psi, X, Y, L)
+    #psi = enforce_no_flux_boundary(psi, X, Y, L)
     psi = psi / torch.max(torch.abs(psi))
     
+    return psi, description
+"""
+def sample_nlse_initial_condition(Nx, Ny, L, condition_type='auto'):
+    X, Y = make_grid(Nx, Ny, L)
+
+    if condition_type == 'auto':
+        condition_types = ['ground', 'vortex', 'multi_vortex', 'soliton',
+                         'lattice', 'turbulence', 'rogue', 'breather',
+                         'sound', 'combined', 'true_vortex', 'spiral_vortex',
+                         'multi_spiral', 'skyrmion', 'multi_skyrmion',
+                         'vortex_dipole', 'vortex_lattice']
+        condition_type = random.choice(condition_types)
+
+    if condition_type == 'true_vortex':
+        charge = random.choice([-2, -1, 1, 2])
+        width = 0.2*L + 0.5*L*torch.rand(1).item()
+        vortex_radius = 0.1*L + 0.2*L*torch.rand(1).item()
+        psi = true_vortex_state(X, Y, charge=charge, width=width, vortex_radius=vortex_radius)
+        description = f"True vortex (charge={charge})"
+
+    elif condition_type == 'spiral_vortex':
+        charge = random.choice([-2, -1, 1, 2])
+        width = 0.2*L + 0.5*L*torch.rand(1).item()
+        spiral_factor = 0.5 + 3.0*torch.rand(1).item()
+        psi = spiral_vortex_state(X, Y, charge=charge, width=width, spiral_factor=spiral_factor)
+        description = f"Spiral vortex (charge={charge}, spiral={spiral_factor:.1f})"
+
+    elif condition_type == 'multi_spiral':
+        num_vortices = random.randint(2, 8)
+        arrangement = random.choice(['random', 'ring', 'lattice'])
+        spiral_factor = 0.5 + 3.0*torch.rand(1).item()
+        psi = multi_spiral_vortex(X, Y, num_vortices=num_vortices,
+                                arrangement=arrangement, spiral_factor=spiral_factor)
+        description = f"Multi-spiral vortices ({num_vortices}, {arrangement})"
+
+    elif condition_type == 'skyrmion':
+        width = 0.2*L + 0.5*L*torch.rand(1).item()
+        skyrmion_radius = 0.1*L + 0.3*L*torch.rand(1).item()
+        edge_width = 0.05*L + 0.1*L*torch.rand(1).item()
+        psi = skyrmion_state(X, Y, width=width, skyrmion_radius=skyrmion_radius, edge_width=edge_width)
+        description = f"Skyrmion (radius={skyrmion_radius:.1f})"
+
+    elif condition_type == 'multi_skyrmion':
+        num_skyrmions = random.randint(2, 8)
+        arrangement = random.choice(['random', 'ring', 'lattice'])
+        width = 0.2*L + 0.5*L*torch.rand(1).item()
+        psi = multi_skyrmion_state(X, Y, num_skyrmions=num_skyrmions,
+                                 arrangement=arrangement, width=width)
+        description = f"Multi-skyrmion ({num_skyrmions}, {arrangement})"
+
+    elif condition_type == 'vortex_dipole':
+        separation = 0.2*L + 0.4*L*torch.rand(1).item()
+        width = 0.3*L + 0.5*L*torch.rand(1).item()
+        orientation = 2*np.pi*torch.rand(1).item()
+        psi = vortex_dipole(X, Y, separation=separation, width=width, orientation=orientation)
+        description = f"Vortex dipole (separation={separation:.1f})"
+
+    elif condition_type == 'vortex_lattice':
+        lattice_type = random.choice(['square', 'triangular', 'honeycomb'])
+        vortex_density = 0.3 + 0.8*torch.rand(1).item()
+        alternating = random.choice([True, False])
+        width = 0.7*L + 0.2*L*torch.rand(1).item()
+        psi = vortex_lattice(X, Y, lattice_type=lattice_type, vortex_density=vortex_density,
+                           alternating=alternating, width=width)
+        polarity = "alternating" if alternating else "same"
+        description = f"Vortex lattice ({lattice_type}, {polarity} polarity)"
+
+    elif condition_type == 'ground':
+        shape = random.choice(['gaussian', 'thomas_fermi', 'plateau'])
+        width = 0.2*L + 0.6*L*torch.rand(1).item()
+        
+        if torch.rand(1).item() < 0.3:
+            def phase_pattern(X, Y, x0, y0):
+                vx, vy = torch.randn(2)
+                return vx * (X - x0) + vy * (Y - y0)
+        else:
+            phase_pattern = None
+            
+        psi = ground_state(X, Y, shape=shape, width=width, phase_pattern=phase_pattern)
+        description = f"Ground state ({shape})"
+        
+    elif condition_type == 'vortex':
+        charge = random.choice([-2, -1, 1, 2])
+        width = 0.2*L + 0.5*L*torch.rand(1).item()
+        psi = vortex_state(X, Y, charge=charge, width=width)
+        description = f"Vortex (charge={charge})"
+        
+    elif condition_type == 'multi_vortex':
+        num_vortices = random.randint(2, 8)
+        arrangement = random.choice(['random', 'ring', 'lattice'])
+        psi = multi_vortex_state(X, Y, num_vortices=num_vortices, arrangement=arrangement)
+        description = f"Multi-vortex ({num_vortices}, {arrangement})"
+        
+    elif condition_type == 'soliton':
+        soliton_type = random.choice(['bright', 'dark'])
+        num_solitons = random.randint(1, 4)
+        arrangement = random.choice(['parallel', 'crossing', 'radial'])
+        if torch.rand(1).item() < 0.5:
+            velocity = 2.0 * torch.rand(1).item()
+        else:
+            velocity = None
+            
+        psi = soliton_state(X, Y, soliton_type=soliton_type, num_solitons=num_solitons,
+                          arrangement=arrangement, velocity=velocity)
+        
+        vel_str = f", v={velocity:.1f}" if velocity is not None else ""
+        description = f"{soliton_type.capitalize()} soliton ({num_solitons}, {arrangement}{vel_str})"
+        
+    elif condition_type == 'lattice':
+        lattice_type = random.choice(['square', 'triangular', 'honeycomb'])
+        num_sites = random.randint(9, 36)
+        psi = lattice_state(X, Y, lattice_type=lattice_type, num_sites=num_sites)
+        description = f"Lattice ({lattice_type}, {num_sites} sites)"
+        
+    elif condition_type == 'turbulence':
+        energy_spectrum = random.choice(['kolmogorov', 'white'])
+        num_vortices = random.randint(10, 50)
+        psi = quantum_turbulence(X, Y, energy_spectrum=energy_spectrum,
+                               num_vortices=num_vortices)
+        description = f"Quantum turbulence ({energy_spectrum}, {num_vortices} vortices)"
+        
+    elif condition_type == 'rogue':
+        peak_amplitude = 2.0 + 2.0 * torch.rand(1).item()
+        psi = rogue_wave(X, Y, peak_amplitude=peak_amplitude)
+        description = f"Rogue wave (amplitude={peak_amplitude:.1f})"
+        
+    elif condition_type == 'breather':
+        breather_type = random.choice(['kuznetsov', 'akhmediev'])
+        width = 0.2*L + 0.4*L*torch.rand(1).item()
+        oscillation = 1.0 + 3.0 * torch.rand(1).item()
+        psi = breather_state(X, Y, breather_type=breather_type,
+                           width=width, oscillation=oscillation)
+        description = f"{breather_type.capitalize()} breather"
+        
+    elif condition_type == 'sound':
+        condensate_shape = random.choice(['gaussian', 'thomas_fermi'])
+        sound_type = random.choice(['random', 'standing', 'radial'])
+        sound_amplitude = 0.05 + 0.15 * torch.rand(1).item()
+        sound_wavelength = 0.2 + 0.8 * torch.rand(1).item()
+        
+        psi = condensate_with_sound(X, Y, condensate_shape=condensate_shape,
+                                  sound_type=sound_type, sound_amplitude=sound_amplitude,
+                                  sound_wavelength=sound_wavelength)
+        
+        description = f"Condensate with {sound_type} sound"
+        
+    elif condition_type == 'combined':
+        all_types = ['vortex', 'ground', 'soliton', 'sound', 'turbulence', 
+                    'lattice', 'breather']
+        num_types = random.randint(2, 4)
+        selected_types = random.sample(all_types, k=num_types)
+        weights = torch.rand(num_types)
+        
+        psi = combined_state(X, Y, components=selected_types, weights=weights)
+        description = f"Combined state ({'+'.join(selected_types)})"
+        
+
+    else:
+        raise NotImplemented
+
+    psi = enforce_no_flux_boundary(psi, X, Y, L)
+    psi = psi / torch.max(torch.abs(psi))
+
     return psi, description
 
 

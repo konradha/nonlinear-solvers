@@ -11,6 +11,7 @@ import datetime
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from real_initial_samplers import sample_initial_conditions
+from general_real_soliton_samplers import sample_sine_gordon_solution 
 
 
 def save_to_hdf5(run_id, run_idx, args, u0, v0, m, traj, elapsed_time, X, Y, actual_seed):
@@ -106,10 +107,16 @@ def main():
     X, Y = np.meshgrid(x, y, indexing='ij')
     
     for i in range(args.num_runs):
-        print(f"\nRun {i+1}/{args.num_runs}")
+        
         seed = args.seed + i if args.seed is not None else np.random.randint(0, 10000)
-        u0, v0, m, _, _ = sample_initial_conditions(args.nx, args.ny, args.Lx)
-        u0, v0, m = u0.detach().numpy().astype(np.float64), v0.detach().numpy().astype(np.float64), m.detach().numpy().astype(np.float64)
+        #u0, v0, m, _, _ = sample_initial_conditions(args.nx, args.ny, args.Lx)
+        #u0, v0, m = u0.detach().numpy().astype(np.float64), v0.detach().numpy().astype(np.float64), m.detach().numpy().astype(np.float64)
+
+        u0, v0, m, sol_info = sample_sine_gordon_solution(args.nx, args.ny, args.Lx) 
+        u0, v0 = u0.cpu().numpy().astype(np.float64), v0.cpu().numpy().astype(np.float64)
+        
+        m = np.ones_like(m, dtype=np.float64)
+        print(f"\nRun {i+1}/{args.num_runs}, type={sol_info}")
          
         ic_file = ic_dir / f"ic_{run_id}_{i:04d}.npy"
         vel_file = vel_dir / f"vel_{run_id}_{i:04d}.npy"
@@ -141,6 +148,7 @@ def main():
                 print(f"Warnings/Errors: {result.stderr}")
         except subprocess.CalledProcessError as e:
             print(f"Error in run: {e}")
+            print(f"Command: {' '.join(cmd)}")
             continue 
 
         end_time = time.time()

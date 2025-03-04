@@ -565,6 +565,8 @@ def sample_sine_gordon_solution(Nx, Ny, L, solution_type='auto'):
     
     mask = torch.abs(m) > 5.0
     m[mask] = 5.0
+
+    m /= torch.max(m)
     
     return u0, v0, m, solution_info
 
@@ -573,18 +575,21 @@ def main():
     Ny = 128
     L = 10.0
     
-    fig = plt.figure(figsize=(20, 15))
+    
+    x = torch.linspace(-L, L, Nx).numpy()
+    y = torch.linspace(-L, L, Ny).numpy()
+    X, Y = np.meshgrid(x, y, indexing='ij')
     
     #solution_types = ['rings', 'kink', 'breather', 'combined', 'kink_array', 
     #                'multi_breather', 'spiral', 'elliptical']
+    """
+    fig = plt.figure(figsize=(20, 15))
     solution_types = ['skyrmion'] * 4
     
     for i, solution_type in enumerate(solution_types):
         u0, v0, m, solution_info = sample_sine_gordon_solution(Nx, Ny, L, solution_type)
         
-        x = torch.linspace(-L, L, Nx).numpy()
-        y = torch.linspace(-L, L, Ny).numpy()
-        X, Y = np.meshgrid(x, y, indexing='ij')
+        
         
         ax1 = fig.add_subplot(3, 4, i+1)
         im1 = ax1.pcolormesh(X, Y, m.numpy(), cmap='viridis', shading='auto')
@@ -602,9 +607,9 @@ def main():
         fig.colorbar(im3, ax=ax3)
     plt.tight_layout() 
     plt.show()
+    """
     
-    fig = plt.figure(figsize=(20, 15))
-    
+    fig = plt.figure(figsize=(20, 15)) 
     for i in range(8):
         u0, v0, m, solution_info = sample_sine_gordon_solution(Nx, Ny, L)
         
