@@ -11,3 +11,11 @@ endfunction()
 if(BUILD_SG_SINGLE)
     add_cuda_driver(sg_single_dev sg_single_driver_dev.cpp)
 endif()
+
+if(BUILD_SG_DOUBLE)
+    add_cuda_driver(sg_double_dev sg_double_driver_dev.cpp)
+endif()
+
+if(BUILD_SG_HYPERBOLIC)
+    add_cuda_driver(sg_hyperbolic_dev sg_hyperbolic_driver_dev.cpp)
+endif()

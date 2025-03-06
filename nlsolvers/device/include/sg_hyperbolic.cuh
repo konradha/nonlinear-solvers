@@ -9,7 +9,7 @@
 
 namespace device {
 
-namespace SGEHyperbolicSolver {
+namespace SGEHyperbolicSolverDevice {
 
 __global__ void neg_sinh_kernel(double *out, const double *in,
                                 const double * m,
@@ -47,7 +47,7 @@ void step(double *d_u, double *d_u_past, double *d_buf, double *d_buf2,
   cudaMemcpy(d_u_past, d_buf, n * sizeof(double), cudaMemcpyDeviceToDevice);
 }
 
-} // namespace SGEHyperbolicSolver
+} // namespace SGEHyperbolicSolverDevice
 
 } // namespace device
 
