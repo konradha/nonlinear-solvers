@@ -1,10 +1,10 @@
-#ifndef SG_SINGLE_DEV_HPP
-#define SG_SINGLE_DEV_HPP
+#ifndef KG_DEV_HPP
+#define KG_DEV_HPP
 
 #include "boundaries.cuh"
 #include "matfunc_real.hpp"
 #include "pragmas.hpp"
-#include "sg_double.cuh"
+#include "phi4_single.cuh"
 #include "spmv.hpp"
 
 #include <cuda_runtime.h>
@@ -12,7 +12,7 @@
 
 namespace device {
 
-class SGEDoubleSolverDevice {
+class Phi4SolverDevice {
 public:
   struct Parameters {
     uint32_t block_size;
@@ -25,7 +25,7 @@ public:
           krylov_dim(m) {}
   };
 
-  SGEDoubleSolverDevice(const int *d_row_ptr, const int *d_col_ind,
+  Phi4SolverDevice(const int *d_row_ptr, const int *d_col_ind,
                   const double *d_values, const double *h_m, uint32_t n,
                   uint32_t nnz, const double *host_u0, const double *host_v0,
                   double dt, const Parameters &params = Parameters())
@@ -65,7 +65,7 @@ public:
     store_snapshot(0);
   }
 
-  ~SGEDoubleSolverDevice() {
+  ~Phi4SolverDevice() {
     delete spmv_;
     delete matfunc_;
     cudaFree(d_u_);
@@ -79,7 +79,7 @@ public:
   }
 
   void step() {
-      device::SGEDoubleSolver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_,
+      device::Phi4Solver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_,
                               matfunc_, d_m_, dt_, n_, grid_dim_, block_dim_);
   }
 
@@ -125,4 +125,4 @@ private:
 
 } // namespace device
 
-#endif // SG_DOUBLE_DEV_HPP
+#endif // KG_SINGLE_DEV_HPP

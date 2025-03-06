@@ -5,7 +5,7 @@
 #include <cuda_runtime.h>
 
 // benchmarked to be fastest for small (nx, ny <= 5000) grid sizes; after that
-// considerable overhead and we shoudl think about how to better employ warps
+// considerable overhead and we should think about how to better employ warps
 template <typename Float>
 void neumann_bc_no_velocity_blocking(Float *u_dev, uint32_t nx, uint32_t ny) {
   cudaMemcpy(u_dev + 0 * ny + 1, u_dev + 1 * ny + 1, (ny - 2) * sizeof(Float),

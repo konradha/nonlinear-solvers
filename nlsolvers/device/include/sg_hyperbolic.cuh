@@ -9,7 +9,7 @@
 
 namespace device {
 
-namespace SGEHyperbolicSolverDevice {
+namespace SGEHyperbolicSolver {
 
 __global__ void neg_sinh_kernel(double *out, const double *in,
                                 const double * m,

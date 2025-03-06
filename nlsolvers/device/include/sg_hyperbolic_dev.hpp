@@ -79,7 +79,7 @@ public:
   }
 
   void step() {
-      device::SGESolver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_,
+      device::SGEHyperbolicSolver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_,
                               matfunc_, d_m_, dt_, n_, grid_dim_, block_dim_);
   }
 

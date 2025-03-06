@@ -19,3 +19,25 @@ endif()
 if(BUILD_SG_HYPERBOLIC)
     add_cuda_driver(sg_hyperbolic_dev sg_hyperbolic_driver_dev.cpp)
 endif()
+
+if(BUILD_KG)
+    add_cuda_driver(kg_dev kg_driver_dev.cpp)
+endif()
+
+if(BUILD_PHI4)
+    add_cuda_driver(phi4_dev phi4_driver_dev.cpp)
+endif()
+
+if(BUILD_NLSE_CUBIC)
+    add_cuda_driver(nlse_dev nlse_driver_dev.cpp)
+endif()
+
+if(BUILD_NLSE_CUBIC_QUINTIC)
+    add_cuda_driver(nlse_cubic_quintic_dev nlse_cubic_quintic_driver_dev.cpp)
+endif()
+
+if(BUILD_NLSE_SATURATING)
+    add_cuda_driver(nlse_saturating_dev nlse_saturating_driver_dev.cpp)
+endif()
+
+

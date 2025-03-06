@@ -1,5 +1,5 @@
-#ifndef SG_DOUBLE_CUH
-#define SG_DOUBLE_CUH
+#ifndef PHI4_SINGLE_CUH
+#define PHI4_SINGLE_CUH
 
 #include "matfunc_real.hpp"
 #include "pragmas.hpp"
@@ -9,15 +9,14 @@
 
 namespace device {
 
-namespace SGEDoubleSolver {
+namespace Phi4Solver {
 
-__global__ void neg_sin_kernel(double *out, const double *in,
+__global__ void neg_kernel(double *out, const double *in,
                                const double * m,
                                const uint32_t n) {
-  // double sine term here!
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n) {
-    out[idx] = -(m[idx] * (sin(in[idx]) + sin(0.5 * in[idx])));
+    out[idx] = -m[idx] * (in[idx] + in[idx]*in[idx]*in[idx]);
   }
 }
 
@@ -39,7 +38,7 @@ void step(double *d_u, double *d_u_past, double *d_buf, double *d_buf2,
   cudaMemcpy(d_buf, d_u, n * sizeof(double), cudaMemcpyDeviceToDevice);
   matfunc->apply(d_buf2, d_u, tau,
                  MatrixFunctionApplicatorReal::FunctionType::ID_SQRT);
-  neg_sin_kernel<<<grid, block>>>(d_buf2, d_buf2, d_m, n);
+  neg_kernel<<<grid, block>>>(d_buf2, d_buf2, d_m, n);
   matfunc->apply(d_buf3, d_buf2, tau,
                  MatrixFunctionApplicatorReal::FunctionType::SINC2_SQRT);
   matfunc->apply(d_buf2, d_u, tau,
@@ -48,8 +47,8 @@ void step(double *d_u, double *d_u_past, double *d_buf, double *d_buf2,
   cudaMemcpy(d_u_past, d_buf, n * sizeof(double), cudaMemcpyDeviceToDevice);
 }
 
-} // namespace SGEDoubleSolverDevice
+} // namespace KGESolver
 
 } // namespace device
 
-#endif // SG_DOUBLE_CUH
+#endif // KG_SINGLE_CUH
