@@ -45,13 +45,14 @@ int main(int argc, char **argv) {
 
   const double dx = 2 * Lx / (nx - 1);
   const double dy = 2 * Ly / (ny - 1);
-  
+
   const auto dt = T / nt;
   std::complex<double> dti(0, dt);
   const auto freq = nt / num_snapshots;
 
   std::vector<uint32_t> input_shape;
-  Eigen::VectorX<std::complex<double>> u0 = read_from_npy<std::complex<double>>(input_file, input_shape);
+  Eigen::VectorX<std::complex<double>> u0 =
+      read_from_npy<std::complex<double>>(input_file, input_shape);
 
   if (input_shape.size() != 2 || input_shape[0] != ny || input_shape[1] != nx) {
     std::cerr << "Error: Input array dimensions mismatch\n";
@@ -89,7 +90,8 @@ int main(int argc, char **argv) {
 
   auto start = std::chrono::high_resolution_clock::now();
 
-  device::NLSESaturatingSolverDevice::Parameters params(num_snapshots, freq, 10, kappa);
+  device::NLSESaturatingSolverDevice::Parameters params(num_snapshots, freq, 10,
+                                                        kappa);
   device::NLSESaturatingSolverDevice solver(L, u0.data(), m.data(), params);
 
   for (uint32_t i = 1; i < nt; ++i) {

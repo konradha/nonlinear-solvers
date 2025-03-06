@@ -1,10 +1,10 @@
 #ifndef NLSE_CUBIC_QUINTIC_DEV_HPP
-#define NLSE_CUBIC_QUINTIC_DEV_HPP 
+#define NLSE_CUBIC_QUINTIC_DEV_HPP
 
 #include "boundaries.cuh"
 #include "matfunc_complex.hpp"
-#include "pragmas.hpp"
 #include "nlse_cubic_quintic.cuh"
+#include "pragmas.hpp"
 #include "spmv.hpp"
 
 #include <cuda_runtime.h>
@@ -22,15 +22,15 @@ public:
     double sigma1;
     double sigma2;
     Parameters(uint32_t ns = 100, uint32_t freq = 5, uint32_t m = 10,
-              double s1 = 1.0, double s2 = 1.0)
+               double s1 = 1.0, double s2 = 1.0)
         : block_size(256), num_snapshots(ns), snapshot_freq(freq),
           krylov_dim(m), sigma1(s1), sigma2(s2) {}
   };
 
-  NLSECubicQuinticSolverDevice(const Eigen::SparseMatrix<std::complex<double>> &L,
-                   const std::complex<double> *host_u0,
-                   const double *host_m,
-                   const Parameters &params = Parameters())
+  NLSECubicQuinticSolverDevice(
+      const Eigen::SparseMatrix<std::complex<double>> &L,
+      const std::complex<double> *host_u0, const double *host_m,
+      const Parameters &params = Parameters())
       : n_(L.rows()), current_snapshot_(0), params_(params) {
 
     cudaMalloc(&d_u_, n_ * sizeof(thrust::complex<double>));
@@ -42,8 +42,7 @@ public:
 
     cudaMemcpy(d_u_, host_u0, n_ * sizeof(thrust::complex<double>),
                cudaMemcpyHostToDevice);
-    cudaMemcpy(d_m_, host_m, n_ * sizeof(double),
-               cudaMemcpyHostToDevice);
+    cudaMemcpy(d_m_, host_m, n_ * sizeof(double), cudaMemcpyHostToDevice);
 
     matfunc_ = new MatrixFunctionApplicatorComplex(L, n_, params_.krylov_dim,
                                                    L.nonZeros());
@@ -78,16 +77,16 @@ public:
   }
 
   void step(const std::complex<double> tau, const uint32_t step_number) {
-    device::density_cubic_quintic<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, 
-                                             params_.sigma1, params_.sigma2, nx_, ny_);
-    device::nonlin_part_cubic_quintic<<<grid_dim_, block_dim_>>>(d_buf_, d_u_, d_density_, -.5 * tau,
-                                           nx_, ny_);
+    device::density_cubic_quintic<<<grid_dim_, block_dim_>>>(
+        d_density_, d_u_, d_m_, params_.sigma1, params_.sigma2, nx_, ny_);
+    device::nonlin_part_cubic_quintic<<<grid_dim_, block_dim_>>>(
+        d_buf_, d_u_, d_density_, -.5 * tau, nx_, ny_);
     matfunc_->apply(d_u_, d_buf_, -tau);
 
-    device::density_cubic_quintic<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, 
-                                             params_.sigma1, params_.sigma2, nx_, ny_);
-    device::nonlin_part_cubic_quintic<<<grid_dim_, block_dim_>>>(d_u_, d_u_, d_density_, -.5 * tau,
-                                           nx_, ny_);
+    device::density_cubic_quintic<<<grid_dim_, block_dim_>>>(
+        d_density_, d_u_, d_m_, params_.sigma1, params_.sigma2, nx_, ny_);
+    device::nonlin_part_cubic_quintic<<<grid_dim_, block_dim_>>>(
+        d_u_, d_u_, d_density_, -.5 * tau, nx_, ny_);
 
     if (step_number % params_.snapshot_freq == 0) {
       store_snapshot(step_number);
@@ -126,6 +125,6 @@ private:
   dim3 block_dim_;
   Parameters params_;
 };
-}
+} // namespace device
 
 #endif

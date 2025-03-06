@@ -2,9 +2,9 @@
 #define KG_DEV_HPP
 
 #include "boundaries.cuh"
+#include "kg_single.cuh"
 #include "matfunc_real.hpp"
 #include "pragmas.hpp"
-#include "kg_single.cuh"
 #include "spmv.hpp"
 
 #include <cuda_runtime.h>
@@ -79,8 +79,8 @@ public:
   }
 
   void step() {
-      device::KGESolver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_,
-                              matfunc_, d_m_, dt_, n_, grid_dim_, block_dim_);
+    device::KGESolver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_, matfunc_,
+                            d_m_, dt_, n_, grid_dim_, block_dim_);
   }
 
   void transfer_snapshots(double *dst) {
@@ -89,10 +89,7 @@ public:
                cudaMemcpyDeviceToHost);
   }
 
-  void apply_bc() {
-    neumann_bc_no_velocity_blocking<double>(d_u_, nx_, ny_);
-  }
-
+  void apply_bc() { neumann_bc_no_velocity_blocking<double>(d_u_, nx_, ny_); }
 
   void store_snapshot(const uint32_t snapshot_idx) {
     if (snapshot_idx < params_.num_snapshots) {

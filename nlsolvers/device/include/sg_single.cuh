@@ -11,8 +11,7 @@ namespace device {
 
 namespace SGESolver {
 
-__global__ void neg_sin_kernel(double *out, const double *in,
-                               const double * m,
+__global__ void neg_sin_kernel(double *out, const double *in, const double *m,
                                const uint32_t n) {
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n) {

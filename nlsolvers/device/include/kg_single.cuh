@@ -11,9 +11,8 @@ namespace device {
 
 namespace KGESolver {
 
-__global__ void neg_kernel(double *out, const double *in,
-                               const double * m,
-                               const uint32_t n) {
+__global__ void neg_kernel(double *out, const double *in, const double *m,
+                           const uint32_t n) {
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n) {
     out[idx] = -m[idx] * in[idx];

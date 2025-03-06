@@ -1,10 +1,10 @@
 #ifndef NLSE_DEV_HPP
-#define NLSE_DEV_HPP 
+#define NLSE_DEV_HPP
 
 #include "boundaries.cuh"
 #include "matfunc_complex.hpp"
-#include "pragmas.hpp"
 #include "nlse.cuh"
+#include "pragmas.hpp"
 #include "spmv.hpp"
 
 #include <cuda_runtime.h>
@@ -25,8 +25,7 @@ public:
   };
 
   NLSESolverDevice(const Eigen::SparseMatrix<std::complex<double>> &L,
-                   const std::complex<double> *host_u0,
-                   const double *host_m,
+                   const std::complex<double> *host_u0, const double *host_m,
                    const Parameters &params = Parameters())
       : n_(L.rows()), current_snapshot_(0), params_(params) {
 
@@ -39,8 +38,7 @@ public:
 
     cudaMemcpy(d_u_, host_u0, n_ * sizeof(thrust::complex<double>),
                cudaMemcpyHostToDevice);
-    cudaMemcpy(d_m_, host_m, n_ * sizeof(double),
-               cudaMemcpyHostToDevice);
+    cudaMemcpy(d_m_, host_m, n_ * sizeof(double), cudaMemcpyHostToDevice);
 
     matfunc_ = new MatrixFunctionApplicatorComplex(L, n_, params_.krylov_dim,
                                                    L.nonZeros());
@@ -75,14 +73,16 @@ public:
   }
 
   void step(const std::complex<double> tau, const uint32_t step_number) {
-    device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_, ny_);
-    device::nonlin_part<<<grid_dim_, block_dim_>>>(d_buf_, d_u_, d_density_, -.5 * tau,
-                                           nx_, ny_);
+    device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
+                                               ny_);
+    device::nonlin_part<<<grid_dim_, block_dim_>>>(d_buf_, d_u_, d_density_,
+                                                   -.5 * tau, nx_, ny_);
     matfunc_->apply(d_u_, d_buf_, -tau);
 
-    device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_, ny_);
-    device::nonlin_part<<<grid_dim_, block_dim_>>>(d_u_, d_u_, d_density_, -.5 * tau,
-                                           nx_, ny_);
+    device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
+                                               ny_);
+    device::nonlin_part<<<grid_dim_, block_dim_>>>(d_u_, d_u_, d_density_,
+                                                   -.5 * tau, nx_, ny_);
     if (step_number % params_.snapshot_freq == 0) {
       store_snapshot(step_number);
     }
@@ -120,5 +120,5 @@ private:
   dim3 block_dim_;
   Parameters params_;
 };
-}
+} // namespace device
 #endif

@@ -26,9 +26,10 @@ public:
   };
 
   SGEDoubleSolverDevice(const int *d_row_ptr, const int *d_col_ind,
-                  const double *d_values, const double *h_m, uint32_t n,
-                  uint32_t nnz, const double *host_u0, const double *host_v0,
-                  double dt, const Parameters &params = Parameters())
+                        const double *d_values, const double *h_m, uint32_t n,
+                        uint32_t nnz, const double *host_u0,
+                        const double *host_v0, double dt,
+                        const Parameters &params = Parameters())
       : n_(n), current_snapshot_(0), params_(params), dt_(dt) {
 
     nx_ = ny_ = std::sqrt(n);
@@ -79,8 +80,9 @@ public:
   }
 
   void step() {
-      device::SGEDoubleSolver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_,
-                              matfunc_, d_m_, dt_, n_, grid_dim_, block_dim_);
+    device::SGEDoubleSolver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_,
+                                  matfunc_, d_m_, dt_, n_, grid_dim_,
+                                  block_dim_);
   }
 
   void transfer_snapshots(double *dst) {
@@ -89,10 +91,7 @@ public:
                cudaMemcpyDeviceToHost);
   }
 
-  void apply_bc() {
-    neumann_bc_no_velocity_blocking<double>(d_u_, nx_, ny_);
-  }
-
+  void apply_bc() { neumann_bc_no_velocity_blocking<double>(d_u_, nx_, ny_); }
 
   void store_snapshot(const uint32_t snapshot_idx) {
     if (snapshot_idx < params_.num_snapshots) {

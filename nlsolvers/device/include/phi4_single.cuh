@@ -11,12 +11,11 @@ namespace device {
 
 namespace Phi4Solver {
 
-__global__ void neg_kernel(double *out, const double *in,
-                               const double * m,
-                               const uint32_t n) {
+__global__ void neg_kernel(double *out, const double *in, const double *m,
+                           const uint32_t n) {
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n) {
-    out[idx] = -m[idx] * (in[idx] + in[idx]*in[idx]*in[idx]);
+    out[idx] = -m[idx] * (in[idx] + in[idx] * in[idx] * in[idx]);
   }
 }
 
@@ -47,7 +46,7 @@ void step(double *d_u, double *d_u_past, double *d_buf, double *d_buf2,
   cudaMemcpy(d_u_past, d_buf, n * sizeof(double), cudaMemcpyDeviceToDevice);
 }
 
-} // namespace KGESolver
+} // namespace Phi4Solver
 
 } // namespace device
 

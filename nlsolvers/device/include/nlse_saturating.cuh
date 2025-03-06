@@ -1,16 +1,15 @@
 #ifndef NLSE_SATURATING_CUH
 #define NLSE_SATURATING_CUH
 
-#include <thrust/complex.h>
 #include <cuda_runtime.h>
+#include <thrust/complex.h>
 
 namespace device {
 
 __global__ void density_saturating(thrust::complex<double> *rho,
-                              const thrust::complex<double> *u,
-                              const double *m,
-                              const double kappa,
-                              const uint32_t nx, const uint32_t ny) {
+                                   const thrust::complex<double> *u,
+                                   const double *m, const double kappa,
+                                   const uint32_t nx, const uint32_t ny) {
   const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const uint32_t j = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -23,10 +22,10 @@ __global__ void density_saturating(thrust::complex<double> *rho,
 }
 
 __global__ void nonlin_part_saturating(thrust::complex<double> *out,
-                           const thrust::complex<double> *in,
-                           const thrust::complex<double> *rho,
-                           const thrust::complex<double> tau,
-                           const uint32_t nx, const uint32_t ny) {
+                                       const thrust::complex<double> *in,
+                                       const thrust::complex<double> *rho,
+                                       const thrust::complex<double> tau,
+                                       const uint32_t nx, const uint32_t ny) {
   const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const uint32_t j = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -37,6 +36,6 @@ __global__ void nonlin_part_saturating(thrust::complex<double> *out,
   }
 }
 
-}
+} // namespace device
 
 #endif

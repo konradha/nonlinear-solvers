@@ -11,8 +11,7 @@ namespace device {
 
 namespace SGEHyperbolicSolver {
 
-__global__ void neg_sinh_kernel(double *out, const double *in,
-                                const double * m,
+__global__ void neg_sinh_kernel(double *out, const double *in, const double *m,
                                 const uint32_t n) {
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n) {
@@ -47,7 +46,7 @@ void step(double *d_u, double *d_u_past, double *d_buf, double *d_buf2,
   cudaMemcpy(d_u_past, d_buf, n * sizeof(double), cudaMemcpyDeviceToDevice);
 }
 
-} // namespace SGEHyperbolicSolverDevice
+} // namespace SGEHyperbolicSolver
 
 } // namespace device
 

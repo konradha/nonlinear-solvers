@@ -103,9 +103,9 @@ int main(int argc, char **argv) {
   auto start = std::chrono::high_resolution_clock::now();
 
   device::SGEHyperbolicSolverDevice::Parameters params(num_snapshots, freq, 10);
-  device::SGEHyperbolicSolverDevice solver(d_row_ptr, d_col_ind, d_values, m.data(),
-                                 nx * ny, L.nonZeros(), u0.data(), v0.data(),
-                                 dt, params);
+  device::SGEHyperbolicSolverDevice solver(d_row_ptr, d_col_ind, d_values,
+                                           m.data(), nx * ny, L.nonZeros(),
+                                           u0.data(), v0.data(), dt, params);
 
   for (uint32_t i = 1; i < nt; ++i) {
     solver.step();
