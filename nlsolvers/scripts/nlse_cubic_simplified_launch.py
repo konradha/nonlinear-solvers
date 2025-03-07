@@ -12,9 +12,13 @@ import datetime
 import torch
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from downsampling import downsample_fft, downsample_interpolation
 from complex_samplers import sampler_random_solitons, sampler_random_fourier_localized
 from real_samplers import generate_grf
 from general_nlse_soliton_samplers import sample_nlse_initial_condition
+from animate_hdf import animate_diff
+
 
 def save_to_hdf5(run_id, run_idx, args, u0, m, traj, X, Y, elapsed_time, actual_seed=0):
     output_dir = Path(args.output_dir)
@@ -65,6 +69,10 @@ def main():
     parser.add_argument("--output-dir", type=str, default="results", help="Output directory")
     parser.add_argument("--exe", type=str, default="./nlse_cubic", help="Path to executable")
     parser.add_argument("--num-runs", type=int, default=1, help="Number of runs to perform")
+    parser.add_argument("--dr-x", type=int, default=128, help="Number of gridpoints to sample down for in x-direction")
+    parser.add_argument("--dr-y", type=int, default=128, help="Number of gridpoints to sample down for in x-direction")
+    parser.add_argument("--dr-strategy", choices=["FFT", "interpolation", "none"], default="interpolation",
+                      help="Downsampling strategy: Default is interpolation due to non-periodic boundary conditions. Choose 'none' if you want to keep the resolution")
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -109,8 +117,7 @@ def main():
         u0 = u0.detach().numpy().astype(np.complex128) if isinstance(u0, torch.Tensor) else u0
         print(f"Run {i+1}/{args.num_runs}, type={sample_type}")
         
-        norm = np.sqrt(np.sum(np.abs(u0)**2) * (2*args.Lx/(args.nx-1)) * (2*args.Ly/(args.ny-1)))
-        u0 = u0 / norm
+
         ic_file = ic_dir / f"ic_{run_id}_{i:04d}.npy"
         np.save(ic_file, u0) 
 
@@ -154,9 +161,37 @@ def main():
             continue
         
         end_time = time.time()
-        elapsed_time = end_time - start_time
+        walltime = end_time - start_time
         traj_data = np.load(traj_file)
-        h5_file = save_to_hdf5(run_id, i, args, u0, m, traj_data, X, Y, elapsed_time)
-            
+
+        if args.dr_strategy == 'none':
+            traj_data = traj_data
+        elif args.dr_strategy == 'FFT':
+            traj_data = downsample_fft(traj_data, target_shape=(args.dr_x, args.dr_y)) 
+        elif args.dr_strategy == 'interpolation':
+            traj_data = downsample_interpolation(traj_data, target_shape=(args.dr_x, args.dr_y), Lx=args.Lx, Ly=args.Ly)
+        else:
+            raise NotImplemented    
+        try:
+            h5_file = save_to_hdf5(run_id, i, args, u0, m, traj_data, X, Y, walltime)
+        except Exception as e:
+            # catastrophic abort if writing hdf5 fails
+            raise e
+
+        postproc_start = time.time()
+        animation_output = traj_dir / f"{run_id}_{i}.mp4" 
+        animate_diff(X, Y, traj_data, args.snapshots, animation_output, is_complex=True) 
+        postproc_end = time.time()
+        postproc_time = postproc_end - postproc_start 
+
+        print(f"Walltime: {walltime:.4f}")
+        print(f"Postproc: {postproc_time:.4f}")
+
+        # delete all intermediate files after successfully writing hdf5 and the movie 
+        os.unlink(traj_file)
+        os.unlink(ic_file)
+        os.unlink(m_file)
+    os.unlink(params_file)
+ 
 if __name__ == "__main__":
     sys.exit(main())

@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
   const std::vector<uint32_t> shape = {num_snapshots, ny, nx};
   save_to_npy(output_file, u_save, shape);
 
-  std::cout << std::scientific << std::setprecision(4);
-  std::cout << "walltime: " << compute_time / 1.e6 << " seconds\n";
+  //std::cout << std::scientific << std::setprecision(4);
+  //std::cout << "walltime: " << compute_time / 1.e6 << " seconds\n";
   return 0;
 }
