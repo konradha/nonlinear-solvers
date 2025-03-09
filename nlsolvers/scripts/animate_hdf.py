@@ -30,7 +30,7 @@ def animate(X, Y, data, nt, name):
     plt.show()
     #ani.save(name,)
 
-def animate_diff(X, Y, data, nt, name, is_complex=False):
+def animate_diff(X, Y, data, nt, name, is_complex=False, title=""):
     fig = plt.figure(figsize=(12, 8))
     
     def update(frame):
@@ -40,6 +40,7 @@ def animate_diff(X, Y, data, nt, name, is_complex=False):
                   aspect='auto',
                   cmap='coolwarm' if not is_complex else 'viridis')
         plt.colorbar()
+        fig.suptitle(title)
     
     fps = 7
     ani = FuncAnimation(fig, update, 

@@ -178,9 +178,17 @@ def main():
             # catastrophic abort if writing hdf5 fails
             raise e
 
+        animation_title = "NLSE $i u_t + \Delta u + |u|^2 u = 0$\n" + \
+        f"Domain: $[0, T={args.T}]x[-{args.Lx:.2f}, {args.Lx:.2f}] x [-{args.Ly:.2f}, {args.Ly:.2f}]$\n" + \
+        f"Solution type: {sample_type}, boundary conditions: no-flux\n" + \
+        f"@ resolution $\\tau = {args.T/args.nt:.3e},  h_x = {(2 * args.Lx / (args.nx - 1)):.3e}, h_y = {(2 *args.Ly/(args.ny - 1)):.3e}\n" + \
+        f"downsampled to: {args.dr_x} x {args.dr_y} using strategy {args.dr_strategy}\n" +\
+        f"samples collected: {args.snapshots}\n"
+
+
         postproc_start = time.time()
-        animation_output = traj_dir / f"{run_id}_{i}.mp4" 
-        animate_diff(X, Y, traj_data, args.snapshots, animation_output, is_complex=True) 
+        animation_output = traj_dir / f"{run_id}_{i:04d}.mp4" 
+        animate_diff(X, Y, traj_data, args.snapshots, animation_output, is_complex=True, title=animation_title) 
         postproc_end = time.time()
         postproc_time = postproc_end - postproc_start 
 
