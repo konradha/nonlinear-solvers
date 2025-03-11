@@ -17,7 +17,7 @@ from downsampling import downsample_fft, downsample_interpolation
 from complex_samplers import sampler_random_solitons, sampler_random_fourier_localized
 from real_samplers import generate_grf
 from general_nlse_soliton_samplers import sample_nlse_initial_condition
-from animate_hdf import animate_diff
+from animate_hdf import animate_diff, animate__
 
 
 def save_to_hdf5(run_id, run_idx, args, u0, m, traj, X, Y, elapsed_time, actual_seed=0):
@@ -66,6 +66,10 @@ def main():
     parser.add_argument("--sampler", choices=["programmatic", "random"], default="programmatic", 
                       help="Initial condition sampler")
     parser.add_argument("--m_type", choices=["one", "anisotropy"], default="one", help="m=m(x,y) term choice")
+    parser.add_argument("--m-mean", type=float, default=1.0, help="Mean value of m(x,y)")
+    parser.add_argument("--m-std", type=float, default=0.5, help="Standard deviation of m(x,y)")
+    parser.add_argument("--m-scale", type=float, default=2.0, help="Correlation scale of m(x,y)")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument("--output-dir", type=str, default="results", help="Output directory")
     parser.add_argument("--exe", type=str, default="./nlse_cubic", help="Path to executable")
     parser.add_argument("--num-runs", type=int, default=1, help="Number of runs to perform")
@@ -110,7 +114,14 @@ def main():
         if args.sampler == "random": 
             u0 = sampler_random_fourier_localized(args.nx, args.ny, args.Lx, args.Ly, seed=seed)
         elif args.sampler == "programmatic":
-            u0, sample_type = sample_nlse_initial_condition(args.nx, args.ny, args.Lx)
+            if np.random.choice([0, 1]): 
+                u0, sample_type = sample_nlse_initial_condition(args.nx, args.ny, args.Lx)
+            else:
+                num_packets = int(np.random.choice(np.linspace(1, 8)))
+                u0 = sampler_random_solitons(X, Y,
+                        num_solitons=num_packets,
+                        soliton_width=.1 * 2 * args.Lx, amp_range=(0.5, 2.0), seed=None)
+                sample_type = f"Colliding wavepackets, {num_packets=}"
         else:
             raise NotImplemented
 
@@ -125,7 +136,7 @@ def main():
             m = np.ones_like(u0)
         elif args.m_type == "anisotropy":
             m = generate_grf(args.nx, args.ny, args.Lx, args.Ly, 
-                       scale=1.5, mean=.5, std=0.4, )
+                       scale=args.m_scale, mean=args.m_mean, std=args.m_std, )
         else:
             raise NotImplemented
         
@@ -178,17 +189,21 @@ def main():
             # catastrophic abort if writing hdf5 fails
             raise e
 
-        animation_title = "NLSE $i u_t + \Delta u + |u|^2 u = 0$\n" + \
-        f"Domain: $[0, T={args.T}]x[-{args.Lx:.2f}, {args.Lx:.2f}] x [-{args.Ly:.2f}, {args.Ly:.2f}]$\n" + \
-        f"Solution type: {sample_type}, boundary conditions: no-flux\n" + \
-        f"@ resolution $\\tau = {args.T/args.nt:.3e},  h_x = {(2 * args.Lx / (args.nx - 1)):.3e}, h_y = {(2 *args.Ly/(args.ny - 1)):.3e}\n" + \
-        f"downsampled to: {args.dr_x} x {args.dr_y} using strategy {args.dr_strategy}\n" +\
-        f"samples collected: {args.snapshots}\n"
+        m_string = f"GRF: $s={args.m_scale:.2f}$, $\mu={args.m_mean:.2f}$, $\sigma= {args.m_std:.2f}$\n" \
+                if args.m_type != "ones" else "\n"
 
+        #f"@ resolution $\\tau = {args.T/args.nt:.3e},  h_x = {(2 * args.Lx / (args.nx - 1)):.3e}, h_y = {(2*args.Ly/(args.ny - 1)):.3e}$\n" + \
+        animation_title = "NLSE $i u_t + \Delta u + m(x,y) |u|^2 u = 0$\n" + f"m: {args.m_type}; " + m_string + \
+        f"Domain: $[0, T = {args.T}] x [-{args.Lx:.2f}, {args.Lx:.2f}] x [-{args.Ly:.2f}, {args.Ly:.2f}]$\n" + \
+        f"Solution type: {sample_type}, boundary conditions: no-flux\n" + \
+        f"resolution $n_t = {args.nt}, n_x = {args.nx}, n_y = {args.ny}$\n" + \
+        f"downsampled to: {args.dr_x} x {args.dr_y} using strategy '{args.dr_strategy}'\n" +\
+        f"samples collected: {args.snapshots}, walltime={walltime:.2f}\n\n"
 
         postproc_start = time.time()
         animation_output = traj_dir / f"{run_id}_{i:04d}.mp4" 
-        animate_diff(X, Y, traj_data, args.snapshots, animation_output, is_complex=True, title=animation_title) 
+        #animate_diff(X, Y, traj_data, args.snapshots, animation_output, is_complex=True, title=animation_title) 
+        animate__(X, Y, traj_data, args.snapshots, animation_output, is_complex=True, title=animation_title)
         postproc_end = time.time()
         postproc_time = postproc_end - postproc_start 
 
@@ -199,6 +214,7 @@ def main():
         os.unlink(traj_file)
         os.unlink(ic_file)
         os.unlink(m_file)
+
     os.unlink(params_file)
  
 if __name__ == "__main__":
