@@ -28,12 +28,13 @@ def save_to_hdf5(run_id, run_idx, args, u0, m, traj, X, Y, elapsed_time, actual_
     h5_file = h5_dir / f"run_{run_id}_{run_idx:04d}.h5" 
     with h5py.File(h5_file, 'w') as f:
         meta = f.create_group('metadata')
-        meta.attrs['problem_type'] = 'nlse_cubic'
+        meta.attrs['problem_type'] = 'nlse_saturating'
         meta.attrs['boundary_condition'] = 'noflux'
         meta.attrs['run_id'] = run_id
         meta.attrs['run_index'] = run_idx
         meta.attrs['timestamp'] = str(datetime.datetime.now())
         meta.attrs['elapsed_time'] = elapsed_time
+        meta.attrs['kappa'] = args.kappa
         grid = f.create_group('grid')
         grid.attrs['nx'] = args.nx
         grid.attrs['ny'] = args.ny
@@ -58,11 +59,13 @@ def save_to_hdf5(run_id, run_idx, args, u0, m, traj, X, Y, elapsed_time, actual_
     return h5_file
 
 def main():
-    parser = argparse.ArgumentParser(description="Local NLSE cubic nonlinearity solver launcher")
+    parser = argparse.ArgumentParser(description="NLSE saturating nonlinearity solver launcher")
     parser.add_argument("--nx", type=int, default=128, help="Grid points in x")
     parser.add_argument("--ny", type=int, default=128, help="Grid points in y")
     parser.add_argument("--Lx", type=float, default=10.0, help="Domain half-width in x")
     parser.add_argument("--Ly", type=float, default=10.0, help="Domain half-width in y")
+    parser.add_argument("--kappa", type=float, default=.5,
+        help="kappa parameter in nonlinearity V = |u|²/(1 + kappa |u|²)")
     parser.add_argument("--T", type=float, default=1.5, help="Simulation time")
     parser.add_argument("--nt", type=int, default=500, help="Number of time steps")
     parser.add_argument("--snapshots", type=int, default=100, help="Number of snapshots")
@@ -155,6 +158,7 @@ def main():
             str(args.ny),
             str(args.Lx),
             str(args.Ly),
+            str(args.kappa),
             str(ic_file),
             str(traj_file),
             str(args.T),
@@ -199,7 +203,8 @@ def main():
         m_string = f"GRF: $s={args.m_scale:.2f}$, $\mu={args.m_mean:.2f}$, $\sigma= {args.m_std:.2f}$\n" \
                 if args.m_type != "one" else "$m=1 \\forall (x,y) \in [-L_x, L_x] x [-L_y, L_y]$\n"
 
-        animation_title = "NLSE $i u_t + \Delta u + m(x,y) |u|^2 u = 0$\n" + f"m: {args.m_type}; " + m_string + \
+        animation_title = "NLSE $i u_t + \Delta u + m(x,y) \\frac{|u|^2}{1 + \kappa |u|^2} u = 0$\n" + f"m: {args.m_type}; " + m_string + \
+        f"$\kappa = {args.kappa:.2f}$\n" + \
         f"domain: $[0, T = {args.T}] x [-{args.Lx:.2f}, {args.Lx:.2f}] x [-{args.Ly:.2f}, {args.Ly:.2f}]$\n" + \
         f"solution type: {sample_type}, boundary conditions: no-flux\n" + \
         f"resolution $n_t = {args.nt}, n_x = {args.nx}, n_y = {args.ny}$\n" + \

@@ -28,12 +28,15 @@ def save_to_hdf5(run_id, run_idx, args, u0, m, traj, X, Y, elapsed_time, actual_
     h5_file = h5_dir / f"run_{run_id}_{run_idx:04d}.h5" 
     with h5py.File(h5_file, 'w') as f:
         meta = f.create_group('metadata')
-        meta.attrs['problem_type'] = 'nlse_cubic'
+        meta.attrs['problem_type'] = 'nlse_cubic_quintic'
         meta.attrs['boundary_condition'] = 'noflux'
         meta.attrs['run_id'] = run_id
         meta.attrs['run_index'] = run_idx
         meta.attrs['timestamp'] = str(datetime.datetime.now())
         meta.attrs['elapsed_time'] = elapsed_time
+        meta.attrs['sigma_1'] = args.s1
+        meta.attrs['sigma_2'] = args.s2
+
         grid = f.create_group('grid')
         grid.attrs['nx'] = args.nx
         grid.attrs['ny'] = args.ny
@@ -58,7 +61,9 @@ def save_to_hdf5(run_id, run_idx, args, u0, m, traj, X, Y, elapsed_time, actual_
     return h5_file
 
 def main():
-    parser = argparse.ArgumentParser(description="Local NLSE cubic nonlinearity solver launcher")
+    parser = argparse.ArgumentParser(description="NLSE cubic-quintic nonlinearity solver launcher")
+    parser.add_argument("--s1", type=float, default=-0.5, help="Parameter \sigma_1")
+    parser.add_argument("--s2", type=float, default=0.5, help="Parameter \sigma_2")
     parser.add_argument("--nx", type=int, default=128, help="Grid points in x")
     parser.add_argument("--ny", type=int, default=128, help="Grid points in y")
     parser.add_argument("--Lx", type=float, default=10.0, help="Domain half-width in x")
@@ -155,6 +160,8 @@ def main():
             str(args.ny),
             str(args.Lx),
             str(args.Ly),
+            str(args.s1),
+            str(args.s2),
             str(ic_file),
             str(traj_file),
             str(args.T),
@@ -199,7 +206,9 @@ def main():
         m_string = f"GRF: $s={args.m_scale:.2f}$, $\mu={args.m_mean:.2f}$, $\sigma= {args.m_std:.2f}$\n" \
                 if args.m_type != "one" else "$m=1 \\forall (x,y) \in [-L_x, L_x] x [-L_y, L_y]$\n"
 
-        animation_title = "NLSE $i u_t + \Delta u + m(x,y) |u|^2 u = 0$\n" + f"m: {args.m_type}; " + m_string + \
+        animation_title =\
+        "NLSE $i u_t + \Delta u + m(x,y) (\sigma_1 |u|^2 + \sigma_2 |u|^4) u = 0$\n" + f"m: {args.m_type}; " + m_string + \
+        f"$\sigma_1 = {args.s1:.2f}, \sigma_2 = {args.s2:.2f}$"
         f"domain: $[0, T = {args.T}] x [-{args.Lx:.2f}, {args.Lx:.2f}] x [-{args.Ly:.2f}, {args.Ly:.2f}]$\n" + \
         f"solution type: {sample_type}, boundary conditions: no-flux\n" + \
         f"resolution $n_t = {args.nt}, n_x = {args.nx}, n_y = {args.ny}$\n" + \

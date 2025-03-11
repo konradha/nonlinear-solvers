@@ -89,8 +89,6 @@ int main(int argc, char **argv) {
 
   u_save_mat.row(0) = u0.transpose();
 
-  auto start = std::chrono::high_resolution_clock::now();
-
   Eigen::VectorXcd u = u0;
   Eigen::VectorXcd buf = u0;
   Eigen::VectorXcd rho_buf(nx * ny);
@@ -105,18 +103,9 @@ int main(int argc, char **argv) {
         u_save_mat.row(snapshot_idx) = u.transpose();
       }
     }
-    // PROGRESS_BAR(i, nt);
   }
-
-  auto end = std::chrono::high_resolution_clock::now();
-  auto compute_time =
-      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-          .count();
-
   const std::vector<uint32_t> shape = {num_snapshots, ny, nx};
   save_to_npy(output_file, u_save, shape);
 
-  std::cout << std::scientific << std::setprecision(4);
-  std::cout << "walltime: " << compute_time / 1.e6 << " seconds\n";
   return 0;
 }
