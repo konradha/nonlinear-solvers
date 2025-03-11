@@ -61,3 +61,12 @@ if(BUILD_PHI4)
         install(TARGETS phi4 RUNTIME DESTINATION bin)
     endif()
 endif()
+
+###### 3D DRIVERS
+if(BUILD_NLSE_CUBIC)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/nlse_cubic_driver_host_3d.cpp")
+        add_executable(nlse_cubic_host_3d nlse_cubic_driver_host_3d.cpp)
+        target_link_libraries(nlse_cubic_host_3d PRIVATE host_solvers)
+        install(TARGETS nlse_cubic_host_3d RUNTIME DESTINATION bin)
+    endif()
+endif()
