@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
   // TODO: Show m=15 Krylov subspace iterations are sufficient
   //       -> There's publications showing that precision becomes marginal
   //          after m=10, ie. we already land between 10^{-8} and 10^{-10}
-  //          at that point.
+  //          in terms of L² errors at that point.
   device::NLSESolverDevice::Parameters params(num_snapshots, freq, 15);
   device::NLSESolverDevice solver(L, u0.data(), m.data(), params);
 

@@ -21,7 +21,7 @@ def animate_isosurface(X, Y, Z, data, nt, name, is_complex=False, title="",
     if iso_level is None:
         max_val = np.max(processed_data)
         min_val = np.min(processed_data)
-        iso_level = min_val + 0.3 * (max_val - min_val)
+        iso_level = min_val + 0.4 * (max_val - min_val)
     
     fig = plt.figure(figsize=(12, 10))
     grid = plt.GridSpec(2, 1, height_ratios=[1, 9], hspace=0.05)
@@ -90,12 +90,11 @@ def animate_isosurface(X, Y, Z, data, nt, name, is_complex=False, title="",
         return mesh,
     
     ani = FuncAnimation(fig, update, frames=nt, interval=1000/fps, blit=False)
+    #plt.show()
     
-    os.makedirs(os.path.dirname(os.path.abspath(name)) if os.path.dirname(name) else '.', exist_ok=True)
-    
-    ani.save(name, dpi=200)
-    plt.close(fig)
-    
+    os.makedirs(os.path.dirname(os.path.abspath(name)) if os.path.dirname(name) else '.', exist_ok=True) 
+    ani.save(name, dpi=250)
+    plt.close(fig) 
     print(f"Animation saved to {name}")
 
 
@@ -186,7 +185,7 @@ def animate_isosurface_dual(X, Y, Z, data, nt, name, is_complex=False, title="",
         mesh2.set_verts([])
         
         try:
-            verts1, faces1, _, _ = measure.marching_cubes(processed_data1[frame], level=iso_levels[0])
+            verts1, faces1, _, _ = measure.marching_cubes(processed_data1[frame], level=iso_levels[-1])
             
             verts1_scaled = np.zeros_like(verts1)
             verts1_scaled[:, 0] = x_min + verts1[:, 0] * (x_max - x_min) / (processed_data1.shape[1] - 1)
@@ -269,7 +268,7 @@ if __name__ == "__main__":
     z = np.linspace(-Lz, Lz, nz)
     X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
     
-    nt = 20
+    nt = 100
     data = np.zeros((nt, nx, ny, nz), dtype=np.complex128)
     
     for t in range(nt):
@@ -292,8 +291,8 @@ if __name__ == "__main__":
     
     animate_isosurface(X, Y, Z, data, nt, 'output/isosurface_example.mp4', 
                       is_complex=True, title="Colliding wave packets", 
-                      iso_level=0.3, view_angles=(30, 30))
+                      iso_level=None, view_angles=(30, 30))
     
-    animate_isosurface_dual(X, Y, Z, (data_real, data_imag), nt, 'output/isosurface_dual_example.mp4',
-                           is_complex=False, title="Colliding wave packets - Real & Imaginary Parts",
-                           colormaps=('viridis', 'plasma'))
+    #animate_isosurface_dual(X, Y, Z, (data_real, data_imag), nt, 'output/isosurface_dual_example.mp4',
+    #                       is_complex=False, title="Colliding wave packets - Real & Imaginary Parts",
+    #                       colormaps=('viridis', 'plasma'))

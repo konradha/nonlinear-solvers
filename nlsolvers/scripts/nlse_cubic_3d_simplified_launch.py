@@ -49,6 +49,9 @@ def save_to_hdf5(run_id, run_idx, args, u0, m, traj, X, Y, Z, elapsed_time, samp
         ic_grp.attrs['sampler'] = args.sampler
         ic_grp.create_dataset('u0', data=u0) 
         m_grp = f.create_group('focusing')
+        m_grp.attrs['mean'] = args.m_mean
+        m_grp.attrs['std'] = args.m_std
+        m_grp.attrs['scale'] = args.m_scale
         m_grp.create_dataset('m', data=m)
         f.create_dataset('u', data=traj)
         f.create_dataset('X', data=X)
@@ -77,14 +80,22 @@ def main():
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
     parser.add_argument("--output-dir", type=str, default="results_3d", help="Output directory")
     parser.add_argument("--exe", type=str, default="./nlse_cubic_3d", help="Path to executable")
-    parser.add_argument("--num-runs", type=int, default=1, help="Number of runs to perform")
-    parser.add_argument("--dr-x", type=int, default=64, help="Number of gridpoints to sample down for in x-direction")
-    parser.add_argument("--dr-y", type=int, default=64, help="Number of gridpoints to sample down for in y-direction")
-    parser.add_argument("--dr-z", type=int, default=64, help="Number of gridpoints to sample down for in z-direction")
+    parser.add_argument("--num-runs", type=int, default=1,
+            help="Number of runs to perform")
+    parser.add_argument("--dr-x", type=int, default=50,
+            help="Number of gridpoints to sample down for in x-direction")
+    parser.add_argument("--dr-y", type=int, default=50,
+            help="Number of gridpoints to sample down for in y-direction")
+    parser.add_argument("--dr-z", type=int, default=50,
+            help="Number of gridpoints to sample down for in z-direction")
     parser.add_argument("--dr-strategy", choices=["FFT", "interpolation", "none"], default="interpolation",
-                      help="Downsampling strategy: Default is interpolation due to non-periodic boundary conditions. Choose 'none' if you want to keep the resolution")
-    parser.add_argument("--iso-level", type=float, default=None, help="Isosurface level (default: 0.3 * max amplitude)")
-    parser.add_argument("--view-angles", type=float, nargs=2, default=[30, 45], help="View angles for 3D visualization (elevation, azimuth)")
+            help="Downsampling strategy: Default is interpolation due to non-periodic boundary conditions. Choose 'none' if you want to keep the resolution")
+    parser.add_argument("--iso-level", type=float, default=None,
+            help="Isosurface level (default: 0.3 * max amplitude)")
+    parser.add_argument("--view-angles", type=float, nargs=2, default=[30, 45],
+            help="View angles for 3D visualization (elevation, azimuth)")
+    parser.add_argument("--delete-intermediates", type=bool, default=True,
+            help="Save space by removing intermediate files")
     args = parser.parse_args()
 
     if args.seed is not None:
@@ -92,7 +103,7 @@ def main():
         torch.manual_seed(args.seed)
         random_seed = args.seed
     else:
-        random_seed = np.random.randint(0, 2**32 - 1)
+        random_seed = np.random.randint(0, (1 << 31) - 1)
         np.random.seed(random_seed)
         torch.manual_seed(random_seed)
 
@@ -152,7 +163,7 @@ def main():
             m = np.ones_like(u0, dtype=u0.dtype)
         elif args.m_type == "anisotropy":
             if isinstance(m, np.ndarray) and args.sampler == "programmatic":
-                pass
+                m = m.astype(u0.dtype)
             else:
                 L = max(args.Lx, args.Ly, args.Lz)
                 nx, ny, nz = args.nx, args.ny, args.nz
@@ -225,7 +236,7 @@ def main():
         f"domain: $[0, T = {args.T}] \\times [-{args.Lx:.2f}, {args.Lx:.2f}] \\times [-{args.Ly:.2f}, {args.Ly:.2f}] \\times [-{args.Lz:.2f}, {args.Lz:.2f}]$\n" + \
         f"solution type: {sample_type}, boundary conditions: no-flux\n" + \
         f"resolution $n_t = {args.nt}, n_x = {args.nx}, n_y = {args.ny}, n_z = {args.nz}$\n" + \
-        f"downsampled to: {args.dr_x} \\times {args.dr_y} \\times {args.dr_z} using strategy '{args.dr_strategy}'\n" +\
+        f"downsampled to: ${args.dr_x} \\times {args.dr_y} \\times {args.dr_z}$ using strategy '{args.dr_strategy}'\n" +\
         f"samples collected: {args.snapshots}, walltime={walltime:.2f} seconds on: {cuda_string}\n\n"
 
         postproc_start = time.time()
@@ -242,10 +253,6 @@ def main():
                          is_complex=True, title=animation_title, 
                          iso_level=args.iso_level, view_angles=tuple(args.view_angles))
         
-        animation_dual_output = anim_dir / f"iso_dual_{run_id}_{i:04d}.mp4"
-        animate_isosurface_dual(X_ds, Y_ds, Z_ds, traj_data, args.snapshots, animation_dual_output,
-                              is_complex=True, title=animation_title,
-                              view_angles=tuple(args.view_angles))
         
         postproc_end = time.time()
         postproc_time = postproc_end - postproc_start 
@@ -253,12 +260,13 @@ def main():
         print(f"Walltime: {walltime:.4f}")
         print(f"Postproc: {postproc_time:.4f}")
 
-        if args.snapshots > 10:
+        if args.delete_intermediates:
             os.unlink(traj_file)
             os.unlink(ic_file)
             os.unlink(m_file)
 
-    os.unlink(params_file)
+    if args.delete_intermediates:
+        os.unlink(params_file)
  
 if __name__ == "__main__":
     sys.exit(main())

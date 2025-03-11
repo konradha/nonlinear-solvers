@@ -665,11 +665,11 @@ def main():
     condition_types = ['ground', 'vortex', 'multi_vortex', 'soliton',
                       'lattice', 'turbulence', 'rogue', 'breather', 'sound', 'droplet']
     
-    for condition_type in condition_types:
-        psi, m, description = sample_nlse_initial_condition_3d(Nx, Ny, Nz, L, condition_type)
-        fig = visualize_isosurfaces(psi, m, description, L)
-        plt.show()
-        plt.close(fig)
+    #for condition_type in condition_types:
+    #    psi, m, description = sample_nlse_initial_condition_3d(Nx, Ny, Nz, L, condition_type)
+    #    fig = visualize_isosurfaces(psi, m, description, L)
+    #    plt.show()
+    #    plt.close(fig)
     
     for i in range(2):
         psi, m, description = sample_nlse_initial_condition_3d(Nx, Ny, Nz, L)

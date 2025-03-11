@@ -350,6 +350,8 @@ def main_3d():
 
 
 if __name__ == '__main__': 
+    main_3d()
+    """
     fname_u = str(argv[1])
     target_nx, target_ny = int(argv[2]), int(argv[3])
 
@@ -392,5 +394,5 @@ if __name__ == '__main__':
     fig.suptitle(f"{'NLSE' if is_complex else 'SGE'}; sample: {ts} / {nt} (num snapshots)")
 
     plt.show()
-
+    """
 
