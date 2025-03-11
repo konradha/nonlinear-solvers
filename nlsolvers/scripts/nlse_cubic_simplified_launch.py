@@ -189,20 +189,20 @@ def main():
             # catastrophic abort if writing hdf5 fails
             raise e
 
+        cuda_avail = torch.cuda.is_available() 
+        cuda_string = "device (presumably)" if cuda_avail else "host"
         m_string = f"GRF: $s={args.m_scale:.2f}$, $\mu={args.m_mean:.2f}$, $\sigma= {args.m_std:.2f}$\n" \
-                if args.m_type != "ones" else "\n"
+                if args.m_type != "one" else "$m=1 \\forall (x,y) \in [-L_x, L_x] x [-L_y, L_y]$\n"
 
-        #f"@ resolution $\\tau = {args.T/args.nt:.3e},  h_x = {(2 * args.Lx / (args.nx - 1)):.3e}, h_y = {(2*args.Ly/(args.ny - 1)):.3e}$\n" + \
         animation_title = "NLSE $i u_t + \Delta u + m(x,y) |u|^2 u = 0$\n" + f"m: {args.m_type}; " + m_string + \
-        f"Domain: $[0, T = {args.T}] x [-{args.Lx:.2f}, {args.Lx:.2f}] x [-{args.Ly:.2f}, {args.Ly:.2f}]$\n" + \
-        f"Solution type: {sample_type}, boundary conditions: no-flux\n" + \
+        f"domain: $[0, T = {args.T}] x [-{args.Lx:.2f}, {args.Lx:.2f}] x [-{args.Ly:.2f}, {args.Ly:.2f}]$\n" + \
+        f"solution type: {sample_type}, boundary conditions: no-flux\n" + \
         f"resolution $n_t = {args.nt}, n_x = {args.nx}, n_y = {args.ny}$\n" + \
         f"downsampled to: {args.dr_x} x {args.dr_y} using strategy '{args.dr_strategy}'\n" +\
-        f"samples collected: {args.snapshots}, walltime={walltime:.2f}\n\n"
+        f"samples collected: {args.snapshots}, walltime={walltime:.2f} seconds on: {cuda_string}\n\n"
 
         postproc_start = time.time()
-        animation_output = traj_dir / f"{run_id}_{i:04d}.mp4" 
-        #animate_diff(X, Y, traj_data, args.snapshots, animation_output, is_complex=True, title=animation_title) 
+        animation_output = traj_dir / f"{run_id}_{i:04d}.mp4"  
         animate__(X, Y, traj_data, args.snapshots, animation_output, is_complex=True, title=animation_title)
         postproc_end = time.time()
         postproc_time = postproc_end - postproc_start 

@@ -89,10 +89,8 @@ int main(int argc, char **argv) {
 
   Eigen::VectorX<std::complex<double>> u_save(num_snapshots * nx * ny);
 
-  auto start = std::chrono::high_resolution_clock::now();
-
   device::NLSECubicQuinticSolverDevice::Parameters params(num_snapshots, freq,
-                                                          10, sigma1, sigma2);
+                                                          15, sigma1, sigma2);
   device::NLSECubicQuinticSolverDevice solver(L, u0.data(), m.data(), params);
 
   for (uint32_t i = 1; i < nt; ++i) {
@@ -100,14 +98,7 @@ int main(int argc, char **argv) {
     solver.apply_bc();
   }
   solver.transfer_snapshots(u_save.data());
-  auto end = std::chrono::high_resolution_clock::now();
-  auto compute_time =
-      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-          .count();
-
   const std::vector<uint32_t> shape = {num_snapshots, ny, nx};
   save_to_npy(output_file, u_save, shape);
-
-  std::cout << "walltime: " << compute_time / (1.e6) << " seconds\n";
   return 0;
 }

@@ -90,9 +90,12 @@ int main(int argc, char **argv) {
 
   Eigen::VectorX<std::complex<double>> u_save(num_snapshots * nx * ny);
 
-  auto start = std::chrono::high_resolution_clock::now();
-
-  device::NLSESolverDevice::Parameters params(num_snapshots, freq, 10);
+  // TODO: Redo performance benchmark. Here: Everything abstracted away.
+  // TODO: Show m=15 Krylov subspace iterations are sufficient
+  //       -> There's publications showing that precision becomes marginal
+  //          after m=10, ie. we already land between 10^{-8} and 10^{-10}
+  //          at that point.
+  device::NLSESolverDevice::Parameters params(num_snapshots, freq, 15);
   device::NLSESolverDevice solver(L, u0.data(), m.data(), params);
 
   for (uint32_t i = 1; i < nt; ++i) {
@@ -100,14 +103,7 @@ int main(int argc, char **argv) {
     solver.apply_bc();
   }
   solver.transfer_snapshots(u_save.data());
-  auto end = std::chrono::high_resolution_clock::now();
-  auto compute_time =
-      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-          .count();
-
   const std::vector<uint32_t> shape = {num_snapshots, ny, nx};
   save_to_npy(output_file, u_save, shape);
-
-  std::cout << "walltime: " << compute_time / (1.e6) << " seconds\n";
   return 0;
 }
