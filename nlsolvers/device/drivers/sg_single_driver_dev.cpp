@@ -100,8 +100,6 @@ int main(int argc, char **argv) {
 
   Eigen::VectorXd u_save(num_snapshots * nx * ny);
 
-  auto start = std::chrono::high_resolution_clock::now();
-
   device::SGESolverDevice::Parameters params(num_snapshots, freq, 10);
   device::SGESolverDevice solver(d_row_ptr, d_col_ind, d_values, m.data(),
                                  nx * ny, L.nonZeros(), u0.data(), v0.data(),
@@ -118,11 +116,7 @@ int main(int argc, char **argv) {
     }
   }
   solver.transfer_snapshots(u_save.data());
-  auto end = std::chrono::high_resolution_clock::now();
-  auto compute_time =
-      std::chrono::duration_cast<std::chrono::microseconds>(end - start)
-          .count();
-
+ 
   const std::vector<uint32_t> shape = {num_snapshots, ny, nx};
   save_to_npy(output_file, u_save, shape);
 
@@ -130,6 +124,5 @@ int main(int argc, char **argv) {
   cudaFree(d_col_ind);
   cudaFree(d_values);
 
-  std::cout << "walltime: " << compute_time / (1.e6) << " seconds\n";
   return 0;
 }

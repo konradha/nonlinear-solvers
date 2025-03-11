@@ -209,7 +209,7 @@ def main():
         postproc_time = postproc_end - postproc_start 
 
         print(f"Walltime: {walltime:.4f}")
-        print(f"Postproc: {postproc_time:.4f}")
+        print(f"Postproc: {postproc_time:.4f}", flush=True)
 
         # delete all intermediate files after successfully writing hdf5 and the movie 
         if args.delete_intermediates:

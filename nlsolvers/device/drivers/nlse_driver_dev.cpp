@@ -14,7 +14,7 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  if (argc != 11 && argc != 12) {
+  if (argc != 10 && argc != 11) {
     std::cerr << "Usage: " << argv[0]
               << " nx ny Lx Ly input_u0.npy input_v0.npy output_traj.npy T nt "
                  "num_snapshots [input_m.npy]\n";
@@ -32,15 +32,14 @@ int main(int argc, char **argv) {
   const double Lx = std::stod(argv[3]);
   const double Ly = std::stod(argv[4]);
   const std::string input_file = argv[5];
-  const std::string input_velocity = argv[6];
-  const std::string output_file = argv[7];
-  const double T = std::stod(argv[8]);
-  const uint32_t nt = std::stoul(argv[9]);
-  const uint32_t num_snapshots = std::stoul(argv[10]);
+  const std::string output_file = argv[6];
+  const double T = std::stod(argv[7]);
+  const uint32_t nt = std::stoul(argv[8]);
+  const uint32_t num_snapshots = std::stoul(argv[9]);
 
   std::optional<std::string> m_file;
-  if (argc == 12) {
-    m_file = argv[11];
+  if (argc == 11) {
+    m_file = argv[10];
   }
 
   const double dx = 2 * Lx / (nx - 1);
@@ -53,9 +52,7 @@ int main(int argc, char **argv) {
   std::vector<uint32_t> input_shape;
   Eigen::VectorX<std::complex<double>> u0 =
       read_from_npy<std::complex<double>>(input_file, input_shape);
-  Eigen::VectorX<std::complex<double>> v0 =
-      read_from_npy<std::complex<double>>(input_velocity, input_shape);
-
+  
   if (input_shape.size() != 2 || input_shape[0] != ny || input_shape[1] != nx) {
     std::cerr << "Error: Input array dimensions mismatch\n";
     std::cerr << "Expected: " << ny << "x" << nx << "\n";
