@@ -12,7 +12,7 @@ The below trajectories show $|u|^2$ with random initial conditions (not fully ra
 will be expanded on at a later point).
 
 ![](content/traj_3b0f7251_0000.gif)
-![](content/traj_7e40f6d2_0000.gif)
+![](content/trajectory_breather_nlse_3d.gif)
 ![](content/traj_dfdf666c_0000.gif)
 
 
