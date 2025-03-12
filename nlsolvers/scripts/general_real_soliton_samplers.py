@@ -276,8 +276,9 @@ def sample_colliding_rings(X, Y, L, num_rings=2, ring_type='random'):
 def sample_elliptical_soliton(X, Y, L, complexity='simple'):
     if complexity == 'simple':
         x0, y0 = (L/2) * (2*torch.rand(2) - 1)
-        a = (0.3*L + 0.4*L*torch.rand(1)) 
+        a = (0.1*L + 0.2*L*torch.rand(1))
         b = a * (0.2 + 0.8*torch.rand(1))
+
 
         theta = torch.pi*torch.rand(1)
         phase = 2*torch.pi*torch.rand(1)
@@ -303,12 +304,11 @@ def sample_elliptical_soliton(X, Y, L, complexity='simple'):
         
         for _ in range(num_features):
             x0, y0 = (L/2) * (2*torch.rand(2) - 1)
-            a = (0.2*L + 0.3*L*torch.rand(1)) 
-            b = a * (0.3 + 0.7*torch.rand(1))
+            a = (0.1*L + 0.2*L*torch.rand(1))
+            b = a * (0.2 + 0.8*torch.rand(1))
             
             theta = torch.pi*torch.rand(1)
-            phase = 2*torch.pi*torch.rand(1)
-            
+            phase = 2*torch.pi*torch.rand(1)            
             X_rot = (X - x0)*torch.cos(theta) + (Y - y0)*torch.sin(theta)
             Y_rot = -(X - x0)*torch.sin(theta) + (Y - y0)*torch.cos(theta)
             
