@@ -26,7 +26,7 @@ python nlse_cubic_simplified_launch.py --exe=../build/bin/nlse_dev\
 		--ny 256 \
 		--Lx 10.0 \
 		--Ly 10.0 \
-		--T 10.0 \
+		--T 1.5 \
 		--nt 1000 \
 		--dr-x 128 --dr-y 128 \
 		--m_type "one"\
