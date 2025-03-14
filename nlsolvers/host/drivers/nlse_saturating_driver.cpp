@@ -62,12 +62,12 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  Eigen::VectorXcd m = Eigen::VectorXcd::Zero(nx * ny);
+  Eigen::VectorXd m = Eigen::VectorXd::Zero(nx * ny);
 
   if (m_file) {
     try {
       std::vector<uint32_t> m_shape;
-      m = read_from_npy<std::complex<double>>(m_file.value(), m_shape);
+      m = read_from_npy<double>(m_file.value(), m_shape);
       if (m_shape.size() != 2 || m_shape[0] != ny || m_shape[1] != nx) {
         std::cerr << "Error: Focusing array dimensions mismatch\n";
         std::cerr << "Expected: " << ny << "x" << nx << "\n";

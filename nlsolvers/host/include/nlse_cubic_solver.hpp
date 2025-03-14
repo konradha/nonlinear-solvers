@@ -54,7 +54,7 @@ namespace NLSESolver {
 template <typename Scalar_t>
 void step(Eigen::VectorX<Scalar_t> &buf, Eigen::VectorX<Scalar_t> &rho_buf,
           Eigen::VectorX<Scalar_t> &u, const Eigen::SparseMatrix<Scalar_t> &L,
-          const Eigen::VectorX<Scalar_t> &m, const Scalar_t tau)
+          const Eigen::VectorX<double> &m, const Scalar_t tau)
 // tau = 1j * dt; important to propagate this in complex time --
 // else we're computing an expensive equilibrium
 {

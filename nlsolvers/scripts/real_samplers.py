@@ -15,6 +15,40 @@ def generate_grf(nx, ny, Lx, Ly, scale=2.0, mean=1.0, std=0.5, seed=None):
     field = np.maximum(field, 1.)
     return field.astype(np.complex128)
 
+import numpy as np
+
+def generate_wavelet(nx, ny, Lx, Ly, num_wavelets=30, scale=0.15, frequency=3.0,
+                           amplitude=1.0, mean=1.0, std=0.5, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+
+    x = np.linspace(-Lx, Lx, nx)
+    y = np.linspace(-Ly, Ly, ny)
+    X, Y = np.meshgrid(x, y, indexing='ij')
+
+    field = np.zeros((nx, ny))
+
+    for _ in range(num_wavelets):
+        x0 = np.random.uniform(-Lx, Lx)
+        y0 = np.random.uniform(-Ly, Ly)
+        s = np.random.uniform(0.5, 1.5) * scale * min(Lx, Ly)
+
+        k = np.random.uniform(0.7, 1.3) * frequency * np.pi / min(Lx, Ly)
+        theta = np.random.uniform(0, 2*np.pi)
+
+        kx = k * np.cos(theta)
+        ky = k * np.sin(theta)
+
+        amp = np.random.uniform(0.7, 1.3) * amplitude
+
+        r2 = ((X - x0)**2 + (Y - y0)**2) / s**2
+        wavelet = amp * np.exp(-0.5 * r2) * np.cos(kx * (X - x0) + ky * (Y - y0))
+        field += wavelet
+
+    field = (field - np.mean(field)) / np.std(field) * std + mean
+    field = np.maximum(field, 0.1)
+    return field
+
 
 # TODO replace the below samplers for KGE and SGE with physically meaningful Wavelet-enhanced GRF samplers
 def sample_random_kink(X, Y, width=1.0, seed=None):
