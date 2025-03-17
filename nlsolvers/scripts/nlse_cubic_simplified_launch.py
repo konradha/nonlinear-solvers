@@ -333,7 +333,7 @@ def main():
             m = generate_wavelet(args.nx, args.ny, args.Lx, args.Ly, 
                        scale=args.m_scale, mean=args.m_mean, std=args.m_std, ).astype(np.float64)
             m = m - np.mean(m)
-            m = m * 25
+            m = m * 50
         else:
             raise NotImplemented
             
