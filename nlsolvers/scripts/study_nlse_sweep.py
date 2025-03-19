@@ -23,6 +23,7 @@ from devise_structured_samplers import (
 
 from precise_nlse_phenomena import NLSEPhenomenonSampler
 from periodic_trap import make_periodic_boxes
+from real_samplers import generate_grf
 
 def setup_logging(log_level=logging.INFO):
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -997,10 +998,24 @@ def generate_and_save_field(m_scaling, sampler_type, m_type, args):
         u = sampler.generate_ensemble("spectral", n_samples=1)[0]
     elif sampler_type == "chaotic":
         u = sampler.generate_ensemble("chaotic", n_samples=1)[0]
+    elif sampler_type == 'logarithmic_singularity':
+        u = sampler.generate_ensemble('logarithmic_singularity_adapted', n_samples=1)[0]
+    elif sampler_type == 'free_singularity':
+        u = sampler.generate_ensemble('free_singularity_adapted', n_samples=1)[0]
+    elif sampler_type == 'multi_ring':
+        u = sampler.generate_ensemble('multi_ring', n_samples=1)[0]
+    elif sampler_type == 'vortex_lattice':
+        u = sampler.generate_ensemble('vortex_lattice', n_samples=1)[0]
+    elif sampler_type == 'one':
+        u = np.ones((nx, ny), dtype=np.complex128) * (1 + 1j)
+    elif sampler_type == 'neg':
+        u = -1 * np.ones((nx, ny), dtype=np.complex128) * (1 + 1j)
     else:
-        raise ValueError(f"Unknown sampler type: {sampler_type}")
+        logger.error(sampler_type)
+        raise ValueError(f"Unknown sampler type: {sampler_type}") 
 
     norm = np.sum(np.abs(u)**2) * dx * dy
+    # not actually normalizing but it's a scale we can nicely adapt to!
     if np.abs(norm - 1.) > 1.:
         u = u / np.max(np.abs(u))
     
@@ -1013,9 +1028,11 @@ def generate_and_save_field(m_scaling, sampler_type, m_type, args):
         r = np.sqrt((X)**2 + (Y)**2)
         m_base = np.tanh(r - Lx/2)
     elif m_type == "periodic_boxes":
-        num_boxes_per_dim = np.random.randint(3, 8)
+        num_boxes_per_dim = 4#np.random.randint(3, 8)
         m_base = make_periodic_boxes(nx, Lx, factor=2.,
                 box_length=.45 / num_boxes_per_dim, num_boxes_per_dim=num_boxes_per_dim, wall_dist=.1) 
+    elif m_type == "grf":
+        m_base = generate_grf(nx, ny, Lx, Ly)
     else:
         raise ValueError(f"Unknown m type: {m_type}")
     
@@ -1102,11 +1119,14 @@ def run_parameter_sweep(args):
             for m_scaling in m_scalings:
                 logger.info(f"Running sweep: sampler={sampler_type}, m_type={m_type}, m_scaling={m_scaling}")
                 u0_path, m_path, run_id, u0, m_base = generate_and_save_field(m_scaling, sampler_type, m_type, args)
+                
                 # globally adapted now for all! 
                 m_base = m_scaling * m_base
 
-                m, (scale_pos, scale_neg) = calculate_physical_scaling(u0, m_base, args.Lx, 'cubic', params=args)
-                cubic_scale = scale_pos + scale_neg
+                # m, (scale_pos, scale_neg) = calculate_physical_scaling(u0, m_base, args.Lx, 'cubic', params=args)
+                # cubic_scale = scale_pos + scale_neg
+
+                cubic_scale = cq_scale = sat_scale = m_scaling
 
                 logger.info(f"Calculated physical scaling for cubic: {cubic_scale:.4f}")
                 scaled_m_path_cubic = create_scaled_m_file(m, cubic_scale, 'cubic', {}, 
@@ -1116,8 +1136,8 @@ def run_parameter_sweep(args):
                 results_cubic_quintic = {}
                 for i, (s1, s2) in enumerate(cubic_quintic_args['s1_s2_pairs']):
                     cq_params = {'s1': s1, 's2': s2}
-                    m, (scale_pos, scale_neg) = calculate_physical_scaling(u0, m_base, args.Lx, 'cubic_quintic', cq_params)
-                    cq_scale = scale_pos + scale_neg 
+                    # m, (scale_pos, scale_neg) = calculate_physical_scaling(u0, m_base, args.Lx, 'cubic_quintic', cq_params)
+                    # cq_scale = scale_pos + scale_neg 
                     logger.info(f"Calculated physical scaling for cubic-quintic (s1={s1}, s2={s2}): {cq_scale:.4f}")
                     scaled_m_path_cq = create_scaled_m_file(m, cq_scale, 'cubic_quintic', cq_params, 
                                                           args.output_dir, m_type, m_scaling, run_id)
@@ -1128,8 +1148,8 @@ def run_parameter_sweep(args):
                 results_saturating = {}
                 for i, kappa in enumerate(saturating_args['kappa_values']):
                     sat_params = {'kappa': kappa}
-                    m, (scale_pos, scale_neg) = calculate_physical_scaling(u0, m_base, args.Lx, 'saturating', sat_params)
-                    sat_scale = scale_pos + scale_neg 
+                    # m, (scale_pos, scale_neg) = calculate_physical_scaling(u0, m_base, args.Lx, 'saturating', sat_params)
+                    # sat_scale = scale_pos + scale_neg 
                     logger.info(f"Calculated physical scaling for saturating (kappa={kappa}): {sat_scale:.4f}")
                     scaled_m_path_sat = create_scaled_m_file(m, sat_scale, 'saturating', sat_params, 
                                                           args.output_dir, m_type, m_scaling, run_id)
@@ -1149,6 +1169,269 @@ def run_parameter_sweep(args):
                 cleanup_intermediate_files(combined_results)
     
     return result_files
+
+def run_parameter_sweep_no_physical_scaling(args):
+    global_args = {
+        'output_dir': args.output_dir,
+        'nx': args.nx,
+        'ny': args.ny,
+        'Lx': args.Lx,
+        'Ly': args.Ly,
+        'T': args.T,
+        'nt': args.nt,
+        'snapshots': args.snapshots
+    }
+    
+    cubic_args = {
+        'exe': args.cubic_exe,
+        **global_args
+    }
+    
+    cubic_quintic_args = {
+        'exe': args.cubic_quintic_exe,
+        's1_s2_pairs': [
+            (args.cq_s1_1, args.cq_s2_1),
+            (args.cq_s1_2, args.cq_s2_2),
+            (args.cq_s1_3, args.cq_s2_3)
+        ],
+        **global_args
+    }
+    
+    saturating_args = {
+        'exe': args.saturating_exe,
+        'kappa_values': [
+            args.sat_kappa_1,
+            args.sat_kappa_2,
+            args.sat_kappa_3
+        ],
+        **global_args
+    }
+    
+    sampler_types = args.sampler_types
+    m_types = args.m_types
+    m_scalings = args.m_scalings
+    
+    result_files = []
+    
+    for sampler_type in sampler_types:
+        for m_type in m_types:
+            for m_scaling in m_scalings:
+                logger.info(f"Running sweep: sampler={sampler_type}, m_type={m_type}, m_scaling={m_scaling}")
+                u0_path, m_path, run_id, u0, m = generate_and_save_field(m_scaling, sampler_type, m_type, args)      
+                cubic_scale = cq_scale = sat_scale = 1.
+
+                results_cubic = run_trajectory_cubic(u0_path, m_path, cubic_args, run_id, cubic_scale) 
+                results_cubic_quintic = {}
+                for i, (s1, s2) in enumerate(cubic_quintic_args['s1_s2_pairs']):
+                    cq_params = {'s1': s1, 's2': s2} 
+                    cq_results = run_trajectory_cubic_quintic(u0_path, m_path, cubic_quintic_args, 
+                                                            run_id, i, s1, s2, cq_scale)
+                    results_cubic_quintic.update(cq_results)
+                
+                results_saturating = {}
+                for i, kappa in enumerate(saturating_args['kappa_values']):
+                    sat_params = {'kappa': kappa}
+                    sat_results = run_trajectory_saturating(u0_path, m_path, saturating_args, 
+                                                         run_id, i, kappa, sat_scale)
+                    results_saturating.update(sat_results)
+                
+                combined_results = {
+                    'cubic': results_cubic,
+                    **results_cubic_quintic,
+                    **results_saturating
+                }
+                
+                output_files = perform_comprehensive_analysis(combined_results, args.output_dir, run_id, 
+                                                            m_scaling, sampler_type, m_type, global_args)
+                
+                cleanup_intermediate_files(combined_results)
+    
+    return result_files
+
+def run_parameter_sweep_no_physical_scaling_mpi(args):
+    from mpi4py import MPI
+    import time
+    import os
+    import shutil
+    
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    
+    global_args = {
+        'output_dir': args.output_dir,
+        'nx': args.nx,
+        'ny': args.ny,
+        'Lx': args.Lx,
+        'Ly': args.Ly,
+        'T': args.T,
+        'nt': args.nt,
+        'snapshots': args.snapshots
+    }
+    
+    cubic_args = {
+        'exe': args.cubic_exe,
+        **global_args
+    }
+    
+    cubic_quintic_args = {
+        'exe': args.cubic_quintic_exe,
+        's1_s2_pairs': [
+            (args.cq_s1_1, args.cq_s2_1),
+            (args.cq_s1_2, args.cq_s2_2),
+            (args.cq_s1_3, args.cq_s2_3)
+        ],
+        **global_args
+    }
+    
+    saturating_args = {
+        'exe': args.saturating_exe,
+        'kappa_values': [
+            args.sat_kappa_1,
+            args.sat_kappa_2,
+            args.sat_kappa_3
+        ],
+        **global_args
+    }
+    
+    sampler_types = args.sampler_types
+    m_types = args.m_types
+    m_scalings = args.m_scalings
+    
+    if rank == 0:
+        result_files = []
+    
+    for sampler_type in sampler_types:
+        for m_type in m_types:
+            for m_scaling in m_scalings:
+                if rank == 0:
+                    logger.info(f"Running sweep: sampler={sampler_type}, m_type={m_type}, m_scaling={m_scaling}")
+                    u0_path, m_path, run_id, u0, m = generate_and_save_field(m_scaling, sampler_type, m_type, args)
+                    
+                    run_data = {
+                        'u0_path': u0_path,
+                        'm_path': m_path,
+                        'run_id': run_id
+                    }
+                else:
+                    run_data = None
+                
+                run_data = comm.bcast(run_data, root=0)
+                
+                u0_path = run_data['u0_path']
+                m_path = run_data['m_path']
+                run_id = run_data['run_id']
+                
+                rank_dir = f"{args.output_dir}/rank_{rank}"
+                if not os.path.exists(rank_dir):
+                    os.makedirs(rank_dir, exist_ok=True)
+                
+                rank_u0_path = f"{rank_dir}/u0_{run_id}.npy"
+                rank_m_path = f"{rank_dir}/m_{run_id}.npy"
+                
+                if os.path.exists(u0_path) and os.path.exists(m_path):
+                    shutil.copy2(u0_path, rank_u0_path)
+                    shutil.copy2(m_path, rank_m_path)
+                
+                cubic_scale = cq_scale = sat_scale = 1.
+                
+                results_cubic = None
+                results_cubic_quintic = {}
+                results_saturating = {}
+                
+                if rank == 0:
+                    results_cubic = run_trajectory_cubic(rank_u0_path, rank_m_path, cubic_args, run_id, cubic_scale)
+                
+                s1_s2_pairs = cubic_quintic_args['s1_s2_pairs']
+                if rank == 1 and len(s1_s2_pairs) > 0:
+                    s1, s2 = s1_s2_pairs[0]
+                    cq_results = run_trajectory_cubic_quintic(rank_u0_path, rank_m_path, cubic_quintic_args, 
+                                                           run_id, 0, s1, s2, cq_scale)
+                    comm.send(cq_results, dest=0)
+                
+                if rank == 2 and len(s1_s2_pairs) > 1:
+                    s1, s2 = s1_s2_pairs[1]
+                    cq_results = run_trajectory_cubic_quintic(rank_u0_path, rank_m_path, cubic_quintic_args, 
+                                                           run_id, 1, s1, s2, cq_scale)
+                    comm.send(cq_results, dest=0)
+                
+                if rank == 3 and len(s1_s2_pairs) > 2:
+                    s1, s2 = s1_s2_pairs[2]
+                    cq_results = run_trajectory_cubic_quintic(rank_u0_path, rank_m_path, cubic_quintic_args, 
+                                                           run_id, 2, s1, s2, cq_scale)
+                    comm.send(cq_results, dest=0)
+                
+                kappa_values = saturating_args['kappa_values']
+                if rank == 4 and len(kappa_values) > 0:
+                    kappa = kappa_values[0]
+                    sat_results = run_trajectory_saturating(rank_u0_path, rank_m_path, saturating_args, 
+                                                         run_id, 0, kappa, sat_scale)
+                    comm.send(sat_results, dest=0)
+                
+                if rank == 5 and len(kappa_values) > 1:
+                    kappa = kappa_values[1]
+                    sat_results = run_trajectory_saturating(rank_u0_path, rank_m_path, saturating_args, 
+                                                         run_id, 1, kappa, sat_scale)
+                    comm.send(sat_results, dest=0)
+                
+                if rank == 6 and len(kappa_values) > 2:
+                    kappa = kappa_values[2]
+                    sat_results = run_trajectory_saturating(rank_u0_path, rank_m_path, saturating_args, 
+                                                         run_id, 2, kappa, sat_scale)
+                    comm.send(sat_results, dest=0)
+                
+                if rank == 0:
+                    if 1 < size and len(s1_s2_pairs) > 0:
+                        cq_results = comm.recv(source=1)
+                        results_cubic_quintic.update(cq_results)
+                    
+                    if 2 < size and len(s1_s2_pairs) > 1:
+                        cq_results = comm.recv(source=2)
+                        results_cubic_quintic.update(cq_results)
+                    
+                    if 3 < size and len(s1_s2_pairs) > 2:
+                        cq_results = comm.recv(source=3)
+                        results_cubic_quintic.update(cq_results)
+                    
+                    if 4 < size and len(kappa_values) > 0:
+                        sat_results = comm.recv(source=4)
+                        results_saturating.update(sat_results)
+                    
+                    if 5 < size and len(kappa_values) > 1:
+                        sat_results = comm.recv(source=5)
+                        results_saturating.update(sat_results)
+                    
+                    if 6 < size and len(kappa_values) > 2:
+                        sat_results = comm.recv(source=6)
+                        results_saturating.update(sat_results)
+                    
+                    combined_results = {
+                        'cubic': results_cubic,
+                        **results_cubic_quintic,
+                        **results_saturating
+                    }
+                    
+                    output_files = perform_comprehensive_analysis(combined_results, args.output_dir, run_id, 
+                                                                m_scaling, sampler_type, m_type, global_args)
+                    
+                    cleanup_intermediate_files(combined_results)
+                    result_files.extend(output_files)
+                
+                for r in range(size):
+                    if rank == r:
+                        try:
+                            if os.path.exists(rank_u0_path):
+                                os.remove(rank_u0_path)
+                            if os.path.exists(rank_m_path):
+                                os.remove(rank_m_path)
+                        except:
+                            pass
+                    comm.Barrier()
+    
+    if rank == 0:
+        return result_files
+    else:
+        return []
 
 def run_trajectory_cubic(u0_path, m_path, args, run_id, scale):
     output_dir = Path(args.get('output_dir', 'nlse_sweep_results'))
@@ -1338,12 +1621,32 @@ def main():
     parser.add_argument("--sat-kappa-1", type=float, default=0.5, help="First kappa value for saturating NLSE")
     parser.add_argument("--sat-kappa-2", type=float, default=1.0, help="Second kappa value for saturating NLSE")
     parser.add_argument("--sat-kappa-3", type=float, default=5.0, help="Third kappa value for saturating NLSE")
+
+    """
+    all_types = [
+        'fundamental_soliton',
+        !!!!!!!!! 'multi_soliton',
+        !!!!!!!!! 'spectral',
+        !!!!!!!!! 'chaotic',
+        'vortex',
+        !!!!!!!!! 'vortex_lattice',
+        'dark_soliton',
+        !!!!!!!!! 'solitary_wave_with_ambient',
+        !!!!!!!!! 'logarithmic_singularity',
+        !!!!!!!!! 'free_singularity',
+        'transparent_solitary_wave',
+        !!!!!!!!! 'colliding_solitary_waves',
+        'oscillating_breather',
+        'ring_soliton',
+        !!!!!!!!!  'multi_ring'
+    ]
+    """
+
     
-    parser.add_argument("--sampler-types", nargs="+", default=["spectral", "multi_soliton", "chaotic"], 
-                      help="Types of samplers to use")
-    parser.add_argument("--m-types", nargs="+", default=["uniform", "step", "radial", "periodic_boxes"], 
+    parser.add_argument("--sampler-types", nargs="+", default=['neg'], help="Types of samplers to use")
+    parser.add_argument("--m-types", nargs="+", default=["periodic_boxes"], #["uniform", "step", "radial", "periodic_boxes"], 
                       help="Types of m field to use")
-    parser.add_argument("--m-scalings", nargs="+", type=float, default=[.9],#default=[-.9, .9], 
+    parser.add_argument("--m-scalings", nargs="+", type=float, default=[.99, -.99],#default=[-.9, .9], 
                       help="Scaling factors for m field")
     
     parser.add_argument("--output-dir", type=str, default="nlse_sweep_results", help="Output directory")
@@ -1351,7 +1654,9 @@ def main():
     
     args = parser.parse_args()
     
-    run_parameter_sweep(args)
+    # run_parameter_sweep(args) # TODO fix
+    # run_parameter_sweep_no_physical_scaling(args)
+    run_parameter_sweep_no_physical_scaling_mpi(args)
 
 if __name__ == "__main__":
     main()

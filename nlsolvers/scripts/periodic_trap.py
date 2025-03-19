@@ -8,7 +8,7 @@ def make_grid(n, L):
 
 
 def make_periodic_boxes(n, L, factor,
-        set_zero=False,
+        set_zero=False, change_sign=True,
         box_length=.1, num_boxes_per_dim=3, wall_dist=.1):
     X, Y = make_grid(n, L)
     box_length *= L
@@ -31,7 +31,8 @@ def make_periodic_boxes(n, L, factor,
                 X >= x0, X <= x1,
                 Y >= y0, Y <= y1
             ))
-            m[mask] *= -factor 
+            m[mask] *= -factor if change_sign else factor 
+            m[~mask] *= .9
     if set_zero:
         # only apply nonlinearity in boxes!
         for mask in masks:
