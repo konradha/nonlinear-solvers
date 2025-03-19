@@ -12,13 +12,22 @@ jobs but also local integrations should preferably be launched using Python.
 TODO
 
 - [x] animation styles: 2d
+- [ ] finalize NLSE samplers
+- [ ] finalize _all_ NLSE infrastructure
+- [ ] finalize SGE/KGE samplers
+- [ ] finalize _all_ SGE infrastructure
+
 - [ ] animation styles: 3d
 - [x] implementing GPU pipeline for all systems
 - [ ] test GPU pipelines
+
 - [ ] porting all systems into 3d mode (CPU)
 - [ ] porting all systems into 3d mode (GPU)
+
 - [ ] testing all systems in 3d (including benchmarking)
+
 - [ ] finalize pipelines and write global SLURM scripts
+
 - [ ] complete analysis framework for 2d
 - [ ] complete analysis framework for 3d
 

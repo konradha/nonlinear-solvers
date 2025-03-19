@@ -217,6 +217,55 @@ class NLSEPhenomenonSampler:
             u = self._envelope(u, envelope_width)
             
         return u
+
+    def akhmediev_breather(self, amplitude=1.0, modulation_frequency=1.0,
+            growth_rate=0.5, position=None, phase=None, orientation=None,
+            breather_phase='compressed', apply_envelope=True, envelope_width=0.7,
+            aspect_ratio=1.0, t_param=None):
+        position_variance = 1.
+        if position is None:
+                x0, y0 = np.random.normal(0, position_variance * self.L/4, 2)
+        if phase is None:
+            phase = np.random.random(1) * 1.j
+        if orientation is None:
+            orientation = np.random.random(1) * np.pi
+        if t_param is None:
+            t_param = np.random.random(1)
+
+        X_rot = (self.X - x0) * np.cos(orientation) + (self.Y - y0) * np.sin(orientation)
+        Y_rot = -(self.X - x0) * np.sin(orientation) + (self.Y - y0) * np.cos(orientation)
+        
+        X_scaled = X_rot / aspect_ratio
+        
+        a = growth_rate
+        omega_mod = modulation_frequency
+        
+        if not 0 < a < 0.5:
+            a = np.clip(a, 0.001, 0.499)
+        
+        b = np.sqrt(8*a*(1-2*a))
+        
+        if breather_phase == 'compressed':
+            z = 0
+        elif breather_phase == 'growing':
+            z = -1.0
+        elif breather_phase == 'decaying':
+            z = 1.0
+        else:
+            z = float(breather_phase)
+        
+        P0 = amplitude * amplitude
+        
+        numerator = (1 - 4*a) * np.cosh(b * z) + np.sqrt(2*a) * np.cos(omega_mod * X_scaled) + 1j * b * np.sinh(b * z)
+        denominator = 2 * a * np.cos(omega_mod * X_scaled) - np.cosh(b * z)
+        phase_evolution = np.exp(1j * (t_param + phase))
+        u = np.sqrt(P0) * numerator / denominator * phase_evolution
+        u = u.astype(complex) 
+        if apply_envelope:
+            envelope = np.exp(-Y_rot**2/(2*envelope_width**2))
+            u = u * envelope
+        
+        return u
     
     def spectral_method(self, spectrum_type='fractal', n_modes=50, 
                       amplitude=1.0, k_min=0.5, k_max=5.0, spectrum_slope=-5/3,
@@ -1375,6 +1424,8 @@ class NLSEPhenomenonSampler:
                 sample = self.self_similar_pattern(**params)
             elif phenomenon_type == 'rogue_wave_precursor':
                 sample = self.rogue_wave_precursor(**params)
+            elif phenomenon_type == 'akhmediev_breather':
+                sample = self.akhmediev_breather(**params)
             else:
                 raise ValueError(f"Unknown phenomenon type: {phenomenon_type}")
             
@@ -1496,7 +1547,7 @@ class NLSEPhenomenonSampler:
                 else:
                     discarded += 1 
             attempts += 1
-        # print("trash ratio:", discarded / attempts)            
+        print("trash ratio:", discarded / attempts)            
         return samples
 
 def tsne_complex_fields(samples, perplexity=30, n_iter=1000):
@@ -1667,17 +1718,18 @@ def detailed_phenomenon_comparison(sampler, n_samples=15, perplexity=30, n_iter=
     import matplotlib.patches as mpatches
 
     phenomena = [
-        {'type': 'multi_soliton', 'name': 'Multi-Soliton', 'system_type': 'cubic'},
-        {'type': 'vortex_lattice', 'name': 'Vortex Lattice', 'system_type': None},
-        {'type': 'ring_soliton', 'name': 'Ring Soliton', 'system_type': None},
-        {'type': 'multi_ring', 'name': 'Multi-Ring', 'system_type': None},
-        {'type': 'dark_soliton', 'name': 'Dark Soliton', 'system_type': None},
-        {'type': 'solitary_wave_with_ambient', 'name': 'Solitary w/ Ambient', 'system_type': 'cubic'},
-        {'type': 'spectral', 'name': 'Spectral Field', 'system_type': None},
-        {'type': 'chaotic', 'name': 'Chaotic Field', 'system_type': None},
-        {'type': 'free_singularity_adapted', 'name': 'Free Singularity', 'system_type': None},
-        {'type': 'turbulent_condensate', 'name': 'Turbulent Condensate', 'system_type': None},
-        {'type': 'topological_defect_network', 'name': 'Topological Defect Network', 'system_type': None}
+            {'type': 'akhmediev_breather', 'name': 'Breather', 'system_type': None},
+        #{'type': 'multi_soliton', 'name': 'Multi-Soliton', 'system_type': 'cubic'},
+        #{'type': 'vortex_lattice', 'name': 'Vortex Lattice', 'system_type': None},
+        #{'type': 'ring_soliton', 'name': 'Ring Soliton', 'system_type': None},
+        #{'type': 'multi_ring', 'name': 'Multi-Ring', 'system_type': None},
+        #{'type': 'dark_soliton', 'name': 'Dark Soliton', 'system_type': None},
+        #{'type': 'solitary_wave_with_ambient', 'name': 'Solitary w/ Ambient', 'system_type': 'cubic'},
+        #{'type': 'spectral', 'name': 'Spectral Field', 'system_type': None},
+        #{'type': 'chaotic', 'name': 'Chaotic Field', 'system_type': None},
+        #{'type': 'free_singularity_adapted', 'name': 'Free Singularity', 'system_type': None},
+        #{'type': 'turbulent_condensate', 'name': 'Turbulent Condensate', 'system_type': None},
+        #{'type': 'topological_defect_network', 'name': 'Topological Defect Network', 'system_type': None}
     ]
 
     meta_ensemble = []
@@ -1708,12 +1760,18 @@ def detailed_phenomenon_comparison(sampler, n_samples=15, perplexity=30, n_iter=
                     sample = sampler.turbulent_condensate()
                 elif p['type'] == 'topological_defect_network':
                     sample = sampler.topological_defect_network()
+                elif p['type'] == 'akhmediev_breather':
+                    sample = sampler.akhmediev_breather()
                 else:
                     continue
 
                 max_amp = np.max(np.abs(sample))
                 if max_amp > 0:
                     sample = sample / max_amp
+
+                if np.sum(sample == np.nan) > 1:
+                    print("Encountered invalid sample")
+                    continue
 
                 meta_ensemble.append(sample)
                 labels.append(idx)
@@ -1843,7 +1901,8 @@ if __name__ == '__main__':
     n = 100
     L = 10.
     sampler = NLSEPhenomenonSampler(n, n, L)
-    detailed_soliton_parameter_scaling(sampler, n_samples=100, perplexity=30, n_iter=2000)
+    detailed_phenomenon_comparison(sampler, n_samples=100, perplexity=30, n_iter=2000)
+    #detailed_soliton_parameter_scaling(sampler, n_samples=100, perplexity=30, n_iter=2000)
     plt.show()   
 
     # good params to get a nice map!
