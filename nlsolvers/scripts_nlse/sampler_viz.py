@@ -166,9 +166,7 @@ class NLSESolutionSpaceMapper:
                 "intensity_scaling": [.33, .6, .9],
                 "num_iterations": [1, 5, 10],
                 "base_pattern": ["ring", "vortex"],
-                #"rotation_per_iteration": [.1, .1j, 1j]
         }
-
         
         return parameter_spaces
     

@@ -82,7 +82,10 @@ class NLSEPhenomenonDiversityAnalyzer:
             "phase_pattern": ["random", "alternating", "synchronized", "vortex"],
             "arrangement": ["concentric", "lattice", "random"],
             "modulation_type": ["none", "azimuthal", "radial"],
-            "apply_envelope": [True, False]
+            "modulation_strength": [0.0, .1, .6],
+            "modulation_mode": [0, 1],
+            "apply_envelope": [True, False],
+            "n_rings": [1, 4, 8]
         }
         
         parameter_spaces["solitary_wave_with_ambient"] = {
@@ -912,44 +915,46 @@ def analyze_nlse_phenomenon(phenomenon_type, output_dir=None, max_samples=50):
 
 if __name__ == "__main__":
     from nlse_sampler import NLSEPhenomenonSampler
-    
+    import gc    
+    from contextlib import contextmanager
+    from sys import argv
     nx = ny = 128
     L = 10.0
     
-    #mock_sampler = NLSEPhenomenonSampler(nx, ny, L)
-    #mock_analyzer = NLSEPhenomenonDiversityAnalyzer(mock_sampler, output_dir="mock_dir") 
-    #ps = mock_analyzer._prepare_parameter_space()
-    #del mock_sampler
-    #del mock_analyzer
-    ## bad design, yes, in the interest of time we took this shortcut
+    mock_sampler = NLSEPhenomenonSampler(nx, ny, L)
+    mock_analyzer = NLSEPhenomenonDiversityAnalyzer(mock_sampler, output_dir="mock_dir") 
+    ps = mock_analyzer._prepare_parameter_space()
+    del mock_sampler
+    del mock_analyzer
+    # bad design, yes, in the interest of time we took this shortcut
 
-    #curr_id = str(uuid.uuid4())[:4]
-    #for phenomenon in ps.keys():
-    #    sampler = NLSEPhenomenonSampler(nx, ny, L)  
-    #    output_dir = f"{phenomenon}_diversity_{curr_id}"
-    #    analyzer = NLSEPhenomenonDiversityAnalyzer(sampler, output_dir=output_dir) 
-    #    analyzer.analyze_phenomenon_diversity(
-    #        phenomenon_type=phenomenon,
-    #        max_samples=100
-    #    ) 
-    #    for param in ps[phenomenon].keys(): 
-    #        analyzer.analyze_parameter_influence(phenomenon, param) 
 
-    #    del sampler
-    #    del analyzer
-
-    for phenomenon in ["self_similar_pattern", "akhmediev_breather"]:
+    curr_id = str(uuid.uuid4())[:4]
+    # somehow, memory keeps growing over runs even though sample sizes not huge!
+    # we try to reduce memory footprint / phenomenon here.
+    @contextmanager
+    def create_analyzer(phenomenon):
         sampler = NLSEPhenomenonSampler(nx, ny, L)
-        output_dir = f"{phenomenon}_diversity"
+        output_dir = f"{phenomenon}_diversity_{curr_id}"
         analyzer = NLSEPhenomenonDiversityAnalyzer(sampler, output_dir=output_dir)
-        ps = analyzer._prepare_parameter_space()
+        try:
+            yield analyzer
+        finally:
+            plt.close('all') 
+            del sampler 
+            del analyzer
+            for _ in range(3):
+                gc.collect()
+
+    if len(argv) == 2:
+        phenomenon = str(argv[1])
+    else:
+        phenomenon = np.random.choice(list(ps.keys()))
+
+    with create_analyzer(phenomenon) as analyzer:
         analyzer.analyze_phenomenon_diversity(
             phenomenon_type=phenomenon,
-            max_samples=100
+            max_samples=1000
         )
         for param in ps[phenomenon].keys():
-            analyzer.analyze_parameter_influence(phenomenon, param)
-
-        del sampler
-        del analyzer
-
+            analyzer.analyze_parameter_influence(phenomenon, param) 

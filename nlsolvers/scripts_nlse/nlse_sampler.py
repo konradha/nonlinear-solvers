@@ -635,7 +635,7 @@ class NLSEPhenomenonSampler:
 
 
     def ring_soliton(self, amplitude=1.0, radius=3.0, width=0.5, position=None,
-                   phase=0.0, apply_envelope=True, envelope_width=0.7,
+                   phase=0.0, apply_envelope=False, envelope_width=0.7,
                    modulation_type='none', modulation_strength=0.0, modulation_mode=0,
                    aspect_ratio=1.0, orientation=0.0, radial_nodes=0):
         if position is None:
@@ -669,16 +669,17 @@ class NLSEPhenomenonSampler:
         return u
 
     def multi_ring(self, amplitude_range=(0.8, 1.2), radius_range=(1.0, 5.0),
-                          width_range=(0.3, 0.8), position_variance=1.0, 
-                          phase_pattern='random', arrangement='random', separation=5.0, 
-                          apply_envelope=False, envelope_width=0.7, 
-                          modulation_type='none', modulation_strength=0.0, modulation_mode=0,
-                          aspect_ratio_range=(1.0, 1.5), orientation_range=(0, 2*np.pi),
-                          radial_nodes_range=(0, 2), n_rings=None):
+                   width_range=(0.3, 0.8), position_variance=1.0, 
+                   phase_pattern='random', arrangement='random', separation=5.0, 
+                   apply_envelope=False, envelope_width=0.7, 
+                   modulation_type='none', modulation_strength=0.0, modulation_mode=0,
+                   aspect_ratio_range=(1.0, 1.5), orientation_range=(0, 2*np.pi),
+                   radial_nodes_range=(0, 2), n_rings=None):
+
         u = np.zeros_like(self.X, dtype=complex)
         
         if n_rings is None:
-            n_rings = np.random.randint(3, 8)
+            n_rings = np.random.randint(3, 6)
             
         if arrangement == 'linear':
             base_positions = [(i - (n_rings-1)/2) * separation for i in range(n_rings)]
@@ -719,6 +720,10 @@ class NLSEPhenomenonSampler:
             center_y = np.mean([p[1] for p in positions])
             phases = [np.arctan2(p[1] - center_y, p[0] - center_x) for p in positions]
         
+        ring_types = np.random.choice(['standard', 'chirped', 'modulated'], n_rings)
+        chirp_factors = np.random.uniform(0.05, 0.4, n_rings)
+        global_phase_field = 0
+        
         for i, ((x0, y0), phase) in enumerate(zip(positions, phases)):
             amplitude = np.random.uniform(*amplitude_range)
             width = np.random.uniform(*width_range)
@@ -731,14 +736,66 @@ class NLSEPhenomenonSampler:
             aspect_ratio = np.random.uniform(*aspect_ratio_range)
             orientation = np.random.uniform(*orientation_range)
             radial_nodes = np.random.randint(*radial_nodes_range)
+            ring_type = ring_types[i]
             
-            component = self.ring_soliton(
-                amplitude, radius=radius, width=width, position=(x0, y0),
-                phase=phase, apply_envelope=False, modulation_type=modulation_type,
-                modulation_strength=modulation_strength, modulation_mode=modulation_mode,
-                aspect_ratio=aspect_ratio, orientation=orientation, radial_nodes=radial_nodes
-            )
+            dx = self.X - x0
+            dy = self.Y - y0
+            r_local = np.sqrt(dx**2 + dy**2)
+            theta_local = np.arctan2(dy, dx)
+            
+            if ring_type == 'standard':
+                component = self.ring_soliton(
+                    amplitude, radius=radius, width=width, position=(x0, y0),
+                    phase=phase, apply_envelope=False, 
+                    modulation_type=modulation_type if modulation_type != 'none' else 'azimuthal',
+                    modulation_strength=modulation_strength if modulation_strength > 0 else 0.2,
+                    modulation_mode=modulation_mode if modulation_mode > 0 else i % 3 + 1,
+                    aspect_ratio=aspect_ratio, orientation=orientation, radial_nodes=radial_nodes
+                )
+            elif ring_type == 'chirped':
+                chirp_factor = chirp_factors[i]
+                radial_chirp = chirp_factor * (r_local - radius)**2
+                component = self.ring_soliton(
+                    amplitude, radius=radius, width=width, position=(x0, y0),
+                    phase=phase, apply_envelope=False,
+                    modulation_type='azimuthal', modulation_strength=0.3,
+                    modulation_mode=i % 3 + 1, aspect_ratio=aspect_ratio, 
+                    orientation=orientation, radial_nodes=radial_nodes
+                )
+                component *= np.exp(1j * radial_chirp)
+            else:  # modulated
+                angular_freq = (i % 4) + 1
+                radial_freq = (i % 3) + 1
+                phase_modulation = 0.3 * np.sin(angular_freq * theta_local) * np.sin(radial_freq * np.pi * (r_local - radius) / width)
+                component = self.ring_soliton(
+                    amplitude, radius=radius, width=width, position=(x0, y0),
+                    phase=phase, apply_envelope=False,
+                    modulation_type='azimuthal', modulation_strength=0.25,
+                    modulation_mode=2, aspect_ratio=aspect_ratio,
+                    orientation=orientation, radial_nodes=radial_nodes
+                )
+                component *= np.exp(1j * phase_modulation)
+            
             u += component
+            
+            if i < n_rings - 1:
+                dx_next = positions[i+1][0] - x0
+                dy_next = positions[i+1][1] - y0
+                dist = np.sqrt(dx_next**2 + dy_next**2)
+                if dist > 0:
+                    interaction_phase = 0.2 * np.exp(
+                            -(r_local - radius)**2/(2*width**2)) * np.exp(
+                                    -((self.X - positions[i+1][0])**2 + (self.Y - positions[i+1][1])**2)/(4*radius**2))
+                    global_phase_field += interaction_phase
+        
+        if np.abs(np.sum(global_phase_field)) < 1e-2:
+            u *= np.exp(1j * global_phase_field)
+        
+        if arrangement == 'concentric' or arrangement == 'circular':
+            center_x = np.mean([p[0] for p in positions])
+            center_y = np.mean([p[1] for p in positions])
+            vortex_field = np.exp(1j * np.arctan2(self.Y - center_y, self.X - center_x))
+            u *= (0.7 + 0.3 * vortex_field)
         
         if apply_envelope:
             u = self._envelope(u, envelope_width)
@@ -1053,48 +1110,57 @@ class NLSEPhenomenonSampler:
         if apply_envelope:
             u = self._envelope(u, envelope_width)          
         return u
-     
     def self_similar_pattern(self, amplitude=1.0, scale_factor=2.0, intensity_scaling=0.6,
-                           num_iterations=5, base_pattern=None, apply_envelope=True,
-                           envelope_width=0.8, position=None, phase=None,
-                           rotation_per_iteration=.1j, width=1.0, seed_amplitude=None):
+                          num_iterations=5, base_pattern=None, apply_envelope=True,
+                          envelope_width=0.8, position=None, phase=None,
+                          rotation_per_iteration=0.1, width=1.0, seed_amplitude=None):
         if base_pattern is None:
             base_pattern = np.random.choice(['soliton', 'vortex', 'ring'])
-        
+
         if position is None:
-            x0, y0 = np.random.rand(2) * self.L / 3
-        else:
-            x0, y0 = position 
+            position = (np.random.uniform(-0.3*self.L, 0.3*self.L), 
+                       np.random.uniform(-0.3*self.L, 0.3*self.L))
+        
+        x0, y0 = position
 
         if phase is None:
-            phase = np.random.rand(1) * np.pi * 1j
-        
+            phase = np.random.uniform(0, 2*np.pi)
         
         if seed_amplitude is None:
             seed_amplitude = amplitude
             
+        base_width = width
+        structure_points = []
+        all_components = []
+        
         if base_pattern == 'soliton':
             base = self.fundamental_soliton(
-                'cubic', amplitude=seed_amplitude, width=width,
-                position=position, phase=phase, apply_envelope=False
+                'cubic', amplitude=seed_amplitude, width=base_width,
+                position=position, phase=phase, apply_envelope=False,
+                chirp_factor=0.3
             )
+            all_components.append((position, base_width, 0, 'soliton'))
         elif base_pattern == 'vortex':
             base = self.vortex_solution(
                 amplitude=seed_amplitude, position=position,
-                core_size=width, apply_envelope=False
+                core_size=base_width, apply_envelope=False,
+                charge=1
             )
+            all_components.append((position, base_width, 0, 'vortex'))
         elif base_pattern == 'ring':
             base = self.ring_soliton(
-                amplitude=seed_amplitude, radius=width*2,
-                width=width, position=position, phase=phase,
+                amplitude=seed_amplitude, radius=base_width*2,
+                width=base_width/2, position=position, phase=phase,
                 apply_envelope=False
             )
+            all_components.append((position, base_width, 0, 'ring'))
         else:
             base = self.spectral_method(
                 amplitude=seed_amplitude, apply_envelope=False,
-                k_min=1/width, k_max=3/width
+                k_min=1/base_width, k_max=3/base_width
             )
-            
+            all_components.append((position, base_width, 0, 'spectral'))
+                
         u = base.copy()
         
         for i in range(1, num_iterations + 1):
@@ -1102,43 +1168,82 @@ class NLSEPhenomenonSampler:
             current_scale = scale_factor ** i
             current_rotation = rotation_per_iteration * i
             
-            for dx in [-1, 0, 1]:
-                for dy in [-1, 0, 1]:
-                    if dx == 0 and dy == 0:
-                        continue
-                        
-                    new_x = x0 + width * current_scale * dx
-                    new_y = y0 + width * current_scale * dy
+            branching = 3 + (i % 3)
+            for k in range(branching):
+                angle = 2*np.pi*k/branching + current_rotation
+                dx = np.cos(angle)
+                dy = np.sin(angle)
+                
+                new_x = x0 + width * current_scale * dx
+                new_y = y0 + width * current_scale * dy
+                
+                local_phase = phase + np.arctan2(dy, dx) + current_rotation
+                local_width = base_width * (0.9 + 0.2 * (i % 2))
+                
+                if base_pattern == 'soliton':
+                    component = self.fundamental_soliton(
+                        'cubic', amplitude=scaled_amplitude, width=local_width,
+                        position=(new_x, new_y), phase=local_phase,
+                        apply_envelope=False, chirp_factor=0.2 + 0.1*i,
+                        aspect_ratio=1.0 + 0.3*np.sin(i*np.pi/2)
+                    )
+                    all_components.append(((new_x, new_y), local_width, i, 'soliton'))
+                elif base_pattern == 'vortex':
+                    charge = 1 if i % 2 == 0 else -1
+                    component = self.vortex_solution(
+                        amplitude=scaled_amplitude, position=(new_x, new_y),
+                        core_size=local_width, apply_envelope=False,
+                        orientation=current_rotation,
+                        charge=charge
+                    )
+                    all_components.append(((new_x, new_y), local_width, i, 'vortex'))
+                elif base_pattern == 'ring':
+                    component = self.ring_soliton(
+                        amplitude=scaled_amplitude, radius=local_width*2,
+                        width=local_width/2, position=(new_x, new_y),
+                        phase=local_phase, apply_envelope=False,
+                        modulation_type='azimuthal' if i % 2 == 0 else 'none',
+                        modulation_strength=0.3,
+                        modulation_mode=1 + (i % 3)
+                    )
+                    all_components.append(((new_x, new_y), local_width, i, 'ring'))
+                else:
+                    component = self.spectral_method(
+                        amplitude=scaled_amplitude, apply_envelope=False,
+                        k_min=1/local_width, k_max=3/local_width
+                    )
+                    all_components.append(((new_x, new_y), local_width, i, 'spectral'))
                     
-                    if base_pattern == 'soliton':
-                        component = self.fundamental_soliton(
-                            'cubic', amplitude=scaled_amplitude, width=width,
-                            position=(new_x, new_y), phase=phase + current_rotation,
-                            apply_envelope=False
-                        )
-                    elif base_pattern == 'vortex':
-                        component = self.vortex_solution(
-                            amplitude=scaled_amplitude, position=(new_x, new_y),
-                            core_size=width, apply_envelope=False,
-                            orientation=current_rotation
-                        )
-                    elif base_pattern == 'ring':
-                        component = self.ring_soliton(
-                            amplitude=scaled_amplitude, radius=width*2,
-                            width=width, position=(new_x, new_y),
-                            phase=phase + current_rotation, apply_envelope=False
-                        )
-                    else:
-                        component = self.spectral_method(
-                            amplitude=scaled_amplitude, apply_envelope=False,
-                            k_min=1/width, k_max=3/width
-                        )
-                        
-                    u += component
+                u += component
+                structure_points.append((new_x, new_y, local_width, i))
+        
+        velocity_field = np.zeros_like(u, dtype=complex)
+        
+        for (cx, cy), cwidth, level, ctype in all_components:
+            dx = self.X - cx
+            dy = self.Y - cy
+            r = np.sqrt(dx**2 + dy**2)
+            theta = np.arctan2(dy, dx)
+            
+            if ctype == 'vortex':
+                charge = 1 if level % 2 == 0 else -1
+                local_field = charge * np.exp(1j * theta) * np.exp(-r**2/(4*cwidth**2))
+            elif ctype == 'ring':
+                radius = cwidth * 2
+                local_field = np.exp(1j * (theta + np.pi/2)) * np.exp(-(r-radius)**2/(cwidth**2))
+            else:
+                local_field = np.exp(1j * (dx*0.2 + dy*0.1)/cwidth) * np.exp(-r**2/(4*cwidth**2))
+                
+            flow_strength = 0.2 * (scale_factor ** (-level/2))
+            velocity_field += flow_strength * local_field
+        
+        velocity_field = np.exp(1j * np.angle(velocity_field))
+        
+        u = u * velocity_field
         
         if apply_envelope:
             u = self._envelope(u, envelope_width)
-            
+                
         return u
    
         
@@ -1200,7 +1305,10 @@ class NLSEPhenomenonSampler:
             
             samples.append(sample)
         
-        return samples
+        if n_samples == 1:
+            return samples[0]
+        else:
+            return samples
     
     def generate_diverse_ensemble(self, phenomenon_type, system_type='cubic', n_samples=10,
                                parameter_ranges=None, similarity_threshold=0.2,
