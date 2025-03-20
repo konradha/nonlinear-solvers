@@ -1,0 +1,25 @@
+TODO: all samplers
+    - topologically parametrized breathers
+    - circular / elliptical solitons
+    - skyrmion
+    - spiral
+    - mix
+    - grf
+
+TODO: set up parameter spaces
+
+TODO: - t-SNE visualization
+      - compare briefly
+
+TODO: finalize launchers working in lockstep with samplers and animation
+
+
+Similarly to NLSE samplers, we'll have to parametrize this into an object that nicely allcoates parameter
+spaces. These parameter spaces need to be visualized using t-SNE as well.
+
+Then an updated, final sampler has to come to completion: Here we can have more variety in the spatial
+nonlinearity m: any geometric pattern (stars, ellipses ...), discrete nonlinearity potentials,
+GRF, GRF modulated with Morlet wavelets, "envelopes" (even though we're in real space.
+
+
+

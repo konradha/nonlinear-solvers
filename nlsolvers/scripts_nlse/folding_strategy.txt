@@ -1,0 +1,15 @@
+NLSE: (cubic, cubic-quintic, saturable)
+Phenomena: [Phenomena]
+Params: [3 / phenomenon]
+spatial amplification: [constant (1), negative (-1),
+    periodic-gaussians (+1.5), periodic-gaussians (-1.5), # periodic gaussians randomized ... 
+    GRF, GRF neg] # fixed params here ...
+
+entire fold makes: 3 x 10 x 3 x 6 = 1024 sample classes with each 1024 samples makes for
+552960 trajectories generated
+
+Let's do: cubic x phenomenon x param x m_type x 16 runs = 64 runs per class needed.
+About 10k launches have to go thourgh for the entire sampling!
+
+To reduce: Launch 4 runs per class. Still makes for rather large sample but can go through
+much quicker.

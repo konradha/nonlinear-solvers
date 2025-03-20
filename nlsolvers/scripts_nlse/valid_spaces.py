@@ -1,3 +1,8 @@
+# This file describes exemplary parameter spaces for different phenomena.
+# These may very well be adapted, transformed and changed. Currently though,
+# it's suggested to not diverge too heavily from them as only those have been
+# tested so far.
+
 import numpy as np
 
 def get_parameter_spaces():
@@ -20,7 +25,7 @@ def get_parameter_spaces():
         "k_min": [0.2, 0.5, 1.0],
         "k_max": [3.0, 5.0, 8.0],
         "spectrum_slope": [-5/3, -1.0, -2.0],
-        "apply_envelope": [True]
+        "apply_envelope": [False, True]
     }
     
     parameter_spaces["chaotic"] = {
@@ -28,7 +33,7 @@ def get_parameter_spaces():
         "spectral_exponent": [-0.5, -1.0, -1.5],
         "coherent_structures": [True, False],
         "n_structures": [1, 3, 5],
-        "apply_envelope": [True]
+        "apply_envelope": [False, True]
     }
     
     parameter_spaces["vortex_lattice"] = {
@@ -36,7 +41,7 @@ def get_parameter_spaces():
         "n_vortices": [3, 5, 7, 9],
         "arrangement": ["square", "triangular", "circular", "random"],
         "charge_distribution": ["alternating", "same", "random"],
-        "apply_envelope": [True]
+        "apply_envelope": [False, True]
     }
     
     parameter_spaces["ring_soliton"] = {
@@ -46,7 +51,7 @@ def get_parameter_spaces():
         "modulation_type": ["none", "azimuthal", "radial"],
         "modulation_strength": [0.0, 0.2, 0.4],
         "modulation_mode": [0, 1, 2],
-        "apply_envelope": [True]
+        "apply_envelope": [False, True]
     }
     
     parameter_spaces["multi_ring"] = {
@@ -101,7 +106,7 @@ def get_parameter_spaces():
         "spectrum_slope": [-1.0, -1.5, -2.0],
         "modulation_type": ["none", "spatial", "phase"],
         "modulation_strength": [0.0, 0.2, 0.4],
-        "apply_envelope": [True]
+        "apply_envelope": [False, True]
     }
     
     parameter_spaces["topological_defect_network"] = {
@@ -112,7 +117,7 @@ def get_parameter_spaces():
         "temperature": [0.5, 1.0, 1.5],
         "core_size": [0.3, 0.5, 0.8],
         "interaction_strength": [0.5, 0.7, 1.0],
-        "apply_envelope": [True]
+        "apply_envelope": [False, True]
     }
 
 
