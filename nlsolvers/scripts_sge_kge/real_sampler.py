@@ -1605,18 +1605,37 @@ class RealWaveEquationSampler:
             v = v / max_v
 
         
-        return u, v
+        return u.astype(np.float64), v.astype(np.float64)
+
+def tsne_on_samples(samples, perplexity=30, n_iter=1000):
+    import numpy as np
+    from sklearn.manifold import TSNE
+    features = []
+    for sample in samples:
+        feature_vector = sample.flatten()
+        features.append(feature_vector)
+    features_array = np.array(features)
+    tsne = TSNE(n_components=2, perplexity=perplexity, max_iter=n_iter, random_state=42)
+    embedding = tsne.fit_transform(features_array)
+    return embedding
+
 
 if __name__ == '__main__':
     nx = ny = 128
     L = 3.
-    sampler = RealWaveEquationSampler(nx, ny, L)
-    for _ in range(5):
-        u, v = sampler.generate_initial_condition(system_type='sine_gordon', 
-                                 phenomenon_types=None, weights=None,
-                                 randomize_parameters=True, apply_envelope=True,
-                                 envelope_width=0.7, normalize=True, time_param=0.0,
-                                 max_amplitude=1.0,)
-        plt.imshow(v)
-        plt.show()
+    sampler  = RealWaveEquationSampler(nx, ny, L)
+    params = {
+                    'n_rings': np.random.randint(2, 6),
+                    'radius_range': (1.0, min(L/4, 5.0)),
+                    'width_range': (0.3, 1.0),
+                    'arrangement': np.random.choice(['concentric', 'random', 'circular']),
+                    'interaction_strength': np.random.uniform(0.5, 0.9),
+                    'modulation_strength': np.random.uniform(0, 0.4),
+                    'modulation_mode_range': (1, 6)
+             }
+
+    n_samples = 100
+    ensemble = sampler.generate_diverse_ensemble(system_type='sine_gordon', phenomenon_type='multi_ring',
+                               n_samples=n_samples,
+                               max_attempts=10 * n_samples, diversity_metric='l2', **params)
     
