@@ -1072,7 +1072,7 @@ class RealWaveSampler:
             return self.kink_field(system_type, **params)
         elif phenomenon_type == 'kink_array':
             return self.kink_array_field(system_type, **params)
-        elif phenomenon_type == 'breather':
+        elif phenomenon_type == 'breather_solution':
             return self.breather_solution(system_type, time_param=time_param, velocity_type=velocity_type, **params)
         elif phenomenon_type == 'breather_field':
             return self.breather_field(system_type, time_param=time_param, **params)

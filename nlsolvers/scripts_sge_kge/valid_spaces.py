@@ -38,7 +38,7 @@ def get_parameter_spaces(L):
         "randomize_positions": [True, False]
     }
     
-    parameter_spaces["breather"] = {
+    parameter_spaces["breather_solution"] = {
         "system_type": system_types,
         "amplitude": np.linspace(0.1, 0.95, 9).tolist(),
         "frequency": np.linspace(0.3, 0.95, 7).tolist(),
