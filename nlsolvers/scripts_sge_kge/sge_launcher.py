@@ -81,9 +81,9 @@ class SGELauncher:
     def generate_initial_condition(self, run_idx, phenomenon_params=None):
         if phenomenon_params is None:
             phenomenon_params = self.sample_phenomenon_params()
-
+        print("parameters:", phenomenon_params)
         u0, v0 = self.sampler.generate_initial_condition(
-                phenomenon_type=self.args.phenomenon, **phenomenon_params)
+            phenomenon_type=self.args.phenomenon, **phenomenon_params)
 
         if isinstance(u0, torch.Tensor):
             u0 = u0.detach().numpy()
@@ -98,7 +98,7 @@ class SGELauncher:
         if self.args.phenomenon in parameter_spaces:
             space = parameter_spaces[self.args.phenomenon]
             params = {}
-            
+
             for key, values in space.items():
                 if isinstance(values[0], tuple) or isinstance(values[0], list):
                     l = len(values)
@@ -159,7 +159,7 @@ class SGELauncher:
         else:
             raise ValueError(f"Unknown m_type: {self.args.m_type}")
 
-        return m.astype(np.float64) # safety first
+        return m.astype(np.float64)  # safety first
 
     def run_simulation(self, run_idx, u0, v0, m):
         u0_file = self.ic_dir / f"u0_{self.run_id}_{run_idx:04d}.npy"
@@ -211,9 +211,11 @@ class SGELauncher:
     def downsample_trajectory(self, traj_data):
         if self.args.dr_strategy == 'none':
             return traj_data
+
         elif self.args.dr_strategy == 'FFT':
-            return downsample_fft(traj_data, target_shape=(
-                self.args.dr_x, self.args.dr_y))
+            return downsample_fft(traj_data,
+                                  target_shape=(self.args.dr_x, self.args.dr_y))
+
         elif self.args.dr_strategy == 'interpolation':
             return downsample_interpolation(
                 traj_data,
@@ -305,7 +307,7 @@ class SGELauncher:
             params_str = params_str[:97] + "..."
 
         return (
-            "sine-Gordon: $u_{tt} = \Delta u + m(x,y) sin(u)$\n"
+            "sine-Gordon: $u_{tt} = \\Delta u + m(x,y) sin(u)$\n"
             f"{self.args.phenomenon}, m: {m_string}\n"
             f"domain: [0, T={self.args.T}] x [-{self.args.Lx:.2f}, {self.args.Lx:.2f}] x [-{self.args.Ly:.2f}, {self.args.Ly:.2f}]\n"
             f"resolution n_t={self.args.nt}, n_x={self.args.nx}, n_y={self.args.ny}\n"
@@ -327,27 +329,35 @@ class SGELauncher:
     def run(self):
         for i in range(self.args.num_runs):
             try:
+                pre_start = time.time()
                 (u0, v0), phenomenon_params = self.generate_initial_condition(i)
                 m = self.generate_spatial_amplification(i)
+                pre_end = time.time()
                 traj_data, walltime = self.run_simulation(i, u0, v0, m)
+                post_start = time.time()
+                # TODO decide whether to visualize before or after downsampling
+                if self.args.visualize:
+                    self.create_visualization(
+                        i, traj_data, m, phenomenon_params, walltime)
                 traj_data = self.downsample_trajectory(traj_data)
                 self.save_to_hdf5(
                     i, u0, v0, m, traj_data,
                     phenomenon_params, walltime)
 
-                if self.args.visualize:
-                    self.create_visualization(
-                        i, traj_data, m, phenomenon_params, walltime)
+                
                 self.cleanup(i)
+                post_end = time.time()
 
                 print(
                     f"Run {i+1}/{self.args.num_runs} ({self.args.phenomenon}, {self.args.m_type})")
-                print(f"Walltime: {walltime:.4f} seconds")
+                print(f"Walltime: {walltime:.2f} seconds")
+                print(f"Pre-processing:  {(pre_end - pre_start):.2f}")
+                print(f"Post-processing: {(post_end - post_start):.2f}")
 
             except Exception as e:
                 print(f"Error in run {i+1}: {e}")
-                import traceback
-                import pdb; pdb.set_trace()
+                #import traceback
+                #import pdb; pdb.set_trace()
                 continue
 
         if self.args.delete_intermediates:

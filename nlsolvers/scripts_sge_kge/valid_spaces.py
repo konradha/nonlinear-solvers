@@ -37,6 +37,17 @@ def get_parameter_spaces(L):
         ],
         "randomize_positions": [True, False]
     }
+
+    parameter_spaces["kink_array_field"] = {
+            "system_type": system_types,
+            "num_kinks_x": [1, 3, 5],
+            "num_kinks_y": [1, 4, 8],
+            "width_range": [
+                (min_w, max_w) for min_w in [0.3, 0.5, 0.7]
+                for max_w in [1.5, 2.0, 3.0]
+            ],
+            "jitter": [0.1, 0.4, 0.8]
+    }
     
     parameter_spaces["breather_solution"] = {
         "system_type": system_types,

@@ -62,8 +62,19 @@ class WaveSolutionMapper:
             ],
             "randomize_positions": [True, False]
         }
+
+        parameter_spaces["kink_array_field"] = {
+            "system_type": system_types,
+            "num_kinks_x": [1, 3, 5],
+            "num_kinks_y": [1, 4, 8],
+            "width_range": [
+                (min_w, max_w) for min_w in [0.3, 0.5, 0.7] 
+                for max_w in [1.5, 2.0, 3.0]
+            ],
+            "jitter": [0.1, 0.4, 0.8]
+        }
         
-        parameter_spaces["breather"] = {
+        parameter_spaces["breather_solution"] = {
             "system_type": system_types,
             "amplitude": np.linspace(0.1, 0.95, 9).tolist(),
             "frequency": np.linspace(0.3, 0.95, 7).tolist(),
@@ -225,7 +236,7 @@ class WaveSolutionMapper:
                           max_configs_per_type=15, n_neighbors=15):
         if phenomena_types is None:
             phenomena_types = [
-                "kink_solution", "kink_field", "breather", "multi_breather_field",
+                "kink_solution", "kink_field", "breather_solution", "multi_breather_field",
                 "ring_soliton", "multi_ring_state", "spiral_wave_field",
                 "skyrmion_solution", "skyrmion_lattice"
             ]
@@ -431,7 +442,7 @@ class WaveSolutionMapper:
                               max_configs_per_type=15, n_neighbors=15):
         if phenomena_types is None:
             phenomena_types = [
-                "kink_solution", "kink_field", "breather", "multi_breather_field",
+                "kink_solution", "kink_field", "breather_solution", "multi_breather_field",
                 "ring_soliton", "multi_ring_state", "spiral_wave_field",
                 "skyrmion_solution", "skyrmion_lattice"
             ]
@@ -831,8 +842,8 @@ def run_wave_mapping(
         
     if phenomena_types is None:
         phenomena_types = [
-            "kink_solution",
-            "kink_field", "breather", "multi_breather_field",
+            "kink_solution", "kink_array_field",
+            "kink_field", "breather_solution", "multi_breather_field",
             "ring_soliton", "spiral_wave_field", "skyrmion_solution", 
             "skyrmion_lattice", "skyrmion_like_field",
             "multi_ring_state", "q_ball_solution",
@@ -864,10 +875,10 @@ if __name__ == '__main__':
     sampler = RealWaveSampler(nx=nx, ny=ny, L=L)
     run_wave_mapping(
         sampler=sampler,
-        n_samples_per_config=1,
+        n_samples_per_config=5,
         max_configs_per_type=10,
         map_direct=True,
         map_physical=True,
-        samples_per_type=1,
+        samples_per_type=4,
         seed=seed
     )

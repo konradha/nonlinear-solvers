@@ -244,51 +244,36 @@ class RealWaveSampler:
 
         return u0, v0
 
-    def kink_array_field(self, system_type: str = 'sine_gordon', num_kinks_x: int = 3,
-                        num_kinks_y: int = 0, width_range: Tuple[float, float] = (0.5, 2.0),
-                        jitter: float = 0.3) -> Tuple[np.ndarray, np.ndarray]:
+    def kink_array_field(self, system_type: str ="sine_gordon",
+            num_kinks_x: int = 1, num_kinks_y: int = 1, width_range: Tuple = (0.5, 2.0),
+            jitter: float =0.3):
         u0 = np.zeros_like(self.X)
+        v0 = np.zeros_like(self.X)
 
         if num_kinks_x > 0:
             width_x = width_range[0] + (width_range[1] - width_range[0]) * np.random.rand()
-            spacing_x = 2.0 * self.L / (num_kinks_x + 1) 
-            direction_choice = np.random.rand()
+            spacing_x = 2.0 * self.L / (num_kinks_x + 1)
+            for i in range(num_kinks_x):
+                x0 = -self.L + (i + 1) * spacing_x
+                if jitter > 0:
+                    x0 = x0 + jitter * spacing_x * (2 * np.random.rand() - 1)
+                sign_x = 1 if np.random.rand() > 0.5 else -1
+                kink_width = width_x * (0.8 + 0.4 * np.random.rand())
+                u0 += sign_x * 4 * np.arctan(np.exp((self.X - x0) / kink_width))
 
-            if direction_choice < 0.25:
-                xi = (self.X - x0) / width
-                u_comp = 4 * np.arctan(amplitude * np.sin(omega * t + phase) /
-                                    (omega * np.cosh(amplitude * xi)))
-                v_comp = 4 * amplitude * omega * np.cos(omega * t + phase) / (
-                    omega * np.cosh(amplitude * xi) *
-                    (1 + (amplitude**2 / omega**2) * np.sin(omega * t + phase)**2)
-                )
-            elif direction_choice < 0.5:
-                yi = (self.Y - y0) / width
-                u_comp = 4 * np.arctan(amplitude * np.sin(omega * t + phase) /
-                                    (omega * np.cosh(amplitude * yi)))
-                v_comp = 4 * amplitude * omega * np.cos(omega * t + phase) / (
-                    omega * np.cosh(amplitude * yi) *
-                    (1 + (amplitude**2 / omega**2) * np.sin(omega * t + phase)**2)
-                )
-            elif direction_choice < 0.75:
-                ri = np.sqrt((self.X - x0)**2 + (self.Y - y0)**2) / width
-                u_comp = 4 * np.arctan(amplitude * np.sin(omega * t + phase) /
-                                    (omega * np.cosh(amplitude * ri)))
-                v_comp = 4 * amplitude * omega * np.cos(omega * t + phase) / (
-                    omega * np.cosh(amplitude * ri) *
-                    (1 + (amplitude**2 / omega**2) * np.sin(omega * t + phase)**2)
-                )
-            else:
-                theta = np.arctan2(self.Y - y0, self.X - x0)
-                r = np.sqrt((self.X - x0)**2 + (self.Y - y0)**2)
-                decay = np.exp(-r**2/(2*self.L**2))
-                u_comp = decay * amplitude * np.sin((i+1) * theta + phase)
-                v_comp = decay * amplitude * (i+1) * np.cos((i+1) * theta + phase)
-
-            u0 += u_comp
-            v0 += v_comp
+        if num_kinks_y > 0:
+            width_y = width_range[0] + (width_range[1] - width_range[0]) * np.random.rand()
+            spacing_y = 2.0 * self.L / (num_kinks_y + 1)
+            for i in range(num_kinks_y):
+                y0 = -self.L + (i + 1) * spacing_y
+                if jitter > 0:
+                    y0 = y0 + jitter * spacing_y * (2 * np.random.rand() - 1)
+                sign_y = 1 if np.random.rand() > 0.5 else -1
+                kink_width = width_y * (0.8 + 0.4 * np.random.rand())
+                u0 += sign_y * 4 * np.arctan(np.exp((self.Y - y0) / kink_width))
 
         return u0, v0
+
 
     def multi_breather_field(self, system_type: str = 'sine_gordon', num_breathers: int = 3,
                             position_type: str = 'random', amplitude_range: Tuple[float, float] = (0.2, 0.8),
@@ -1070,7 +1055,7 @@ class RealWaveSampler:
             return self.kink_solution(system_type, velocity_type=velocity_type, **params)
         elif phenomenon_type == 'kink_field':
             return self.kink_field(system_type, **params)
-        elif phenomenon_type == 'kink_array':
+        elif phenomenon_type == 'kink_array_field':
             return self.kink_array_field(system_type, **params)
         elif phenomenon_type == 'breather_solution':
             return self.breather_solution(system_type, time_param=time_param, velocity_type=velocity_type, **params)
