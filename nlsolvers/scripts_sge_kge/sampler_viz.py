@@ -1,283 +1,246 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+import os
+import uuid
+from tqdm import tqdm
+import itertools
 from sklearn.manifold import TSNE
 import umap
-from tqdm import tqdm
 from scipy.spatial.distance import pdist, squareform
-from matplotlib.colors import ListedColormap
-import matplotlib.patches as mpatches
-import os
-import itertools
-import uuid
-import time
 import warnings
-from real_sampler import RealWaveEquationSampler
+from typing import Dict, List, Tuple, Optional, Union, Any
 
-class RealWaveSpaceMapper:
-    def __init__(self, sampler, output_dir="real_wave_mapping_results"):
+class WaveSolutionMapper:
+    def __init__(self, sampler, output_dir=None):
         self.sampler = sampler
-        self.output_dir = output_dir
+        if output_dir is None:
+            self.output_dir = f"samples_{str(uuid.uuid4())[:4]}"
+        else:
+            self.output_dir = output_dir
         self.samples = []
         self.metadata = []
         self.distance_matrix = None
         self.embeddings = {}
-
-        self.X, self.Y = sampler.X, sampler.Y
-        self.dx, self.dy = sampler.dx, sampler.dy
-        self.cell_area = sampler.dx * sampler.dy
         
         os.makedirs(output_dir, exist_ok=True)
+    
+    def create_parameter_space(self):
+        system_types = [
+            "sine_gordon", 
+            "double_sine_gordon", 
+            "hyperbolic_sine_gordon", 
+            "phi4", 
+            "klein_gordon"
+        ]
         
-    def _prepare_parameter_space(self):
         parameter_spaces = {}
         
-        parameter_spaces["kink"] = {
-            "system_type": ["sine_gordon", "phi4", "double_sine_gordon"],
-            "amplitude": [1.0],
-            "width": [0.5, 1.0, 1.5],
-            "position": [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)],
-            "orientation": [0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi],
-            "velocity": [(0.0, 0.0), (0.2, 0.0), (0.0, 0.2), (0.2, 0.2)],
+        parameter_spaces["kink_solution"] = {
+            "system_type": system_types,
+            "width": np.linspace(0.3, 3.0, 6).tolist(),
+            "position": [
+                (x, y) for x in np.linspace(-self.sampler.L*0.7, self.sampler.L*0.7, 5) 
+                for y in np.linspace(-self.sampler.L*0.7, self.sampler.L*0.7, 5)
+            ],
+            "orientation": np.linspace(0, 2*np.pi, 8).tolist(),
+            "velocity": [
+                (vx, vy) for vx in np.linspace(-0.4, 0.4, 5) 
+                for vy in np.linspace(-0.4, 0.4, 5)
+            ],
             "kink_type": ["standard", "anti", "double"],
-            "velocity_type": ["fitting", "zero"]
-        }
-        
-        parameter_spaces["breather"] = {
-            "system_type": ["sine_gordon", "phi4", "double_sine_gordon"],
-            "amplitude": [0.3, 0.5, 0.8],
-            "frequency": [0.7, 0.8, 0.9],
-            "width": [0.5, 1.0, 1.5],
-            "position": [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)],
-            "phase": [0, np.pi/2, np.pi, 3*np.pi/2],
-            "orientation": [0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi],
-            "breather_type": ["standard", "radial"],
-            "time_param": [0, 0.5, 1.0],
             "velocity_type": ["fitting", "zero", "grf"]
         }
         
-        parameter_spaces["oscillon"] = {
-            "system_type": ["phi4", "sine_gordon"],
-            "amplitude": [0.3, 0.5, 0.8],
-            "frequency": [0.7, 0.8, 0.9],
-            "width": [0.5, 1.0, 1.5],
-            "position": [(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)],
-            "phase": [0, np.pi/2, np.pi, 3*np.pi/2],
-            "profile": ["gaussian", "sech", "polynomial"],
-            "time_param": [0, 0.5, 1.0]
+        parameter_spaces["kink_field"] = {
+            "system_type": system_types,
+            "winding_x": list(range(-4, 5)),
+            "winding_y": list(range(-4, 5)),
+            "width_range": [
+                (min_w, max_w) for min_w in [0.3, 0.5, 0.7] 
+                for max_w in [1.5, 2.0, 3.0]
+            ],
+            "randomize_positions": [True, False]
         }
         
-        parameter_spaces["multi_oscillon"] = {
-            "system_type": ["phi4", "sine_gordon"],
-            "n_oscillons": [3, 5, 8],
-            "amplitude_range": [(0.3, 0.7), (0.5, 1.0)],
-            "width_range": [(0.5, 1.0), (1.0, 2.0)],
-            "frequency_range": [(0.7, 0.9), (0.8, 0.95)],
-            "position_variance": [0.5, 1.0],
-            "arrangement": ["random", "circular", "lattice", "linear"],
-            "interaction_strength": [0.5, 0.7, 0.9],
-            "time_param": [0, 0.5, 1.0]
+        parameter_spaces["breather"] = {
+            "system_type": system_types,
+            "amplitude": np.linspace(0.1, 0.95, 9).tolist(),
+            "frequency": np.linspace(0.3, 0.95, 7).tolist(),
+            "width": np.linspace(0.3, 3.0, 6).tolist(),
+            "position": [
+                (x, y) for x in np.linspace(-self.sampler.L*0.7, self.sampler.L*0.7, 4) 
+                for y in np.linspace(-self.sampler.L*0.7, self.sampler.L*0.7, 4)
+            ],
+            "phase": np.linspace(0, 2*np.pi, 8).tolist(),
+            "orientation": np.linspace(0, 2*np.pi, 8).tolist(),
+            "breather_type": ["standard", "radial"],
+            "time_param": np.linspace(0, 2.0, 5).tolist(),
+            "velocity_type": ["fitting", "zero", "grf"]
         }
         
-        parameter_spaces["ring"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "amplitude": [0.8, 1.0, 1.2],
-            "radius": [1.0, 1.5, 2.0],
-            "width": [0.3, 0.5, 0.8],
-            "position": [(0, 0), (-0.5, -0.5), (0.5, 0.5)],
-            "velocity": [0.0, 0.1, 0.2],
+        parameter_spaces["multi_breather_field"] = {
+            "system_type": system_types,
+            "num_breathers": list(range(2, 8)),
+            "position_type": ["random", "circle", "line"],
+            "amplitude_range": [
+                (min_a, max_a) for min_a in [0.1, 0.2, 0.3, 0.4] 
+                for max_a in [0.6, 0.7, 0.8, 0.9]
+            ],
+            "width_range": [
+                (min_w, max_w) for min_w in [0.3, 0.5, 0.7] 
+                for max_w in [1.5, 2.0, 3.0]
+            ],
+            "frequency_range": [
+                (min_f, max_f) for min_f in [0.5, 0.6, 0.7] 
+                for max_f in [0.8, 0.9, 0.95]
+            ],
+            "time_param": np.linspace(0, 2.0, 5).tolist(),
+            "velocity_type": ["fitting", "zero", "grf"]
+        }
+        
+        parameter_spaces["ring_soliton"] = {
+            "system_type": system_types,
+            "amplitude": np.linspace(0.5, 2.0, 4).tolist(),
+            "radius": np.linspace(0.5, min(self.sampler.L*0.6, 5.0), 8).tolist(),
+            "width": np.linspace(0.2, 1.5, 7).tolist(),
+            "position": [
+                (x, y) for x in np.linspace(-self.sampler.L*0.3, self.sampler.L*0.3, 3) 
+                for y in np.linspace(-self.sampler.L*0.3, self.sampler.L*0.3, 3)
+            ],
+            "velocity": np.linspace(-0.3, 0.3, 7).tolist(),
             "ring_type": ["expanding", "kink_antikink"],
-            "modulation_strength": [0.0, 0.2, 0.4],
-            "modulation_mode": [0, 2, 4]
+            "modulation_strength": np.linspace(0, 0.5, 6).tolist(),
+            "modulation_mode": list(range(0, 8)),
+            "time_param": np.linspace(0, 1.5, 4).tolist()
         }
         
-        parameter_spaces["multi_ring"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "n_rings": [2, 3, 4],
-            "radius_range": [(1.0, 2.0), (1.5, 3.0)],
-            "width_range": [(0.3, 0.6), (0.5, 0.8)],
-            "position_variance": [0.3, 0.5],
+        parameter_spaces["multi_ring_state"] = {
+            "system_type": system_types,
+            "n_rings": list(range(2, 8)),
+            "radius_range": [
+                (min_r, max_r) for min_r in [0.5, 1.0, 1.5] 
+                for max_r in [2.5, 3.5, 4.5]
+            ],
+            "width_range": [
+                (min_w, max_w) for min_w in [0.2, 0.3, 0.4] 
+                for max_w in [0.6, 0.8, 1.0]
+            ],
             "arrangement": ["concentric", "random", "circular"],
-            "interaction_strength": [0.5, 0.7, 0.9],
-            "modulation_strength": [0.0, 0.2, 0.4],
-            "modulation_mode_range": [(1, 3), (2, 5)]
+            "interaction_strength": np.linspace(0.3, 1.0, 5).tolist(),
+            "modulation_strength": np.linspace(0, 0.5, 6).tolist(),
+            "modulation_mode_range": [
+                (min_m, max_m) for min_m in [1, 2, 3] 
+                for max_m in [4, 6, 8]
+            ]
+        }
+       
+        parameter_spaces["colliding_rings"] = {
+            "system_type": system_types,
+            "num_rings": list(range(2, 4)),
+            "ring_type": ["cocentric", "nested", "random"],
+            "amplitude": [1., 3.],
         }
         
-        parameter_spaces["skyrmion"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "amplitude": [0.8, 1.0, 1.2],
-            "radius": [0.8, 1.0, 1.5],
-            "position": [(0, 0), (-0.5, -0.5), (0.5, 0.5)],
-            "charge": [1, -1],
+        parameter_spaces["spiral_wave_field"] = {
+            "num_arms": list(range(1, 9)),
+            "decay_rate": np.linspace(0.2, 1.0, 5).tolist(),
+            "amplitude": np.linspace(0.5, 2.0, 4).tolist(),
+            "position": [
+                (x, y) for x in np.linspace(-self.sampler.L*0.5, self.sampler.L*0.5, 4) 
+                for y in np.linspace(-self.sampler.L*0.5, self.sampler.L*0.5, 4)
+            ],
+            "phase": np.linspace(0, 2*np.pi, 8).tolist(),
+            "k_factor": np.linspace(0.5, 4.0, 8).tolist()
+        }
+        
+        parameter_spaces["skyrmion_solution"] = {
+            "system_type": system_types,
+            "amplitude": np.linspace(0.5, 2.0, 4).tolist(),
+            "radius": np.linspace(0.3, 2.5, 6).tolist(),
+            "position": [
+                (x, y) for x in np.linspace(-self.sampler.L*0.5, self.sampler.L*0.5, 4) 
+                for y in np.linspace(-self.sampler.L*0.5, self.sampler.L*0.5, 4)
+            ],
+            "charge": [-2, -1, 1, 2],
             "profile": ["standard", "compact", "exponential"]
         }
         
         parameter_spaces["skyrmion_lattice"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "n_skyrmions": [4, 7, 12],
-            "radius_range": [(0.5, 1.0), (0.8, 1.5)],
-            "amplitude": [0.8, 1.0, 1.2],
+            "system_type": system_types,
+            "n_skyrmions": [4, 7, 9, 12, 16, 25],
+            "radius_range": [
+                (min_r, max_r) for min_r in [0.3, 0.5, 0.7] 
+                for max_r in [1.0, 1.5, 2.0]
+            ],
+            "amplitude": np.linspace(0.5, 2.0, 4).tolist(),
             "arrangement": ["triangular", "square", "random"],
-            "separation": [2.0, 2.5, 3.0],
+            "separation": np.linspace(1.5, 4.0, 6).tolist(),
             "charge_distribution": ["alternating", "random", "same"]
         }
-        
-        parameter_spaces["spiral_wave"] = {
-            "num_arms": [1, 2, 3, 4],
-            "decay_rate": [0.3, 0.5, 0.7],
-            "amplitude": [0.8, 1.0, 1.2],
-            "phase": [0, np.pi/2, np.pi, 3*np.pi/2],
-            "k_factor": [1.0, 1.5, 2.0]
+
+        parameter_spaces["skyrmion_like_field"] = {
+            "num_skyrmions": list(range(2, 9)),  
         }
-        
-        parameter_spaces["multi_spiral"] = {
-            "n_spirals": [2, 3, 4],
-            "amplitude_range": [(0.5, 1.0), (0.8, 1.5)],
-            "num_arms_range": [(1, 3), (2, 4)],
-            "decay_rate_range": [(0.3, 0.5), (0.5, 0.8)],
-            "position_variance": [0.5, 1.0],
-            "interaction_strength": [0.5, 0.7, 0.9]
-        }
-        
-        parameter_spaces["rogue_wave"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "amplitude": [1.5, 2.0, 2.5],
-            "background_level": [0.1, 0.2, 0.3],
-            "width": [0.5, 0.8, 1.0]
-        }
-        
-        parameter_spaces["multi_rogue"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "n_rogues": [2, 3, 4],
-            "amplitude_range": [(1.5, 2.5), (2.0, 3.0)],
-            "width_range": [(0.5, 1.0), (0.8, 1.5)],
-            "background_level": [0.1, 0.2, 0.3],
-            "position_variance": [0.3, 0.5, 0.7]
-        }
-        
-        parameter_spaces["fractal_kink"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "levels": [2, 3, 4],
-            "base_width": [0.8, 1.2, 1.5],
-            "scale_factor": [1.5, 2.0, 2.5],
-            "amplitude": [0.8, 1.0, 1.2],
-            "orientation": [0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi]
-        }
-        
-        parameter_spaces["domain_wall_network"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "n_walls": [4, 6, 8],
-            "width_range": [(0.5, 1.0), (0.8, 1.5)],
-            "orientation_variance": [0.3, 0.5, 0.8],
-            "interaction_strength": [0.5, 0.7, 0.9]
-        }
-        
-        parameter_spaces["soliton_gas"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "n_solitons": [8, 12, 16],
-            "width_range": [(0.5, 1.0), (0.8, 1.5)],
-            "velocity_scale": [0.1, 0.2, 0.3],
-            "interaction_strength": [0.5, 0.7, 0.9]
-        }
-        
-        parameter_spaces["q_ball"] = {
-            "system_type": ["phi4"],
-            "amplitude": [0.8, 1.0, 1.2],
-            "radius": [0.8, 1.0, 1.5],
-            "phase": [0, np.pi/2, np.pi, 3*np.pi/2],
-            "frequency": [0.6, 0.7, 0.8],
-            "charge": [1, 2],
-            "time_param": [0, 0.5, 1.0]
+
+
+        parameter_spaces["q_ball_solution"] = {
+            "system_type": system_types,
+            "position": [
+                (x, y) for x in np.linspace(-self.sampler.L*0.5, self.sampler.L*0.5, 100) 
+                for y in np.linspace(-self.sampler.L*0.5, self.sampler.L*0.5, 100)
+            ],
+            "phase": [0.0, .5],
+            "frequency": [.3, .8],
+            "charge": [-1, 1],
         }
         
         parameter_spaces["multi_q_ball"] = {
-            "system_type": ["phi4"],
-            "n_qballs": [2, 3, 4],
-            "amplitude_range": [(0.5, 1.0), (0.8, 1.5)],
-            "radius_range": [(0.5, 1.0), (0.8, 1.5)],
-            "frequency_range": [(0.6, 0.8), (0.7, 0.9)],
-            "position_variance": [0.5, 1.0],
-            "interaction_strength": [0.5, 0.7, 0.9],
-            "time_param": [0, 0.5, 1.0]
+            "system_type": system_types,
+            "n_qballs": [2, 4, 8],
+            "amplitude_range": [(.1, 1.1), (.5, 1.5)],
+            "radius_range": [(.5, 2), (.1, 4.)],
+
         }
-        
-        parameter_spaces["vibrational_kink"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "amplitude": [0.8, 1.0, 1.2],
-            "width": [0.8, 1.0, 1.5],
-            "mode_amplitude": [0.2, 0.3, 0.4],
-            "mode_frequency": [0.3, 0.5, 0.7],
-            "phase": [0, np.pi/2, np.pi, 3*np.pi/2],
-            "orientation": [0, np.pi/4, np.pi/2, 3*np.pi/4, np.pi],
-            "time_param": [0, 0.5, 1.0]
-        }
-        
-        parameter_spaces["radiation_soliton"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "soliton_width": [0.8, 1.0, 1.5],
-            "radiation_amplitude": [0.2, 0.3, 0.4],
-            "radiation_wavelength": [0.3, 0.5, 0.8],
-            "radiation_direction": [0, np.pi/4, np.pi/2, 3*np.pi/4]
-        }
-        
-        parameter_spaces["combined"] = {
-            "system_type": ["sine_gordon", "phi4"],
-            "solution_types": [
-                ["kink", "breather", "ring"],
-                ["kink", "spiral", "rogue"],
-                ["breather", "ring", "spiral"],
-                ["oscillon", "spiral", "fractal"],
-                ["kink", "skyrmion", "qball"]
-            ],
-            "weights": [
-                [0.4, 0.3, 0.3],
-                [0.33, 0.33, 0.34],
-                [0.5, 0.3, 0.2]
-            ]
-        }
-        
+         
         return parameter_spaces
     
-    def _sample_phenomenon(self, phenomenon_type, system_type=None, **params):
+    def generate_sample(self, phenomenon_type, system_type=None, **params):
         try:
             u, v = self.sampler.generate_sample(
                 system_type=system_type, 
                 phenomenon_type=phenomenon_type,
                 **params
-            )
-            
+            ) 
             return (u, v), {
                 "phenomenon_type": phenomenon_type,
                 "system_type": system_type,
                 "params": params
             }
-            
         except Exception as e:
-            warnings.warn(f"Error generating {phenomenon_type} with system_type={system_type}, params={params}: {e}")
+            warnings.warn(f"Error generating {phenomenon_type} with {system_type}: {e}")
             return None, None
     
-    def map_solution_space(self, phenomena_types=None, n_samples_per_config=2, max_configs_per_type=10, 
-                           n_neighbors=15):
+    def map_solution_space(self, phenomena_types=None, n_samples_per_config=2, 
+                          max_configs_per_type=15, n_neighbors=15):
         if phenomena_types is None:
             phenomena_types = [
-                "kink", "breather", "oscillon", "multi_oscillon", 
-                "ring_soliton", "multi_ring", "skyrmion", "skyrmion_lattice",
-                "spiral_wave", "multi_spiral", "rogue_wave", "multi_rogue",
-                "fractal_kink", "domain_wall_network", "soliton_gas", 
-                "q_ball", "multi_q_ball", "vibrational_kink", 
-                "radiation_soliton", "combined"
+                "kink_solution", "kink_field", "breather", "multi_breather_field",
+                "ring_soliton", "multi_ring_state", "spiral_wave_field",
+                "skyrmion_solution", "skyrmion_lattice"
             ]
         
         self.samples = []
         self.metadata = []
-            
-        parameter_spaces = self._prepare_parameter_space()
         
-        for phenomenon_type in tqdm(phenomena_types, desc="Generating samples"):
+        parameter_spaces = self.create_parameter_space()
+        
+        for phenomenon_type in tqdm(phenomena_types, desc="Processing phenomenon types"):
             if phenomenon_type not in parameter_spaces:
                 warnings.warn(f"No parameter space defined for {phenomenon_type}. Skipping.")
                 continue
             
-            param_space = parameter_spaces[phenomenon_type]
+            param_space = parameter_spaces[phenomenon_type].copy()
             
             system_types = param_space.pop("system_type", [None])
             
@@ -287,19 +250,23 @@ class RealWaveSpaceMapper:
             all_combinations = list(itertools.product(*param_values))
             
             if len(all_combinations) > max_configs_per_type:
-                step = max(1, len(all_combinations) // max_configs_per_type)
-                selected_combinations = all_combinations[::step][:max_configs_per_type]
+                selected_indices = np.random.choice(
+                    len(all_combinations), 
+                    size=max_configs_per_type, 
+                    replace=False
+                )
+                selected_combinations = [all_combinations[i] for i in selected_indices]
             else:
                 selected_combinations = all_combinations
             
             for system_type in system_types:
                 for combination in tqdm(selected_combinations, 
-                                    desc=f"Params for {phenomenon_type} (system_type={system_type})",
-                                    leave=False):
+                                      desc=f"{phenomenon_type} ({system_type})",
+                                      leave=False):
                     params = {k: v for k, v in zip(param_keys, combination)}
                     
                     for _ in range(n_samples_per_config):
-                        sample, metadata = self._sample_phenomenon(
+                        sample, metadata = self.generate_sample(
                             phenomenon_type, system_type=system_type, **params
                         )
                         
@@ -308,8 +275,6 @@ class RealWaveSpaceMapper:
                             self.metadata.append(metadata)
         
         print(f"Generated {len(self.samples)} samples across {len(phenomena_types)} phenomenon types")
-            
-        print("Computing distance matrix...")
         
         features = []
         for sample in tqdm(self.samples, desc="Extracting features"):
@@ -322,307 +287,166 @@ class RealWaveSpaceMapper:
         
         print("Computing embeddings...")
         
+        n_neighbors = min(n_neighbors, len(self.samples) - 1)
+        
         self.embeddings['tsne'] = TSNE(
             n_components=2, 
-            perplexity=min(n_neighbors, len(self.samples) - 1),
-            max_iter=2000,
+            perplexity=n_neighbors,
+            n_iter=2000,
             random_state=42
         ).fit_transform(self.distance_matrix)
         
         self.embeddings['umap'] = umap.UMAP(
             n_components=2,
             min_dist=0.1,
-            n_neighbors=min(n_neighbors, len(self.samples) - 1),
+            n_neighbors=n_neighbors,
             random_state=42
         ).fit_transform(self.distance_matrix)
         
         return self.samples, self.metadata, self.distance_matrix, self.embeddings
     
-    def visualize_solution_space(self, extra_title="", output_prefix=None):
-        if 'tsne' not in self.embeddings:
-            raise ValueError("Must run map_solution_space first")
-            
-        if output_prefix is None:
-            output_prefix = f"real_wave_map_{len(self.samples)}"
-        
-        phenomenon_types = sorted(set(m["phenomenon_type"] for m in self.metadata))
-        n_phenomena = len(phenomenon_types)
-        
-        phenomenon_colors = plt.cm.tab20(np.linspace(0, 1, n_phenomena))
-        phenomenon_cmap = ListedColormap(phenomenon_colors)
-        
-        plt.figure(figsize=(14, 10))
-        plt.scatter(
-            self.embeddings['tsne'][:, 0], 
-            self.embeddings['tsne'][:, 1],
-            c=[phenomenon_types.index(m["phenomenon_type"]) for m in self.metadata],
-            cmap=phenomenon_cmap,
-            s=30,
-            alpha=0.7
-        )
-        plt.title(f"{extra_title} t-SNE Visualization of Real Wave Solution Space", fontsize=16)
-        plt.axis('equal')
-        plt.grid(True, alpha=0.3)
-        
-        plt.legend(
-            handles=[plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=phenomenon_colors[i], 
-                               markersize=10, label=p) for i, p in enumerate(phenomenon_types)],
-            loc='upper right',
-            title='Phenomenon Type',
-            fontsize=10
-        )
-        
-        plt.tight_layout()
-        plt.savefig(f"{self.output_dir}/{output_prefix}_tsne_by_phenomenon.png", dpi=300, bbox_inches='tight')
-        plt.close()
-        
-        system_types = sorted(set(m["system_type"] for m in self.metadata if m["system_type"] is not None))
-        if system_types:
-            n_systems = len(system_types)
-            system_colors = plt.cm.viridis(np.linspace(0, 1, n_systems))
-            system_cmap = ListedColormap(system_colors)
-            
-            plt.figure(figsize=(14, 10))
-            
-            system_indices = []
-            for m in self.metadata:
-                if m["system_type"] is not None:
-                    system_indices.append(system_types.index(m["system_type"]))
-                else:
-                    system_indices.append(-1)
-            
-            scatter = plt.scatter(
-                self.embeddings['tsne'][:, 0], 
-                self.embeddings['tsne'][:, 1],
-                c=[idx if idx >= 0 else 0 for idx in system_indices],
-                cmap=system_cmap,
-                s=30,
-                alpha=0.7
-            )
-            
-            plt.title(f"{extra_title} t-SNE Visualization by System Type", fontsize=16)
-            plt.axis('equal')
-            plt.grid(True, alpha=0.3)
-            
-            plt.legend(
-                handles=[plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=system_colors[i], 
-                                   markersize=10, label=s) for i, s in enumerate(system_types)],
-                loc='upper right',
-                title='System Type',
-                fontsize=10
-            )
-            
-            plt.tight_layout()
-            plt.savefig(f"{self.output_dir}/{output_prefix}_tsne_by_system.png", dpi=300, bbox_inches='tight')
-            plt.close()
-        
-        plt.figure(figsize=(14, 10))
-        plt.scatter(
-            self.embeddings['umap'][:, 0], 
-            self.embeddings['umap'][:, 1],
-            c=[phenomenon_types.index(m["phenomenon_type"]) for m in self.metadata],
-            cmap=phenomenon_cmap,
-            s=30,
-            alpha=0.7
-        )
-        plt.title(f"{extra_title} UMAP Visualization of Real Wave Solution Space", fontsize=16)
-        plt.axis('equal')
-        plt.grid(True, alpha=0.3)
-        
-        plt.legend(
-            handles=[plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=phenomenon_colors[i], 
-                               markersize=10, label=p) for i, p in enumerate(phenomenon_types)],
-            loc='upper right',
-            title='Phenomenon Type',
-            fontsize=10
-        )
-        
-        plt.tight_layout()
-        plt.savefig(f"{self.output_dir}/{output_prefix}_umap_by_phenomenon.png", dpi=300, bbox_inches='tight')
-        plt.close()
-        
-        n_rows = min(len(phenomenon_types), 10)
-        n_cols = 3
-
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4 * n_rows))
-
-        if n_rows == 1:
-            axes = np.array([axes])
-
-        cmaps = ['viridis', 'RdBu_r', 'RdBu_r']
-        labels = ['u field', 'v field', 'u+v overlay']
-
-        for row, phenomenon in enumerate(phenomenon_types[:n_rows]):
-            indices = [i for i, m in enumerate(self.metadata) if m["phenomenon_type"] == phenomenon]
-            if not indices:
-                continue
-            idx = np.random.choice(indices)
-            u, v = self.samples[idx]
-
-            axes[row][0].imshow(u, cmap=cmaps[0])
-            plt.colorbar(axes[row][0].imshow(u, cmap=cmaps[0]), ax=axes[row][0])
-
-            axes[row][1].imshow(v, cmap=cmaps[1])
-            plt.colorbar(axes[row][1].imshow(v, cmap=cmaps[1]), ax=axes[row][1])
-            
-            overlay = np.zeros((u.shape[0], u.shape[1], 4))
-            overlay[..., 0] = np.clip((u + 1) / 2, 0, 1)
-            overlay[..., 2] = np.clip((v + 1) / 2, 0, 1)
-            overlay[..., 3] = 0.7
-            axes[row][2].imshow(overlay)
-
-            meta = self.metadata[idx]
-            system_info = ""
-            if meta["system_type"] is not None and row == 0:
-                system_info = f"System: {meta['system_type']}"
-
-            axes[row][0].set_ylabel(meta['phenomenon_type'], fontsize=12, rotation=90, va='center', ha='right')
-
-            for col in range(n_cols):
-                axes[row][col].axis('off')
-
-        for col, label in enumerate(labels):
-            axes[0][col].set_title(label, fontsize=12)
-
-        fig.suptitle(f"{system_info}\n") 
-        plt.tight_layout()
-        plt.savefig(f"{self.output_dir}/{output_prefix}_detailed_view.png", dpi=300, bbox_inches='tight')
-        plt.close()
-        
-        return {
-            'phenomenon_types': phenomenon_types,
-            'system_types': system_types
-        }
-
-    def characterize_solution(self, field_pair):
+    def calculate_physical_properties(self, field_pair):
         u, v = field_pair
         properties = {}
         
-        properties['u_energy'] = np.sum(u**2) * self.cell_area
-        properties['v_energy'] = np.sum(v**2) * self.cell_area
+        dx = self.sampler.dx
+        dy = self.sampler.dy
+        cell_area = dx * dy
+        
+        properties['u_energy'] = np.sum(u**2) * cell_area
+        properties['v_energy'] = np.sum(v**2) * cell_area
         properties['total_energy'] = properties['u_energy'] + properties['v_energy']
         
         properties['u_peak'] = np.max(np.abs(u))
         properties['v_peak'] = np.max(np.abs(v))
         
-        u_centroid = np.array([
-            np.sum(self.X * u**2) / np.sum(u**2) if np.sum(u**2) > 0 else 0,
-            np.sum(self.Y * u**2) / np.sum(u**2) if np.sum(u**2) > 0 else 0
-        ])
+        X, Y = self.sampler.X, self.sampler.Y
         
-        v_centroid = np.array([
-            np.sum(self.X * v**2) / np.sum(v**2) if np.sum(v**2) > 0 else 0,
-            np.sum(self.Y * v**2) / np.sum(v**2) if np.sum(v**2) > 0 else 0
-        ])
+        u2_sum = np.sum(u**2)
+        v2_sum = np.sum(v**2)
+        
+        if u2_sum > 0:
+            u_centroid = np.array([np.sum(X * u**2) / u2_sum, np.sum(Y * u**2) / u2_sum])
+        else:
+            u_centroid = np.array([0, 0])
+            
+        if v2_sum > 0:
+            v_centroid = np.array([np.sum(X * v**2) / v2_sum, np.sum(Y * v**2) / v2_sum])
+        else:
+            v_centroid = np.array([0, 0])
         
         properties['u_centroid'] = u_centroid
         properties['v_centroid'] = v_centroid
         
-        u_radius_of_gyration = np.sqrt(
-            np.sum(((self.X - u_centroid[0])**2 +
-                    (self.Y - u_centroid[1])**2) * u**2) / np.sum(u**2)
-        ) if np.sum(u**2) > 0 else 0
-        
-        v_radius_of_gyration = np.sqrt(
-            np.sum(((self.X - v_centroid[0])**2 +
-                    (self.Y - v_centroid[1])**2) * v**2) / np.sum(v**2)
-        ) if np.sum(v**2) > 0 else 0
+        if u2_sum > 0:
+            u_radius_of_gyration = np.sqrt(
+                np.sum(((X - u_centroid[0])**2 + (Y - u_centroid[1])**2) * u**2) / u2_sum
+            )
+        else:
+            u_radius_of_gyration = 0
+            
+        if v2_sum > 0:
+            v_radius_of_gyration = np.sqrt(
+                np.sum(((X - v_centroid[0])**2 + (Y - v_centroid[1])**2) * v**2) / v2_sum
+            )
+        else:
+            v_radius_of_gyration = 0
         
         properties['u_radius_of_gyration'] = u_radius_of_gyration
         properties['v_radius_of_gyration'] = v_radius_of_gyration
         
-        u_laplacian = ((np.roll(u, -1, axis=0) + np.roll(u, 1, axis=0) - 2*u) / self.dx**2 +
-                     (np.roll(u, -1, axis=1) + np.roll(u, 1, axis=1) - 2*u) / self.dy**2)
-                     
-        v_laplacian = ((np.roll(v, -1, axis=0) + np.roll(v, 1, axis=0) - 2*v) / self.dx**2 +
-                     (np.roll(v, -1, axis=1) + np.roll(v, 1, axis=1) - 2*v) / self.dy**2)
-                     
-        properties['u_laplacian_energy'] = np.sum(u_laplacian**2) * self.cell_area
-        properties['v_laplacian_energy'] = np.sum(v_laplacian**2) * self.cell_area
+        u_laplacian = (
+            (np.roll(u, -1, axis=0) + np.roll(u, 1, axis=0) - 2*u) / dx**2 +
+            (np.roll(u, -1, axis=1) + np.roll(u, 1, axis=1) - 2*u) / dy**2
+        )
+        
+        v_laplacian = (
+            (np.roll(v, -1, axis=0) + np.roll(v, 1, axis=0) - 2*v) / dx**2 +
+            (np.roll(v, -1, axis=1) + np.roll(v, 1, axis=1) - 2*v) / dy**2
+        )
+        
+        properties['u_laplacian_energy'] = np.sum(u_laplacian**2) * cell_area
+        properties['v_laplacian_energy'] = np.sum(v_laplacian**2) * cell_area
+        
+        u_gradient_x = (np.roll(u, -1, axis=0) - np.roll(u, 1, axis=0)) / (2 * dx)
+        u_gradient_y = (np.roll(u, -1, axis=1) - np.roll(u, 1, axis=1)) / (2 * dy)
+        v_gradient_x = (np.roll(v, -1, axis=0) - np.roll(v, 1, axis=0)) / (2 * dx)
+        v_gradient_y = (np.roll(v, -1, axis=1) - np.roll(v, 1, axis=1)) / (2 * dy)
+        
+        properties['u_gradient_energy'] = np.sum(u_gradient_x**2 + u_gradient_y**2) * cell_area
+        properties['v_gradient_energy'] = np.sum(v_gradient_x**2 + v_gradient_y**2) * cell_area
+        
+        properties['topological_charge'] = np.sum(
+            (u_gradient_x * v_gradient_y - u_gradient_y * v_gradient_x) / 
+            (2 * np.pi * (u**2 + v**2 + 1e-10))
+        ) * cell_area
         
         u_fft = np.fft.fftshift(np.abs(np.fft.fft2(u)))
         v_fft = np.fft.fftshift(np.abs(np.fft.fft2(v)))
         
-        kx, ky = self.sampler.k_x, self.sampler.k_y
-        KX, KY = self.sampler.KX, self.sampler.KY
-        K_mag = self.sampler.K_mag
+        kx = np.fft.fftshift(np.fft.fftfreq(u.shape[0], dx))
+        ky = np.fft.fftshift(np.fft.fftfreq(u.shape[1], dy))
+        KX, KY = np.meshgrid(kx, ky, indexing='ij')
+        K_mag = np.sqrt(KX**2 + KY**2)
         
-        properties['u_spectral_centroid'] = np.array([
-            np.sum(KX * u_fft) / np.sum(u_fft) if np.sum(u_fft) > 0 else 0,
-            np.sum(KY * u_fft) / np.sum(u_fft) if np.sum(u_fft) > 0 else 0
-        ])
+        u_fft_sum = np.sum(u_fft)
+        v_fft_sum = np.sum(v_fft)
         
-        properties['v_spectral_centroid'] = np.array([
-            np.sum(KX * v_fft) / np.sum(v_fft) if np.sum(v_fft) > 0 else 0,
-            np.sum(KY * v_fft) / np.sum(v_fft) if np.sum(v_fft) > 0 else 0
-        ])
+        if u_fft_sum > 0:
+            properties['u_spectral_radius'] = np.sqrt(np.sum(K_mag**2 * u_fft) / u_fft_sum)
+        else:
+            properties['u_spectral_radius'] = 0
+            
+        if v_fft_sum > 0:
+            properties['v_spectral_radius'] = np.sqrt(np.sum(K_mag**2 * v_fft) / v_fft_sum)
+        else:
+            properties['v_spectral_radius'] = 0
         
-        properties['u_spectral_radius'] = np.sqrt(
-            np.sum(K_mag**2 * u_fft) / np.sum(u_fft)
-        ) if np.sum(u_fft) > 0 else 0
-        
-        properties['v_spectral_radius'] = np.sqrt(
-            np.sum(K_mag**2 * v_fft) / np.sum(v_fft)
-        ) if np.sum(v_fft) > 0 else 0
-        
-        properties['u_entropy'] = -np.sum((u**2 / properties['u_energy']) *
-                                      np.log(u**2 / properties['u_energy'] + 1e-10)) * self.cell_area if properties['u_energy'] > 0 else 0
-                                      
-        properties['v_entropy'] = -np.sum((v**2 / properties['v_energy']) *
-                                      np.log(v**2 / properties['v_energy'] + 1e-10)) * self.cell_area if properties['v_energy'] > 0 else 0
-        
-        properties['uv_correlation'] = np.sum(u * v) / (np.sqrt(np.sum(u**2) * np.sum(v**2)) + 1e-10)
+        u_norm = np.sqrt(np.sum(u**2))
+        v_norm = np.sqrt(np.sum(v**2))
+        if u_norm > 0 and v_norm > 0:
+            properties['uv_correlation'] = np.sum(u * v) / (u_norm * v_norm)
+        else:
+            properties['uv_correlation'] = 0
         
         feature_vector = np.array([
-            properties['u_energy'],
-            properties['v_energy'],
             properties['total_energy'],
             properties['u_peak'],
             properties['v_peak'],
-            properties['u_centroid'][0],
-            properties['u_centroid'][1],
-            properties['v_centroid'][0],
-            properties['v_centroid'][1],
             properties['u_radius_of_gyration'],
             properties['v_radius_of_gyration'],
             properties['u_laplacian_energy'],
             properties['v_laplacian_energy'],
-            properties['u_spectral_centroid'][0],
-            properties['u_spectral_centroid'][1],
-            properties['v_spectral_centroid'][0],
-            properties['v_spectral_centroid'][1],
+            properties['u_gradient_energy'],
+            properties['v_gradient_energy'],
             properties['u_spectral_radius'],
             properties['v_spectral_radius'],
-            properties['u_entropy'],
-            properties['v_entropy'],
-            properties['uv_correlation']
+            properties['uv_correlation'],
+            properties['topological_charge']
         ])
         
         return properties, feature_vector
     
-    def map_solution_proxies(self, phenomena_types=None, n_samples_per_config=2, max_configs_per_type=10, 
-                           n_neighbors=15):
+    def map_physical_properties(self, phenomena_types=None, n_samples_per_config=2, 
+                              max_configs_per_type=15, n_neighbors=15):
         if phenomena_types is None:
             phenomena_types = [
-                "kink", "breather", "oscillon", "multi_oscillon", 
-                "ring_soliton", "multi_ring", "skyrmion", "skyrmion_lattice",
-                "spiral_wave", "multi_spiral", "rogue_wave", "multi_rogue",
-                "fractal_kink", "domain_wall_network", "soliton_gas", 
-                "q_ball", "multi_q_ball", "vibrational_kink", 
-                "radiation_soliton", "combined"
+                "kink_solution", "kink_field", "breather", "multi_breather_field",
+                "ring_soliton", "multi_ring_state", "spiral_wave_field",
+                "skyrmion_solution", "skyrmion_lattice"
             ]
         
         self.samples = []
         self.metadata = []
         
-        parameter_spaces = self._prepare_parameter_space()
+        parameter_spaces = self.create_parameter_space()
         
-        for phenomenon_type in tqdm(phenomena_types, desc="Generating samples"):
+        for phenomenon_type in tqdm(phenomena_types, desc="Processing phenomenon types"):
             if phenomenon_type not in parameter_spaces:
                 warnings.warn(f"No parameter space defined for {phenomenon_type}. Skipping.")
                 continue
             
-            param_space = parameter_spaces[phenomenon_type]
+            param_space = parameter_spaces[phenomenon_type].copy()
             
             system_types = param_space.pop("system_type", [None])
             
@@ -632,19 +456,23 @@ class RealWaveSpaceMapper:
             all_combinations = list(itertools.product(*param_values))
             
             if len(all_combinations) > max_configs_per_type:
-                step = max(1, len(all_combinations) // max_configs_per_type)
-                selected_combinations = all_combinations[::step][:max_configs_per_type]
+                selected_indices = np.random.choice(
+                    len(all_combinations), 
+                    size=max_configs_per_type, 
+                    replace=False
+                )
+                selected_combinations = [all_combinations[i] for i in selected_indices]
             else:
                 selected_combinations = all_combinations
             
             for system_type in system_types:
                 for combination in tqdm(selected_combinations, 
-                                    desc=f"Params for {phenomenon_type} (system_type={system_type})",
-                                    leave=False):
+                                      desc=f"{phenomenon_type} ({system_type})",
+                                      leave=False):
                     params = {k: v for k, v in zip(param_keys, combination)}
                     
                     for _ in range(n_samples_per_config):
-                        sample, metadata = self._sample_phenomenon(
+                        sample, metadata = self.generate_sample(
                             phenomenon_type, system_type=system_type, **params
                         )
                         
@@ -655,104 +483,391 @@ class RealWaveSpaceMapper:
         print(f"Generated {len(self.samples)} samples across {len(phenomena_types)} phenomenon types")
         
         features = []
-        for sample in tqdm(self.samples, desc="Calculating physical proxies"):
-            _, feature_vector = self.characterize_solution(sample)
+        for sample in tqdm(self.samples, desc="Calculating physical properties"):
+            _, feature_vector = self.calculate_physical_properties(sample)
             features.append(feature_vector)
             
         features_array = np.array(features)
-        import pdb; pdb.set_trace() 
+        
+        features_array = (features_array - np.mean(features_array, axis=0)) / (np.std(features_array, axis=0) + 1e-10)
+        
         self.distance_matrix = squareform(pdist(features_array, metric='euclidean'))
         
         print("Computing embeddings...")
         
+        n_neighbors = min(n_neighbors, len(self.samples) - 1)
+        
         self.embeddings['tsne'] = TSNE(
             n_components=2, 
-            perplexity=min(n_neighbors, len(self.samples) - 1),
-            max_iter=2000,
+            perplexity=n_neighbors,
+            n_iter=2000,
             random_state=42
-        ).fit_transform(self.distance_matrix)
+        ).fit_transform(features_array)
         
         self.embeddings['umap'] = umap.UMAP(
             n_components=2,
             min_dist=0.1,
-            n_neighbors=min(n_neighbors, len(self.samples) - 1),
+            n_neighbors=n_neighbors,
             random_state=42
-        ).fit_transform(self.distance_matrix)
+        ).fit_transform(features_array)
         
         return self.samples, self.metadata, self.distance_matrix, self.embeddings
+    
+    def visualize_solution_space(self, embedding_type='tsne', color_by='phenomenon', 
+                               title_prefix="", output_prefix=None):
+        if embedding_type not in self.embeddings:
+            raise ValueError(f"Embedding {embedding_type} not found")
+            
+        if output_prefix is None:
+            output_prefix = f"wave_map_{len(self.samples)}"
+        
+        embedding = self.embeddings[embedding_type]
+        
+        phenomenon_types = sorted(set(m["phenomenon_type"] for m in self.metadata))
+        n_phenomena = len(phenomenon_types)
+        
+        phenomenon_colors = plt.cm.tab20(np.linspace(0, 1, n_phenomena))
+        phenomenon_cmap = ListedColormap(phenomenon_colors)
+        
+        system_types = sorted(set(m["system_type"] for m in self.metadata if m["system_type"] is not None))
+        n_systems = len(system_types)
+        system_colors = plt.cm.viridis(np.linspace(0, 1, n_systems))
+        system_cmap = ListedColormap(system_colors)
+        
+        fig, ax = plt.subplots(figsize=(14, 10))
+        
+        if color_by == 'phenomenon':
+            scatter = ax.scatter(
+                embedding[:, 0], 
+                embedding[:, 1],
+                c=[phenomenon_types.index(m["phenomenon_type"]) for m in self.metadata],
+                cmap=phenomenon_cmap,
+                s=30,
+                alpha=0.7
+            )
+            
+            legend_handles = [
+                plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=phenomenon_colors[i], 
+                          markersize=10, label=p) for i, p in enumerate(phenomenon_types)
+            ]
+            
+            legend_title = 'Phenomenon Type'
+            
+        elif color_by == 'system':
+            system_indices = []
+            for m in self.metadata:
+                if m["system_type"] is not None:
+                    system_indices.append(system_types.index(m["system_type"]))
+                else:
+                    system_indices.append(-1)
+            
+            scatter = ax.scatter(
+                embedding[:, 0], 
+                embedding[:, 1],
+                c=[idx if idx >= 0 else 0 for idx in system_indices],
+                cmap=system_cmap,
+                s=30,
+                alpha=0.7
+            )
+            
+            legend_handles = [
+                plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=system_colors[i], 
+                          markersize=10, label=s) for i, s in enumerate(system_types)
+            ]
+            
+            legend_title = 'System Type'
+        
+        embedding_name = embedding_type.upper()
+        ax.set_title(f"{title_prefix}{embedding_name} Visualization of Wave Solutions", fontsize=16)
+        ax.axis('equal')
+        ax.grid(True, alpha=0.3)
+        
+        ax.legend(
+            handles=legend_handles,
+            loc='upper right',
+            title=legend_title,
+            fontsize=10
+        )
+        
+        plt.tight_layout()
+        plt.savefig(f"{self.output_dir}/{output_prefix}_{embedding_type}_{color_by}.png", dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return fig, ax
+    
+    def create_sample_gallery(self, output_prefix=None, samples_per_type=2):
+        if output_prefix is None:
+            output_prefix = f"wave_gallery_{len(self.samples)}"
+            
+        phenomenon_types = sorted(set(m["phenomenon_type"] for m in self.metadata))
+        n_rows = len(phenomenon_types)
+        n_cols = samples_per_type * 3
+ 
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 2, n_rows * 2))
+        if n_rows == 1: axes = np.array([axes])
+        
+        cmaps = ['viridis', 'RdBu_r', 'RdBu_r']
+        
+        for row, phenomenon in enumerate(phenomenon_types):
+            indices = [i for i, m in enumerate(self.metadata) if m["phenomenon_type"] == phenomenon]
+            
+            if not indices:
+                continue
+                
+            selected_indices = np.random.choice(indices, size=min(samples_per_type, len(indices)), replace=False)
+            
+            for i, idx in enumerate(selected_indices):
+                u, v = self.samples[idx]
+                
+                col_offset = i * 3
+                
+                axes[row, col_offset].imshow(u, cmap=cmaps[0])
+                axes[row, col_offset].set_title("u field")
+                
+                axes[row, col_offset + 1].imshow(v, cmap=cmaps[1])
+                axes[row, col_offset + 1].set_title("v field")
+                
+                overlay = np.zeros((u.shape[0], u.shape[1], 4))
+                overlay[..., 0] = np.clip((u + 1) / 2, 0, 1)
+                overlay[..., 2] = np.clip((v + 1) / 2, 0, 1)
+                overlay[..., 3] = 0.7
+                
+                axes[row, col_offset + 2].imshow(overlay)
+                axes[row, col_offset + 2].set_title("overlay")
+                
+            for j in range(len(selected_indices) * 3, n_cols):
+                axes[row, j].axis('off')
+            
+            axes[row, 0].set_ylabel(phenomenon, fontsize=12, rotation=90, va='center', ha='right')
+            
+        for row in range(n_rows):
+            for col in range(n_cols):
+                axes[row, col].axis('off')
+        
+        plt.tight_layout()
+        plt.savefig(f"{self.output_dir}/{output_prefix}_gallery.png", dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return fig, axes
+    
+    def create_system_comparison(self, phenomenon_type, output_prefix=None):
+        if output_prefix is None:
+            output_prefix = f"wave_system_comparison_{phenomenon_type}"
+            
+        system_types = sorted(set(m["system_type"] for m in self.metadata 
+                              if m["phenomenon_type"] == phenomenon_type and m["system_type"] is not None))
+            
+        if len(system_types) < 2:
+            print(f"Not enough system types for {phenomenon_type}")
+            return None, None
+            
+        n_systems = len(system_types)
+        n_cols = 3
+        
+        fig, axes = plt.subplots(n_systems, n_cols, figsize=(n_cols * 3, n_systems * 3))
+        
+        if n_systems == 1:
+            axes = np.array([axes])
+            
+        cmaps = ['viridis', 'RdBu_r', 'RdBu_r']
+        
+        for i, system_type in enumerate(system_types):
+            indices = [j for j, m in enumerate(self.metadata) 
+                      if m["phenomenon_type"] == phenomenon_type and m["system_type"] == system_type]
+            
+            if not indices:
+                continue
+                
+            idx = indices[0]
+            u, v = self.samples[idx]
+            
+            axes[i, 0].imshow(u, cmap=cmaps[0])
+            axes[i, 0].set_title(f"{system_type} - u field")
+            
+            axes[i, 1].imshow(v, cmap=cmaps[1])
+            axes[i, 1].set_title(f"{system_type} - v field")
+            
+            overlay = np.zeros((u.shape[0], u.shape[1], 4))
+            overlay[..., 0] = np.clip((u + 1) / 2, 0, 1)
+            overlay[..., 2] = np.clip((v + 1) / 2, 0, 1)
+            overlay[..., 3] = 0.7
+            
+            axes[i, 2].imshow(overlay)
+            axes[i, 2].set_title(f"{system_type} - overlay")
+            
+        for i in range(n_systems):
+            for j in range(n_cols):
+                axes[i, j].axis('off')
+                
+        plt.tight_layout()
+        plt.savefig(f"{self.output_dir}/{output_prefix}.png", dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return fig, axes
+    
+    def analyze_physical_properties(self, output_prefix=None):
+        if not self.samples:
+            raise ValueError("No samples available")
+            
+        if output_prefix is None:
+            output_prefix = f"wave_physics_{len(self.samples)}"
+            
+        physical_properties = []
+        
+        for sample in tqdm(self.samples, desc="Analyzing physical properties"):
+            props, _ = self.calculate_physical_properties(sample)
+            physical_properties.append(props)
+            
+        phenomenon_types = sorted(set(m["phenomenon_type"] for m in self.metadata))
+        
+        features_to_plot = [
+            ('total_energy', 'Energy'),
+            ('topological_charge', 'Topological Charge'),
+            ('u_radius_of_gyration', 'Spatial Extent'),
+            ('u_spectral_radius', 'Spectral Width'),
+            ('uv_correlation', 'u-v Correlation'),
+            ('u_gradient_energy', 'Gradient Energy')
+        ]
+        
+        n_plots = len(features_to_plot)
+        fig, axes = plt.subplots(1, n_plots, figsize=(n_plots * 4, 5))
+        
+        for i, (feature_name, feature_label) in enumerate(features_to_plot):
+            boxplot_data = []
+            boxplot_labels = []
+            
+            for phenomenon in phenomenon_types:
+                phenomenon_indices = [j for j, m in enumerate(self.metadata) if m["phenomenon_type"] == phenomenon]
+                
+                if phenomenon_indices:
+                    feature_values = [physical_properties[j][feature_name] for j in phenomenon_indices]
+                    boxplot_data.append(feature_values)
+                    boxplot_labels.append(phenomenon)
+            
+            axes[i].boxplot(boxplot_data, vert=True, patch_artist=True)
+            axes[i].set_xticklabels(boxplot_labels, rotation=90)
+            axes[i].set_title(feature_label)
+            
+        plt.tight_layout()
+        plt.savefig(f"{self.output_dir}/{output_prefix}_analysis.png", dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return fig, axes
+    
+    def run_comprehensive_analysis(self, phenomena_types=None, n_samples_per_config=1, 
+                                 max_configs_per_type=10, map_direct=True, map_physical=True,
+                                 samples_per_type=2):
+        run_id = str(uuid.uuid4())[:4]
+        output_prefix = f"wave_analysis_{run_id}"
+        
+        if map_direct:
+            print(f"\n{'='*80}\nMapping direct field values...\n{'='*80}\n")
+            self.map_solution_space(
+                phenomena_types=phenomena_types,
+                n_samples_per_config=n_samples_per_config,
+                max_configs_per_type=max_configs_per_type
+            )
+            
+            print("Creating visualizations for direct mapping...")
+            self.visualize_solution_space(embedding_type='tsne', color_by='phenomenon', 
+                                        output_prefix=f"{output_prefix}_direct")
+            self.visualize_solution_space(embedding_type='tsne', color_by='system', 
+                                        output_prefix=f"{output_prefix}_direct")
+            self.visualize_solution_space(embedding_type='umap', color_by='phenomenon', 
+                                        output_prefix=f"{output_prefix}_direct")
+            self.visualize_solution_space(embedding_type='umap', color_by='system', 
+                                        output_prefix=f"{output_prefix}_direct")
+            
+            self.create_sample_gallery(output_prefix=f"{output_prefix}_direct", 
+                                     samples_per_type=samples_per_type)
+            
+        if map_physical:
+            print(f"\n{'='*80}\nMapping physical properties...\n{'='*80}\n")
+            self.map_physical_properties(
+                phenomena_types=phenomena_types,
+                n_samples_per_config=n_samples_per_config,
+                max_configs_per_type=max_configs_per_type
+            )
+            
+            print("Creating visualizations for physical property mapping...")
+            self.visualize_solution_space(embedding_type='tsne', color_by='phenomenon', 
+                                        title_prefix="Physical Properties - ", 
+                                        output_prefix=f"{output_prefix}_physical")
+            self.visualize_solution_space(embedding_type='tsne', color_by='system', 
+                                        title_prefix="Physical Properties - ", 
+                                        output_prefix=f"{output_prefix}_physical")
+            self.visualize_solution_space(embedding_type='umap', color_by='phenomenon', 
+                                        title_prefix="Physical Properties - ", 
+                                        output_prefix=f"{output_prefix}_physical")
+            self.visualize_solution_space(embedding_type='umap', color_by='system', 
+                                        title_prefix="Physical Properties - ", 
+                                        output_prefix=f"{output_prefix}_physical")
+            
+            self.analyze_physical_properties(output_prefix=f"{output_prefix}_physical")
+            
+        phenomena_to_compare = set(m["phenomenon_type"] for m in self.metadata)
+        for phenomenon_type in phenomena_to_compare:
+            self.create_system_comparison(phenomenon_type, 
+                                       output_prefix=f"{output_prefix}_compare_{phenomenon_type}")
+            
+        return output_prefix
+        
+def run_wave_mapping(
+    sampler,
+    output_dir=None,
+    phenomena_types=None,
+    n_samples_per_config=1,
+    max_configs_per_type=10,
+    map_direct=True,
+    map_physical=True,
+    samples_per_type=2,
+    seed=42
+):
+    np.random.seed(seed)
+    
+    if output_dir is None:
+        run_id = str(uuid.uuid4())[:4]
+        output_dir = f"wave_solution_mapping_{run_id}"
+        
+    if phenomena_types is None:
+        phenomena_types = [
+            "kink_solution",
+            "kink_field", "breather", "multi_breather_field",
+            "ring_soliton", "spiral_wave_field", "skyrmion_solution", 
+            "skyrmion_lattice", "skyrmion_like_field",
+            "multi_ring_state", "q_ball_solution",
+            "multi_q_ball", "colliding_rings",
+        ]
+        
+    mapper = WaveSolutionMapper(sampler, output_dir=output_dir)
+    
+    output_prefix = mapper.run_comprehensive_analysis(
+        phenomena_types=phenomena_types,
+        n_samples_per_config=n_samples_per_config,
+        max_configs_per_type=max_configs_per_type,
+        map_direct=map_direct,
+        map_physical=map_physical,
+        samples_per_type=samples_per_type
+    )
+     
+    return mapper
 
 
-def main():
+
+if __name__ == '__main__':
+    from real_sampler import RealWaveSampler
     nx = ny = 128
     L = 10.0
 
-    p_waves = [["ring"]]
-    p_names = ["ring_soliton"]
-    for i, p_list in enumerate(p_waves):
-        curr_id = str(uuid.uuid4())[:4]
-        output_dir = f"real_wave_mapping_{p_names[i]}_{curr_id}"
-        
-        sampler = RealWaveEquationSampler(nx, ny, L)
-        mapper = RealWaveSpaceMapper(sampler, output_dir=output_dir)
-        
-        samples, metadata, distance_matrix, embeddings = mapper.map_solution_proxies(
-            phenomena_types=p_list,
-            n_samples_per_config=1,
-            max_configs_per_type=100
-        )
-        mapper.visualize_solution_space(output_prefix=f"proxies", extra_title="Physical Proxies")
-        
-        samples, metadata, distance_matrix, embeddings = mapper.map_solution_space(
-            phenomena_types=p_list,
-            n_samples_per_config=5,
-            max_configs_per_type=4
-        )
-        mapper.visualize_solution_space()
-        
-        print(f"Mapped {len(samples)} samples across {len(p_list)} phenomenon types")
-        print(f"Results saved to {output_dir}")
+    seed = np.random.randint(1 << 10)
 
-
-    
-    #phenomena_waves = [
-    #    "ring_soliton", 
-    #    "skyrmion", "spiral_wave", "rogue_wave", "fractal_kink",
-    #    "q_ball", "vibrational_kink", "radiation_soliton"
-    #]
-    #
-    #phenomena_complex = [
-    #    "multi_oscillon", "multi_ring", "skyrmion_lattice",
-    #    "multi_spiral", "multi_rogue", "domain_wall_network", 
-    #    "soliton_gas", "multi_q_ball", "combined"
-    #]
-    #
-    #global_phenomena = phenomena_waves + phenomena_complex
-    #
-    #p_names = ["waves", "complex", "global"]
-    #for i, p_list in enumerate([phenomena_waves, phenomena_complex, global_phenomena]):
-    #    curr_id = str(uuid.uuid4())[:4]
-    #    output_dir = f"real_wave_mapping_{p_names[i]}_{curr_id}"
-    #    
-    #    sampler = RealWaveEquationSampler(nx, ny, L)
-    #    mapper = RealWaveSpaceMapper(sampler, output_dir=output_dir)
-    #    
-    #    samples, metadata, distance_matrix, embeddings = mapper.map_solution_proxies(
-    #        phenomena_types=p_list,
-    #        n_samples_per_config=5,
-    #        max_configs_per_type=4
-    #    )
-    #    mapper.visualize_solution_space(output_prefix=f"proxies", extra_title="Physical Proxies")
-    #    
-    #    samples, metadata, distance_matrix, embeddings = mapper.map_solution_space(
-    #        phenomena_types=p_list,
-    #        n_samples_per_config=5,
-    #        max_configs_per_type=4
-    #    )
-    #    mapper.visualize_solution_space()
-    #    
-    #    print(f"Mapped {len(samples)} samples across {len(p_list)} phenomenon types")
-    #    print(f"Results saved to {output_dir}")
-
-
-if __name__ == "__main__":
-    main()
+    sampler = RealWaveSampler(nx=nx, ny=ny, L=L)
+    run_wave_mapping(
+        sampler=sampler,
+        n_samples_per_config=1,
+        max_configs_per_type=10,
+        map_direct=True,
+        map_physical=True,
+        samples_per_type=1,
+        seed=seed
+    )
