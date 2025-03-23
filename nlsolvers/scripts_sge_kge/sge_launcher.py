@@ -26,6 +26,9 @@ from real_sampler import RealWaveSampler
 from visualization import animate_simulation
 from valid_spaces import get_parameter_spaces
 
+#from classify_trajectory import SpectralSolitonClassifier, batch_process_solutions 
+
+from simplified_classifier import SpectralSolitonClassifier, batch_process_solutions
 
 class SGELauncher:
     def __init__(self, args):
@@ -327,6 +330,15 @@ class SGELauncher:
                     os.unlink(file)
 
     def run(self):
+        dt = self.args.T / self.args.nt
+        dx = 2 * self.args.Lx / (self.args.nx - 1)
+        dy = 2 * self.args.Ly / (self.args.ny - 1)
+        classifier = SpectralSolitonClassifier(dx, dy, dt, self.args.Lx, self.args.Ly,
+                self.args.T, self.args.dr_x, self.args.dr_y, self.args.snapshots
+                )
+
+        sols = {i: None for i in range(self.args.num_runs)}
+         
         for i in range(self.args.num_runs):
             try:
                 pre_start = time.time()
@@ -335,11 +347,13 @@ class SGELauncher:
                 pre_end = time.time()
                 traj_data, walltime = self.run_simulation(i, u0, v0, m)
                 post_start = time.time()
+                 
                 # TODO decide whether to visualize before or after downsampling
                 if self.args.visualize:
                     self.create_visualization(
                         i, traj_data, m, phenomenon_params, walltime)
                 traj_data = self.downsample_trajectory(traj_data)
+                sols[i] = traj_data
                 self.save_to_hdf5(
                     i, u0, v0, m, traj_data,
                     phenomenon_params, walltime)
@@ -356,10 +370,13 @@ class SGELauncher:
 
             except Exception as e:
                 print(f"Error in run {i+1}: {e}")
-                #import traceback
-                #import pdb; pdb.set_trace()
+                import traceback as t
+                import pdb
+                t.print_exc()
+                pdb.set_trace()
                 continue
 
+        batch_process_solutions(sols, classifier, self.analysis_dir)
         if self.args.delete_intermediates:
             params_file = self.output_dir / f"params_{self.run_id}.txt"
             if params_file.exists():
