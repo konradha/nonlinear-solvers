@@ -61,27 +61,27 @@ def get_parameter_spaces(L):
         "phase": np.linspace(0, 2*np.pi, 8).tolist(),
         "orientation": np.linspace(0, 2*np.pi, 8).tolist(),
         "breather_type": ["standard", "radial"],
-        "time_param": np.linspace(0, 2.0, 5).tolist(),
+        "time_param": [0.0], #np.linspace(0, 2.0, 5).tolist(),
         "velocity_type": ["fitting", "zero", "grf"]
     }
     
     parameter_spaces["multi_breather_field"] = {
         "system_type": system_types,
-        "num_breathers": list(range(2, 8)),
-        "position_type": ["random", "circle", "line"],
+        "num_breathers": list(range(1, 4)),
+        "position_type": ["line"],# ["random", "circle", "line"],
         "amplitude_range": [
             (min_a, max_a) for min_a in [0.1, 0.2, 0.3, 0.4] 
             for max_a in [0.6, 0.7, 0.8, 0.9]
         ],
         "width_range": [
             (min_w, max_w) for min_w in [0.3, 0.5, 0.7] 
-            for max_w in [1.5, 2.0, 3.0]
+            for max_w in [1., 1.5]
         ],
         "frequency_range": [
-            (min_f, max_f) for min_f in [0.5, 0.6, 0.7] 
+            (min_f, max_f) for min_f in [0.3, 0.6, 0.7] 
             for max_f in [0.8, 0.9, 0.95]
         ],
-        "time_param": np.linspace(0, 2.0, 5).tolist(),
+        "time_param": [0.0],# np.linspace(0, 2.0, 5).tolist(),
         "velocity_type": ["fitting", "zero", "grf"]
     }
     

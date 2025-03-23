@@ -692,30 +692,30 @@ class RealWaveSampler:
 
         return phi, 0.05 * self.anisotropic_grf(length_scale=self.L)
 
-    def q_ball_solution(self, system_type: str = 'phi4', amplitude: float = 1.0,
+    def q_ball_solution(self, system_type: str = 'sine-gordon', amplitude: float = 1.0,
                        radius: float = 1.0, position: Tuple[float, float] = (0.0, 0.0),
                        phase: float = 0.0, frequency: float = 0.8, charge: int = 1,
                        time_param: float = 0.0) -> Tuple[np.ndarray, np.ndarray]:
         x0, y0 = position
-        r_local = np.sqrt((self.X - x0)**2 + (self.Y - y0)**2)
-        theta_local = np.arctan2(self.Y - y0, self.X - x0)
-
-        profile = amplitude * np.exp(-r_local**2 / (2 * radius**2))
-
-        u = profile * np.cos(charge * theta_local + frequency * time_param + phase)
-        v = -profile * frequency * np.sin(charge * theta_local + frequency * time_param + phase)
-
+        r = np.sqrt((self.X - x0)**2 + (self.Y - y0)**2) 
+        omega = frequency * np.sign(charge) # incorporate m in this term?
+        profile = amplitude / np.cosh(r/(radius/np.sqrt(2)))
+        time_phase = omega * time_param + phase
+        u = profile * np.cos(time_phase)
+        v = -profile * omega * np.sin(time_phase)
         return u, v
 
-    def multi_q_ball(self, system_type: str = 'phi4', n_qballs: int = 3,
-            amplitude_range: Tuple = (-.5, .5), radius_range: Tuple = (.1, 1.), frequency_range: Tuple = (.1, 1.)):
+    def multi_q_ball(self, system_type: str = 'sine-gordon', n_qballs: int = 3,
+                     amplitude_range: Tuple = (0.2, 1.0), radius_range: Tuple = (0.5, 2.0), 
+                     frequency_range: Tuple = (0.4, 0.9), position_variance: float = 0.3,
+                     time_param: float = 0.0):
         u = np.zeros_like(self.X)
         v = np.zeros_like(self.X)
 
-        for i in range(n_qballs):
-            amplitude = amplitude_range[0] + (amplitude_range[1] - amplitude_range[0]) * np.random.rand()
-            radius = radius_range[0] + (radius_range[1] - radius_range[0]) * np.random.rand()
-            frequency = frequency_range[0] + (frequency_range[1] - frequency_range[0]) * np.random.rand()
+        for _ in range(n_qballs):
+            amplitude = np.random.uniform(*amplitude_range)
+            radius = np.random.uniform(*radius_range)
+            frequency = np.random.uniform(*frequency_range)
             phase = 2 * np.pi * np.random.rand()
             charge = 1 if np.random.rand() > 0.5 else -1
 
@@ -733,13 +733,11 @@ class RealWaveSampler:
                 time_param=time_param
             )
 
-            if i == 0:
-                u = u_q
-                v = v_q
-            else:
-                u = u + interaction_strength * u_q
-                v = v + interaction_strength * v_q
+            u += u_q
+            v += v_q
+
         return u, v
+
                 
 
     def breather_solution(self, system_type: str = 'sine_gordon', amplitude: float = 0.5,
