@@ -26,9 +26,7 @@ from real_sampler import RealWaveSampler
 from visualization import animate_simulation
 from valid_spaces import get_parameter_spaces
 
-#from classify_trajectory import SpectralSolitonClassifier, batch_process_solutions 
-
-from simplified_classifier import SpectralSolitonClassifier, batch_process_solutions
+from classify_trajectory import batch_process_solutions 
 
 class SGELauncher:
     def __init__(self, args):
@@ -84,7 +82,7 @@ class SGELauncher:
     def generate_initial_condition(self, run_idx, phenomenon_params=None):
         if phenomenon_params is None:
             phenomenon_params = self.sample_phenomenon_params()
-        print("parameters:", phenomenon_params)
+        print(f"run {run_idx + 1} parameters:", phenomenon_params)
         u0, v0 = self.sampler.generate_initial_condition(
             phenomenon_type=self.args.phenomenon, **phenomenon_params)
 
@@ -285,6 +283,7 @@ class SGELauncher:
         )
 
         animation_output = self.traj_dir / f"{self.run_id}_{run_idx:04d}.mp4"
+        print(animation_output)
         animate_simulation(
             self.X,
             self.Y,
@@ -333,12 +332,8 @@ class SGELauncher:
         dt = self.args.T / self.args.nt
         dx = 2 * self.args.Lx / (self.args.nx - 1)
         dy = 2 * self.args.Ly / (self.args.ny - 1)
-        classifier = SpectralSolitonClassifier(dx, dy, dt, self.args.Lx, self.args.Ly,
-                self.args.T, self.args.dr_x, self.args.dr_y, self.args.snapshots
-                )
-
-        sols = {i: None for i in range(self.args.num_runs)}
-         
+       
+        sols = dict()   
         for i in range(self.args.num_runs):
             try:
                 pre_start = time.time()
@@ -353,7 +348,7 @@ class SGELauncher:
                     self.create_visualization(
                         i, traj_data, m, phenomenon_params, walltime)
                 traj_data = self.downsample_trajectory(traj_data)
-                sols[i] = traj_data
+                sols[f"{self.run_id}_{i}"] = traj_data # save downsampled u trajectory only to perform analysis
                 self.save_to_hdf5(
                     i, u0, v0, m, traj_data,
                     phenomenon_params, walltime)
@@ -362,21 +357,30 @@ class SGELauncher:
                 self.cleanup(i)
                 post_end = time.time()
 
+                #print(
+                #    f"Run {i+1}/{self.args.num_runs} ({self.args.phenomenon}, {self.args.m_type})")
+                #print(f"Walltime: {walltime:.2f} seconds")
+                #print(f"Pre-processing:  {(pre_end - pre_start):.2f}")
+                #print(f"Post-processing: {(post_end - post_start):.2f}")
+
+                total_t =  walltime + abs(pre_end - pre_start) + abs(post_end - post_start)
+                part_pre = abs(pre_end - pre_start) / total_t
+                part_run = walltime / total_t
+                part_pst = abs(post_end - post_start) / total_t  
                 print(
-                    f"Run {i+1}/{self.args.num_runs} ({self.args.phenomenon}, {self.args.m_type})")
-                print(f"Walltime: {walltime:.2f} seconds")
-                print(f"Pre-processing:  {(pre_end - pre_start):.2f}")
-                print(f"Post-processing: {(post_end - post_start):.2f}")
+            f"walltime: {total_t:.2f}s, pre: {part_pre * 100:.1f}%, run: {part_run * 100:.1f}%, post: {part_pst*100:.1f}%")
 
             except Exception as e:
                 print(f"Error in run {i+1}: {e}")
-                import traceback as t
-                import pdb
-                t.print_exc()
-                pdb.set_trace()
+                # import traceback as t
+                # import pdb
+                # t.print_exc()
+                # pdb.set_trace()
                 continue
 
-        batch_process_solutions(sols, classifier, self.analysis_dir)
+        batch_process_solutions(sols, self.args.dr_x, self.args.dr_y, self.args.Lx, self.args.Lx,
+                self.args.T / self.args.snapshots, self.args.T, save_dir=self.analysis_dir)
+
         if self.args.delete_intermediates:
             params_file = self.output_dir / f"params_{self.run_id}.txt"
             if params_file.exists():

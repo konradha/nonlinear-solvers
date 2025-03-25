@@ -1,5 +1,6 @@
 import numpy as np
 
+# TODO look at valid time frames to investigate
 def get_parameter_spaces(L):
     system_types = [
         "sine_gordon", 
@@ -38,6 +39,8 @@ def get_parameter_spaces(L):
         "randomize_positions": [True, False]
     }
 
+    # using T=40 and appropriate nt (ie. nt=4000) yields a periodicity in time
+    # -> breather-like kink!
     parameter_spaces["kink_array_field"] = {
             "system_type": system_types,
             "num_kinks_x": [1, 3, 5],
@@ -138,6 +141,22 @@ def get_parameter_spaces(L):
         ],
         "phase": np.linspace(0, 2*np.pi, 8).tolist(),
         "k_factor": np.linspace(0.5, 4.0, 8).tolist()
+    }
+
+
+    parameter_spaces["multi_spiral_state"] = {
+            "n_spirals": np.linspace(1, 10, 5).astype(int),
+            "amplitude_range": [
+                (min_a, max_a) for min_a in [0.1, 0.2, 0.3, 0.4] 
+                for max_a in [0.6, 0.7, 0.8, 0.9]
+                ],
+            "num_arms_range": [(1, 3), (3, 12), (1, 8)],
+            "decay_rate_range": [
+                (min_d, max_d) for min_d in [0.3, 0.6, 0.7] 
+                for max_d in [0.8, 0.9, 0.95]
+            ],
+            "position_variance": [.3, 1., 1.5],
+            "interaction_strength": [1e-2, .3, .8],
     }
     
     parameter_spaces["skyrmion_solution"] = {
