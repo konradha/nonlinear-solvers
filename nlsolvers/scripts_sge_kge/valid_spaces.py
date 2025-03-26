@@ -67,6 +67,14 @@ def get_parameter_spaces(L):
         "time_param": [0.0], #np.linspace(0, 2.0, 5).tolist(),
         "velocity_type": ["fitting", "zero", "grf"]
     }
+
+
+    parameter_spaces["breather_field"] = {
+        "system_type": system_types,
+        "num_breathers": list(range(2, 9)),
+        "position_type": ["random", "circle", "line"],
+        "time_param": [0.0, .5, 10.]
+    }
     
     parameter_spaces["multi_breather_field"] = {
         "system_type": system_types,

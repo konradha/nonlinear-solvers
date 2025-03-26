@@ -27,6 +27,7 @@ from visualization import animate_simulation
 from valid_spaces import get_parameter_spaces
 
 from classify_trajectory import batch_process_solutions 
+from global_analysis_sge import analyze_all_runs 
 
 class SGELauncher:
     def __init__(self, args):
@@ -173,7 +174,7 @@ class SGELauncher:
         np.save(m_file, m)
 
         traj_file = self.traj_dir / f"traj_{self.run_id}_{run_idx:04d}.npy"
-        vel_file  =  self.traj_dir / f"vel_{self.run_id}_{run_idx:04d}.npy"
+        vel_file  = self.traj_dir / f"vel_{self.run_id}_{run_idx:04d}.npy"
 
         exe_path = Path(self.args.exe)
         if not exe_path.exists():
@@ -328,8 +329,8 @@ class SGELauncher:
             m_file    = self.focusing_dir / f"m_{self.run_id}_{run_idx:04d}.npy"
             traj_file = self.traj_dir / f"traj_{self.run_id}_{run_idx:04d}.npy"
             vel_file  =  self.traj_dir / f"vel_{self.run_id}_{run_idx:04d}.npy"
-
-            for file in [u0_file, v0_file, m_file, traj_file]:
+            
+            for file in [u0_file, v0_file, m_file, traj_file, vel_file]:
                 if file.exists():
                     os.unlink(file)
 
@@ -382,9 +383,14 @@ class SGELauncher:
                 # t.print_exc()
                 # pdb.set_trace()
                 continue
-
+        analysis_start = time.time()
         batch_process_solutions(sols, self.args.dr_x, self.args.dr_y, self.args.Lx, self.args.Lx,
                 self.args.T / self.args.snapshots, self.args.T, save_dir=self.analysis_dir)
+
+        analyze_all_runs(self.h5_dir, output_dir=self.analysis_dir, pattern=f"run_{self.run_id}_*.h5",
+                run_id=self.run_id)
+        analysis_end = time.time()
+        print(f"analysis took {(analysis_end - analysis_start):.2f}s")
 
         if self.args.delete_intermediates:
             params_file = self.output_dir / f"params_{self.run_id}.txt"
