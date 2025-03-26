@@ -21,8 +21,8 @@ def downsample_fft(u: np.ndarray, target_shape: tuple) -> np.ndarray:
     ft_shifted = torch.fft.fftshift(ft, dim=(-2, -1))
     start_x = (original_shape[0] - target_shape[0]) // 2
     start_y = (original_shape[1] - target_shape[1]) // 2
-    ft_cropped = ft_shifted[..., start_x:start_x+target_shape[0],
-                             start_y:start_y+target_shape[1]]
+    ft_cropped = ft_shifted[..., start_x:start_x + target_shape[0],
+                            start_y:start_y + target_shape[1]]
     ft_cropped = torch.fft.ifftshift(ft_cropped, dim=(-2, -1))
     downsampled = torch.fft.ifft2(ft_cropped, norm='ortho', dim=(-2, -1))
 
@@ -32,7 +32,9 @@ def downsample_fft(u: np.ndarray, target_shape: tuple) -> np.ndarray:
 
     return np.real(downsampled_np).astype(np.float64)
 
-def reconstruct_fft(downsampled: np.ndarray, original_shape: tuple) -> np.ndarray:
+
+def reconstruct_fft(downsampled: np.ndarray,
+                    original_shape: tuple) -> np.ndarray:
     assert len(downsampled.shape) == 3
     assert len(original_shape) == 2
 
@@ -52,8 +54,8 @@ def reconstruct_fft(downsampled: np.ndarray, original_shape: tuple) -> np.ndarra
     start_x = (original_shape[0] - current_shape[0]) // 2
     start_y = (original_shape[1] - current_shape[1]) // 2
     padded_ft[...,
-             start_x:start_x+current_shape[0],
-             start_y:start_y+current_shape[1]] = ft_shifted
+              start_x:start_x + current_shape[0],
+              start_y:start_y + current_shape[1]] = ft_shifted
 
     padded_ft = torch.fft.ifftshift(padded_ft, dim=(-2, -1))
     reconstructed = torch.fft.ifft2(padded_ft, norm='ortho', dim=(-2, -1))
@@ -62,17 +64,19 @@ def reconstruct_fft(downsampled: np.ndarray, original_shape: tuple) -> np.ndarra
         reconstructed_np = reconstructed_np.real
     return np.real(reconstructed_np).astype(np.float64)
 
+
 def downsample_interpolation(
-    u: np.ndarray, 
-    target_shape, 
-    Lx: float, 
+    u: np.ndarray,
+    target_shape,
+    Lx: float,
     Ly: float,
-    original_grid = None
+    original_grid=None
 ) -> np.ndarray:
-    
+
     assert len(u.shape) == 3, "Input data should be 3D (nt, nx, ny)"
-    assert len(target_shape) == 2, "Target shape should be 2D (target_nx, target_ny)"
-    
+    assert len(
+        target_shape) == 2, "Target shape should be 2D (target_nx, target_ny)"
+
     nt, nx, ny = u.shape
     target_nx, target_ny = target_shape
     if original_grid is None:
@@ -82,31 +86,33 @@ def downsample_interpolation(
         x, y = original_grid
 
     x_new = np.linspace(-Lx, Lx, target_nx)
-    y_new = np.linspace(-Ly, Ly, target_ny) 
-    downsampled = np.zeros((nt, target_nx, target_ny), dtype=u.dtype) 
+    y_new = np.linspace(-Ly, Ly, target_ny)
+    downsampled = np.zeros((nt, target_nx, target_ny), dtype=u.dtype)
     X_new, Y_new = np.meshgrid(x_new, y_new, indexing='ij')
-    for t in range(nt):    
+    for t in range(nt):
         interp_func = RegularGridInterpolator(
-            (x, y), 
-            u[t], 
-            method='linear', 
-            bounds_error=False, 
+            (x, y),
+            u[t],
+            method='linear',
+            bounds_error=False,
             fill_value=None
         )
-         
+
         points = np.vstack([X_new.ravel(), Y_new.ravel()]).T
-        downsampled[t] = interp_func(points).reshape(target_nx, target_ny) 
+        downsampled[t] = interp_func(points).reshape(target_nx, target_ny)
     return np.real(downsampled).astype(np.float64)
+
 
 def reconstruct_interpolation(
     downsampled: np.ndarray,
     original_shape,
     Lx: float,
     Ly: float,
-    downsampled_grid = None
+    downsampled_grid=None
 ) -> np.ndarray:
 
-    assert len(downsampled.shape) == 3, "Input data should be 3D (nt, target_nx, target_ny)"
+    assert len(
+        downsampled.shape) == 3, "Input data should be 3D (nt, target_nx, target_ny)"
     assert len(original_shape) == 2, "Original shape should be 2D (nx, ny)"
 
     nt, target_nx, target_ny = downsampled.shape
@@ -137,9 +143,11 @@ def reconstruct_interpolation(
         reconstructed[t] = interp_func(points).reshape(nx, ny)
     return np.real(reconstructed).astype(np.float64)
 
+
 def downsample_fft_3d(u: np.ndarray, target_shape: tuple) -> np.ndarray:
     assert len(u.shape) == 4, "Input data should be 4D (nt, nx, ny, nz)"
-    assert len(target_shape) == 3, "Target shape should be 3D (target_nx, target_ny, target_nz)"
+    assert len(
+        target_shape) == 3, "Target shape should be 3D (target_nx, target_ny, target_nz)"
 
     is_complex = np.iscomplexobj(u)
     original_shape = u.shape[-3:]
@@ -153,9 +161,9 @@ def downsample_fft_3d(u: np.ndarray, target_shape: tuple) -> np.ndarray:
     start_y = (original_shape[1] - target_shape[1]) // 2
     start_z = (original_shape[2] - target_shape[2]) // 2
     ft_cropped = ft_shifted[...,
-                           start_x:start_x+target_shape[0],
-                           start_y:start_y+target_shape[1],
-                           start_z:start_z+target_shape[2]]
+                            start_x:start_x + target_shape[0],
+                            start_y:start_y + target_shape[1],
+                            start_z:start_z + target_shape[2]]
     ft_cropped = torch.fft.ifftshift(ft_cropped, dim=(-3, -2, -1))
     downsampled = torch.fft.ifftn(ft_cropped, dim=(-3, -2, -1), norm='ortho')
 
@@ -166,8 +174,10 @@ def downsample_fft_3d(u: np.ndarray, target_shape: tuple) -> np.ndarray:
     return np.real(downsampled_np).astype(np.float64)
 
 
-def reconstruct_fft_3d(downsampled: np.ndarray, original_shape: tuple) -> np.ndarray:
-    assert len(downsampled.shape) == 4, "Input data should be 4D (nt, target_nx, target_ny, target_nz)"
+def reconstruct_fft_3d(downsampled: np.ndarray,
+                       original_shape: tuple) -> np.ndarray:
+    assert len(
+        downsampled.shape) == 4, "Input data should be 4D (nt, target_nx, target_ny, target_nz)"
     assert len(original_shape) == 3, "Original shape should be 3D (nx, ny, nz)"
 
     is_complex = np.iscomplexobj(downsampled)
@@ -179,7 +189,8 @@ def reconstruct_fft_3d(downsampled: np.ndarray, original_shape: tuple) -> np.nda
     ft = torch.fft.fftn(ds_tensor, dim=(-3, -2, -1), norm='ortho')
     ft_shifted = torch.fft.fftshift(ft, dim=(-3, -2, -1))
     padded_ft = torch.zeros(
-        (*ds_tensor.shape[:-3], original_shape[0], original_shape[1], original_shape[2]),
+        (*ds_tensor.shape[:-3], original_shape[0],
+         original_shape[1], original_shape[2]),
         dtype=dtype,
         device=device
     )
@@ -187,9 +198,9 @@ def reconstruct_fft_3d(downsampled: np.ndarray, original_shape: tuple) -> np.nda
     start_y = (original_shape[1] - current_shape[1]) // 2
     start_z = (original_shape[2] - current_shape[2]) // 2
     padded_ft[...,
-             start_x:start_x+current_shape[0],
-             start_y:start_y+current_shape[1],
-             start_z:start_z+current_shape[2]] = ft_shifted
+              start_x:start_x + current_shape[0],
+              start_y:start_y + current_shape[1],
+              start_z:start_z + current_shape[2]] = ft_shifted
 
     padded_ft = torch.fft.ifftshift(padded_ft, dim=(-3, -2, -1))
     reconstructed = torch.fft.ifftn(padded_ft, dim=(-3, -2, -1), norm='ortho')
@@ -207,10 +218,11 @@ def downsample_interpolation_3d(
     Lx: float,
     Ly: float,
     Lz: float,
-    original_grid = None
+    original_grid=None
 ) -> np.ndarray:
     assert len(u.shape) == 4, "Input data should be 4D (nt, nx, ny, nz)"
-    assert len(target_shape) == 3, "Target shape should be 3D (target_nx, target_ny, target_nz)"
+    assert len(
+        target_shape) == 3, "Target shape should be 3D (target_nx, target_ny, target_nz)"
 
     nt, nx, ny, nz = u.shape
     target_nx, target_ny, target_nz = target_shape
@@ -225,7 +237,8 @@ def downsample_interpolation_3d(
     x_new = np.linspace(-Lx, Lx, target_nx)
     y_new = np.linspace(-Ly, Ly, target_ny)
     z_new = np.linspace(-Lz, Lz, target_nz)
-    downsampled = np.zeros((nt, target_nx, target_ny, target_nz), dtype=u.dtype)
+    downsampled = np.zeros(
+        (nt, target_nx, target_ny, target_nz), dtype=u.dtype)
     X_new, Y_new, Z_new = np.meshgrid(x_new, y_new, z_new, indexing='ij')
     points_new = np.vstack([X_new.ravel(), Y_new.ravel(), Z_new.ravel()]).T
 
@@ -238,7 +251,8 @@ def downsample_interpolation_3d(
             fill_value=None
         )
 
-        downsampled[t] = interp_func(points_new).reshape(target_nx, target_ny, target_nz)
+        downsampled[t] = interp_func(points_new).reshape(
+            target_nx, target_ny, target_nz)
 
     return np.real(downsampled).astype(np.float64)
 
@@ -249,9 +263,10 @@ def reconstruct_interpolation_3d(
     Lx: float,
     Ly: float,
     Lz: float,
-    downsampled_grid = None
+    downsampled_grid=None
 ) -> np.ndarray:
-    assert len(downsampled.shape) == 4, "Input data should be 4D (nt, target_nx, target_ny, target_nz)"
+    assert len(
+        downsampled.shape) == 4, "Input data should be 4D (nt, target_nx, target_ny, target_nz)"
     assert len(original_shape) == 3, "Original shape should be 3D (nx, ny, nz)"
 
     nt, target_nx, target_ny, target_nz = downsampled.shape
@@ -301,7 +316,7 @@ def main_3d():
     nx, ny, nz = u.shape[1], u.shape[2], u.shape[3]
 
     ts = np.random.randint(0, nt)
-    slice_z = nz // 2 
+    slice_z = nz // 2
 
     is_complex = np.iscomplexobj(u)
 
@@ -316,40 +331,41 @@ def main_3d():
             downsampled, (nx, ny, nz), Lx, Ly, Lz)
 
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
-    
+
     if is_complex:
         im1 = ax1.imshow(np.real(u[ts, :, :, slice_z]))
     else:
         im1 = ax1.imshow(u[ts, :, :, slice_z])
     ax1.set_title("Original (z-slice)")
-    
+
     ds_slice_z = slice_z * target_nz // nz
     if is_complex:
         im2 = ax2.imshow(np.real(downsampled[ts, :, :, ds_slice_z]))
     else:
         im2 = ax2.imshow(downsampled[ts, :, :, ds_slice_z])
     ax2.set_title("Downsampled (z-slice)")
-    
+
     if is_complex:
-        diff = np.abs(np.real(u[ts, :, :, slice_z] - reconstructed[ts, :, :, slice_z]))
+        diff = np.abs(np.real(u[ts, :, :, slice_z] -
+                      reconstructed[ts, :, :, slice_z]))
     else:
         diff = np.abs(u[ts, :, :, slice_z] - reconstructed[ts, :, :, slice_z])
     im3 = ax3.imshow(diff, cmap="seismic")
     ax3.set_title("Reconstruction Error (z-slice)")
-    
+
     fig.colorbar(im1, ax=[ax1, ax2], label='magnitude / [1]')
     fig.colorbar(im3, ax=[ax3], label="Diff / [1]")
-   
+
     method = "FFT" if use_fft else "Interpolation"
     error_norm = np.linalg.norm(u[ts] - reconstructed[ts], ord='fro')
-    fig.suptitle(f"3D {'NLSE' if is_complex else 'SGE'} Downsampling ({method})\n" + 
-                f"Sample: {ts}/{nt}, Error norm: {error_norm:.4f}")
-    
+    fig.suptitle(f"3D {'NLSE' if is_complex else 'SGE'} Downsampling ({method})\n" +
+                 f"Sample: {ts}/{nt}, Error norm: {error_norm:.4f}")
+
     plt.tight_layout()
     plt.show()
 
 
-if __name__ == '__main__': 
+if __name__ == '__main__':
     main_3d()
     """
     fname_u = str(argv[1])
@@ -368,12 +384,12 @@ if __name__ == '__main__':
 
     is_complex = np.iscomplexobj(u)
     downsampled = downsample_fft(u, (target_nx, target_ny))
-    reconstructed = reconstruct_fft(downsampled, (nx, ny)) 
+    reconstructed = reconstruct_fft(downsampled, (nx, ny))
     #downsampled = downsample_interpolation(
-    #    u, (target_nx, target_ny), Lx, Ly) 
+    #    u, (target_nx, target_ny), Lx, Ly)
     #reconstructed = reconstruct_interpolation(
     #    downsampled, (u.shape[1], u.shape[2]), Lx, Ly)
-    
+
 
 
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(10, 5))
@@ -387,7 +403,7 @@ if __name__ == '__main__':
     im_r = ax3.imshow(diff, cmap="seismic")
     ax3.set_title("Reconstructed to original diff")
 
-    
+
 
     fig.colorbar(im, ax=[ax1, ax2], label='magnitude / [1]')
     fig.colorbar(im_r, ax=[ax3], label="Diff / [1]")
@@ -395,4 +411,3 @@ if __name__ == '__main__':
 
     plt.show()
     """
-

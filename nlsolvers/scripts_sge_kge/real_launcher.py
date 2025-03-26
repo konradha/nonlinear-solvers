@@ -26,10 +26,11 @@ from real_sampler import RealWaveSampler
 from visualization import animate_simulation
 from valid_spaces import get_parameter_spaces
 
-from classify_trajectory import batch_process_solutions 
-from global_analysis_sge import analyze_all_runs 
+from classify_trajectory import batch_process_solutions
+from global_analysis import analyze_all_runs
 
-class SGELauncher:
+
+class Launcher:
     def __init__(self, args):
         self.args = args
         self.run_id = str(uuid.uuid4())[:8]
@@ -38,6 +39,7 @@ class SGELauncher:
         # restriction to play nice with hand-rolled C++ integrators
         assert args.nx == args.ny and np.abs(args.Lx - args.Ly) < 1e-8
         self.sampler = RealWaveSampler(args.nx, args.ny, args.Lx)
+        self.system_type = args.system_type
 
     def setup_directories(self):
         self.output_dir = Path(self.args.output_dir)
@@ -95,7 +97,6 @@ class SGELauncher:
         return (u0, v0), phenomenon_params
 
     def sample_phenomenon_params(self):
-        # TODO: enable setting hard params via args
         parameter_spaces = get_parameter_spaces(self.args.Lx)
         if self.args.phenomenon in parameter_spaces:
             space = parameter_spaces[self.args.phenomenon]
@@ -108,7 +109,8 @@ class SGELauncher:
                     params[key] = values[idx]
                 else:
                     params[key] = np.random.choice(values)
-            params["system_type"] = "sine_gordon"
+
+            params["system_type"] = self.system_type
             params["velocity_type"] = self.args.velocity_type
             return params
         else:
@@ -174,7 +176,7 @@ class SGELauncher:
         np.save(m_file, m)
 
         traj_file = self.traj_dir / f"traj_{self.run_id}_{run_idx:04d}.npy"
-        vel_file  = self.traj_dir / f"vel_{self.run_id}_{run_idx:04d}.npy"
+        vel_file = self.traj_dir / f"vel_{self.run_id}_{run_idx:04d}.npy"
 
         exe_path = Path(self.args.exe)
         if not exe_path.exists():
@@ -210,7 +212,7 @@ class SGELauncher:
         walltime = end_time - start_time
 
         traj_data = np.load(traj_file)
-        vel_data  = np.load(vel_file)
+        vel_data = np.load(vel_file)
         return (traj_data, vel_data), walltime
 
     def downsample_trajectory(self, traj_data):
@@ -313,8 +315,21 @@ class SGELauncher:
         if len(params_str) > 100:
             params_str = params_str[:97] + "..."
 
+        if self.system_type == "sine_gordon":
+            str_start = "sine-Gordon: $u_{tt} = \\Delta u - m(x,y) sin(u)$\n"
+        elif self.system_type == "double_sine_gordon":
+            str_start = "double sine-Gordon: $u_{tt} = \\Delta u - m(x,y) (sin(u) + \\lambda sin(2u)$\n"
+        elif self.system_type == "hyperbolic_sine_gordon":
+            str_start = "hyperbolic sine-Gordon: $u_{tt} = \\Delta u - m(x,y) sinh(u)$\n"
+        elif self.system_type == "klein_gordon":
+            str_start = "Klein-Gordon: $u_{tt} = \\Delta u - m(x,y) u$\n"
+        elif self.system_type == "phi4":
+            str_start = "$\\phi-4$: $u_{tt} = \\Delta u - m(x,y) (u - u^3)$\n"
+        else:
+            raise Exception("Invalid system type")
+
         return (
-            "sine-Gordon: $u_{tt} = \\Delta u + m(x,y) sin(u)$\n"
+            str_start
             f"{self.args.phenomenon}, m: {m_string}\n"
             f"domain: [0, T={self.args.T}] x [-{self.args.Lx:.2f}, {self.args.Lx:.2f}] x [-{self.args.Ly:.2f}, {self.args.Ly:.2f}]\n"
             f"resolution n_t={self.args.nt}, n_x={self.args.nx}, n_y={self.args.ny}\n"
@@ -324,12 +339,12 @@ class SGELauncher:
 
     def cleanup(self, run_idx):
         if self.args.delete_intermediates:
-            u0_file   = self.ic_dir / f"u0_{self.run_id}_{run_idx:04d}.npy"
-            v0_file   = self.ic_dir / f"v0_{self.run_id}_{run_idx:04d}.npy"
-            m_file    = self.focusing_dir / f"m_{self.run_id}_{run_idx:04d}.npy"
+            u0_file = self.ic_dir / f"u0_{self.run_id}_{run_idx:04d}.npy"
+            v0_file = self.ic_dir / f"v0_{self.run_id}_{run_idx:04d}.npy"
+            m_file = self.focusing_dir / f"m_{self.run_id}_{run_idx:04d}.npy"
             traj_file = self.traj_dir / f"traj_{self.run_id}_{run_idx:04d}.npy"
-            vel_file  =  self.traj_dir / f"vel_{self.run_id}_{run_idx:04d}.npy"
-            
+            vel_file = self.traj_dir / f"vel_{self.run_id}_{run_idx:04d}.npy"
+
             for file in [u0_file, v0_file, m_file, traj_file, vel_file]:
                 if file.exists():
                     os.unlink(file)
@@ -338,8 +353,8 @@ class SGELauncher:
         dt = self.args.T / self.args.nt
         dx = 2 * self.args.Lx / (self.args.nx - 1)
         dy = 2 * self.args.Ly / (self.args.ny - 1)
-       
-        sols = dict()   
+
+        sols = dict()
         for i in range(self.args.num_runs):
             try:
                 pre_start = time.time()
@@ -348,33 +363,28 @@ class SGELauncher:
                 pre_end = time.time()
                 (traj_data, vel_data), walltime = self.run_simulation(i, u0, v0, m)
                 post_start = time.time()
-                 
-                # TODO decide whether to visualize before or after downsampling
+
+                # animate using high-res data
                 if self.args.visualize:
                     self.create_visualization(
                         i, traj_data, m, phenomenon_params, walltime)
                 traj_data = self.downsample_trajectory(traj_data)
-                vel_data  = self.downsample_trajectory(vel_data)
-                sols[f"{self.run_id}_{i}"] = (traj_data, vel_data) # save downsampled u trajectory only to perform analysis
+                vel_data = self.downsample_trajectory(vel_data)
+                sols[f"{self.run_id}_{i}"] = (traj_data, vel_data)
+                # save downsampled (u, v) trajectory only to perform analysis
                 self.save_to_hdf5(
                     i, u0, v0, m, traj_data, vel_data,
                     phenomenon_params, walltime)
-                
+
                 self.cleanup(i)
                 post_end = time.time()
-
-                #print(
-                #    f"Run {i+1}/{self.args.num_runs} ({self.args.phenomenon}, {self.args.m_type})")
-                #print(f"Walltime: {walltime:.2f} seconds")
-                #print(f"Pre-processing:  {(pre_end - pre_start):.2f}")
-                #print(f"Post-processing: {(post_end - post_start):.2f}")
-
-                total_t =  walltime + abs(pre_end - pre_start) + abs(post_end - post_start)
+                total_t = walltime + \
+                    abs(pre_end - pre_start) + abs(post_end - post_start)
                 part_pre = abs(pre_end - pre_start) / total_t
                 part_run = walltime / total_t
-                part_pst = abs(post_end - post_start) / total_t  
+                part_pst = abs(post_end - post_start) / total_t
                 print(
-            f"walltime: {total_t:.2f}s, pre: {part_pre * 100:.1f}%, run: {part_run * 100:.1f}%, post: {part_pst*100:.1f}%")
+                    f"walltime: {total_t:.2f}s, pre: {part_pre * 100:.1f}%, run: {part_run * 100:.1f}%, post: {part_pst*100:.1f}%")
 
             except Exception as e:
                 print(f"Error in run {i+1}: {e}")
@@ -385,10 +395,10 @@ class SGELauncher:
                 continue
         analysis_start = time.time()
         batch_process_solutions(sols, self.args.dr_x, self.args.dr_y, self.args.Lx, self.args.Lx,
-                self.args.T / self.args.snapshots, self.args.T, save_dir=self.analysis_dir)
+                                self.args.T / self.args.snapshots, self.args.T, save_dir=self.analysis_dir, system_type=self.system_type)
 
         analyze_all_runs(self.h5_dir, output_dir=self.analysis_dir, pattern=f"run_{self.run_id}_*.h5",
-                run_id=self.run_id)
+                         run_id=self.run_id, system_type=self.system_type)
         analysis_end = time.time()
         print(f"analysis took {(analysis_end - analysis_start):.2f}s")
 
@@ -400,7 +410,14 @@ class SGELauncher:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Advanced sine-Gordon solver launcher")
+        description="Real solver launcher")
+
+    parser.add_argument("--system-type", type=str, default="sine_gordon",
+                        choices=["sine_gordon",
+                                 "double_sine_gordon",
+                                 "hyperbolic_sine_gordon",
+                                 "phi4",
+                                 "klein_gordon"])
 
     parser.add_argument("--phenomenon", type=str, default="kink_field",
                         choices=["kink_solution", "kink_field", "kink_array_field",
@@ -505,7 +522,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    launcher = SGELauncher(args)
+    launcher = Launcher(args)
     launcher.run()
 
 
