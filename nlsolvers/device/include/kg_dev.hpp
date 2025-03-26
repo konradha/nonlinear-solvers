@@ -53,6 +53,7 @@ public:
     cudaMemcpy(d_m_, h_m, n * sizeof(double), cudaMemcpyHostToDevice);
 
     cudaMalloc(&d_u_trajectory_, n * params_.num_snapshots * sizeof(double));
+    cudaMalloc(&d_v_trajectory_, n * params_.num_snapshots * sizeof(double));
 
     spmv_ = new DeviceSpMV<double>(d_row_ptr, d_col_ind, d_values, n, nnz);
     matfunc_ = new MatrixFunctionApplicatorReal(d_row_ptr, d_col_ind, d_values,
@@ -76,15 +77,19 @@ public:
     cudaFree(d_buf3_);
     cudaFree(d_m_);
     cudaFree(d_u_trajectory_);
+    cudaFree(d_v_trajectory_);
   }
 
   void step() {
-    device::KGESolver::step(d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_, matfunc_,
+    device::KGESolver::step(d_v_, d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_, matfunc_,
                             d_m_, dt_, n_, grid_dim_, block_dim_);
   }
 
-  void transfer_snapshots(double *dst) {
-    cudaMemcpy(dst, d_u_trajectory_,
+  void transfer_snapshots(double *dst_u, double *dst_v) {
+    cudaMemcpy(dst_u, d_u_trajectory_,
+               params_.num_snapshots * n_ * sizeof(double),
+               cudaMemcpyDeviceToHost);
+    cudaMemcpy(dst_v, d_v_trajectory_,
                params_.num_snapshots * n_ * sizeof(double),
                cudaMemcpyDeviceToHost);
   }
@@ -94,6 +99,8 @@ public:
   void store_snapshot(const uint32_t snapshot_idx) {
     if (snapshot_idx < params_.num_snapshots) {
       cudaMemcpy(d_u_trajectory_ + snapshot_idx * n_, d_u_, n_ * sizeof(double),
+                 cudaMemcpyDeviceToDevice);
+      cudaMemcpy(d_v_trajectory_ + snapshot_idx * n_, d_v_, n_ * sizeof(double),
                  cudaMemcpyDeviceToDevice);
       current_snapshot_ = snapshot_idx + 1;
     }
@@ -110,6 +117,7 @@ private:
   double *d_buf2_;
   double *d_buf3_;
   double *d_u_trajectory_;
+  double *d_v_trajectory_;
   uint32_t current_snapshot_;
   uint32_t nx_;
   uint32_t ny_;
