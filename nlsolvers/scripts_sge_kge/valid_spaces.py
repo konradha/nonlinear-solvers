@@ -103,6 +103,11 @@ def get_parameter_spaces(L):
         "modulation_mode": list(range(0, 8)),
         "time_param": np.linspace(0, 1.5, 4).tolist()
     }
+
+    parameter_spaces["elliptical_soliton"] = {
+        "system_type": system_types,
+        "complexity": ["complex", "simple"]
+    }
     
     parameter_spaces["multi_ring_state"] = {
         "system_type": system_types,

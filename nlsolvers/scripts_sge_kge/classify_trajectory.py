@@ -53,32 +53,36 @@ class SolitonDashboard:
         
         ax1 = fig.add_subplot(subgs[0,0])
         norms = features['conservation']['norm']
-        norms_logdiff = [np.nan] + [np.abs(norms[i] - norms[0]) / np.max(norms) for i in range(1, self.nt)]
-        ax1.plot(tn, norms_logdiff, 'k-')
+        kinetic, gradient_energy, potential = features['energy']
+        energies = kinetic + gradient_energy + potential 
+        energies_logdiff = [np.nan] + [np.log(np.abs(energies[i] - energies[0])) for i in range(1, self.nt)]
+        ax1.plot(tn, norms, 'k-', label="$ u^2 / u_0^2 $") 
         ax1.set_ylabel("Norm")
-        ax1.legend(['$log |u^2 - u_{0}^2$'], loc='upper right')
+        ax1.legend()
         ax1.grid(True)
 
         ax2 = fig.add_subplot(subgs[0,1])
         ax2.semilogy(tn, features['terms']['laplacian'], 'b-', label='$\Delta u$')
         ax2.semilogy(tn, features['terms']['nonlinear'], 'r--', label='$sin u$')
         ax2.set_ylabel("Term Magnitudes")
-        ax2.legend(loc='upper left')
+        ax2.legend()
         ax2.grid(True) 
 
         ax3 = ax2.twinx()
         ax3.semilogy(tn, features['terms']['ratio'], 'g:', alpha=0.7)
-        ax3.set_ylabel("Ratio", rotation=270, labelpad=15)
+        #ax3.set_ylabel("Ratio", rotation=270, labelpad=15)
         ax3.legend(['$\\frac{\Delta u}{sin(u)}$'], loc='upper right')
         ax3.grid(True)
 
         ax4 = fig.add_subplot(subgs[0,2])
-        energies = features['energy']
-        # print([(np.abs(energies[i] - energies[0])) for i in range(1, self.nt)])
-        energies_logdiff = [np.nan] + [np.log(np.abs(energies[i] - energies[0])) for i in range(1, self.nt)]
-        ax4.plot(tn, energies_logdiff, 'm-')
-        ax4.set_ylabel("Drift")
-        ax4.legend(['$\log | E - E_0 |$'], loc='upper right')
+        kinetic, gradient_energy, potential = features['energy']
+        energies = list(features['energy'])
+        #e_names = ["kinetic", "gradient", "potential"] 
+        e_names = ["kinetic: $\int 1/2 u_t^2 dx dy$",
+                "gradient: $1/2 \int \\nabla u dx dy$", "potential: $\int (1 - cos(u)) dx dy$"]
+        for i, name in enumerate(e_names): 
+            ax4.plot(tn, energies[i], linestyle='-.', label=name)        
+        ax4.legend()
         ax4.grid(True)
 
     def _plot_analysis(self, fig, gs, features):
@@ -104,7 +108,7 @@ class SolitonDashboard:
     def _analyze(self, u, v):
         return {
             'energy': self._compute_energy(u, v),
-            'conservation': self._compute_conservation(u),
+            'conservation': {'norm': np.sum(u**2, axis=(1,2)) / np.sum(u[0] ** 2)},
             'terms': self._compute_terms(u),
             'trajectory': self._compute_trajectory(u),
             'power_spectrum': np.abs(fftshift(fft2(u[-1])))**2,
@@ -133,7 +137,7 @@ class SolitonDashboard:
     def _compute_energy(self, u, v):
         # IMPORTANT: As we mostly don't save v we only crudely approximate energy conservation!
         # Kinetic energy is "neglected"
-        kinetic = 0.5*np.sum(v**2, axis=(1,2))*self.dx*self.dy if v is not None else 0
+        kinetic = 0.5*np.sum(v**2, axis=(1,2))*self.dx*self.dy if v is not None else [np.nan] * self.nt
 
         gradient_energy = np.zeros(u.shape[0])
         for i, ut in enumerate(u):
@@ -142,13 +146,9 @@ class SolitonDashboard:
             gradient_energy[i] = 0.5*np.sum(grad_x**2 + grad_y**2)*self.dx*self.dy
 
         potential = np.sum(1-np.cos(u), axis=(1,2))*self.dx*self.dy
-        return kinetic + gradient_energy + potential
+        return kinetic, gradient_energy, potential
 
-    def _compute_conservation(self, u):
-        energy = self._compute_energy(u, None)
-        norm = np.sum(u**2, axis=(1,2))*self.dx*self.dy 
-        return {'energy': energy, 'norm': norm}
-
+    
     def _compute_trajectory(self, u):
         return np.array([(np.sum(self.X*ut)/np.sum(ut), np.sum(self.Y*ut)/np.sum(ut)) 
                        for ut in u])

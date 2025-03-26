@@ -173,6 +173,7 @@ class SGELauncher:
         np.save(m_file, m)
 
         traj_file = self.traj_dir / f"traj_{self.run_id}_{run_idx:04d}.npy"
+        vel_file  =  self.traj_dir / f"vel_{self.run_id}_{run_idx:04d}.npy"
 
         exe_path = Path(self.args.exe)
         if not exe_path.exists():
@@ -187,6 +188,7 @@ class SGELauncher:
             str(u0_file),
             str(v0_file),
             str(traj_file),
+            str(vel_file),
             str(self.args.T),
             str(self.args.nt),
             str(self.args.snapshots),
@@ -207,7 +209,8 @@ class SGELauncher:
         walltime = end_time - start_time
 
         traj_data = np.load(traj_file)
-        return traj_data, walltime
+        vel_data  = np.load(vel_file)
+        return (traj_data, vel_data), walltime
 
     def downsample_trajectory(self, traj_data):
         if self.args.dr_strategy == 'none':
@@ -228,7 +231,7 @@ class SGELauncher:
             raise ValueError(
                 f"Unknown downsampling strategy: {self.args.dr_strategy}")
 
-    def save_to_hdf5(self, run_idx, u0, v0, m, traj_data,
+    def save_to_hdf5(self, run_idx, u0, v0, m, traj_data, vel_data,
                      phenomenon_params, elapsed_time):
         h5_file = self.h5_dir / f"run_{self.run_id}_{run_idx:04d}.h5"
         with h5py.File(h5_file, 'w') as f:
@@ -270,6 +273,7 @@ class SGELauncher:
                 m_grp.attrs['scale'] = self.args.m_scale
             m_grp.create_dataset('m', data=m)
             f.create_dataset('u', data=traj_data)
+            f.create_dataset('v', data=vel_data)
             f.create_dataset('X', data=self.X)
             f.create_dataset('Y', data=self.Y)
 
@@ -319,10 +323,11 @@ class SGELauncher:
 
     def cleanup(self, run_idx):
         if self.args.delete_intermediates:
-            u0_file = self.ic_dir / f"u0_{self.run_id}_{run_idx:04d}.npy"
-            v0_file = self.ic_dir / f"v0_{self.run_id}_{run_idx:04d}.npy"
-            m_file = self.focusing_dir / f"m_{self.run_id}_{run_idx:04d}.npy"
+            u0_file   = self.ic_dir / f"u0_{self.run_id}_{run_idx:04d}.npy"
+            v0_file   = self.ic_dir / f"v0_{self.run_id}_{run_idx:04d}.npy"
+            m_file    = self.focusing_dir / f"m_{self.run_id}_{run_idx:04d}.npy"
             traj_file = self.traj_dir / f"traj_{self.run_id}_{run_idx:04d}.npy"
+            vel_file  =  self.traj_dir / f"vel_{self.run_id}_{run_idx:04d}.npy"
 
             for file in [u0_file, v0_file, m_file, traj_file]:
                 if file.exists():
@@ -340,7 +345,7 @@ class SGELauncher:
                 (u0, v0), phenomenon_params = self.generate_initial_condition(i)
                 m = self.generate_spatial_amplification(i)
                 pre_end = time.time()
-                traj_data, walltime = self.run_simulation(i, u0, v0, m)
+                (traj_data, vel_data), walltime = self.run_simulation(i, u0, v0, m)
                 post_start = time.time()
                  
                 # TODO decide whether to visualize before or after downsampling
@@ -348,11 +353,11 @@ class SGELauncher:
                     self.create_visualization(
                         i, traj_data, m, phenomenon_params, walltime)
                 traj_data = self.downsample_trajectory(traj_data)
-                sols[f"{self.run_id}_{i}"] = traj_data # save downsampled u trajectory only to perform analysis
+                vel_data  = self.downsample_trajectory(vel_data)
+                sols[f"{self.run_id}_{i}"] = (traj_data, vel_data) # save downsampled u trajectory only to perform analysis
                 self.save_to_hdf5(
-                    i, u0, v0, m, traj_data,
+                    i, u0, v0, m, traj_data, vel_data,
                     phenomenon_params, walltime)
-
                 
                 self.cleanup(i)
                 post_end = time.time()
