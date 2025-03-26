@@ -232,7 +232,7 @@ class GlobalAnalyzer:
 
                 im = ax.pcolormesh(X, Y, v0, cmap='coolwarm', shading='auto')
                 fig.colorbar(im, ax=ax,)
-                ax.set_title(f"v0")
+                ax.set_title(f"v0 (exemplary)")
                 ax.set_xlabel("X")
                 ax.set_ylabel("Y")
                 ax.set_aspect('equal')
@@ -247,7 +247,7 @@ class GlobalAnalyzer:
             if data['m'] is not None:
                 m = data['m']
                 X, Y = data['X'], data['Y']
-                stride = 1  # max(1, X.shape[0] // 50)
+                stride = 1
                 surf = ax.plot_surface(X[::stride, ::stride],
                                        Y[::stride, ::stride],
                                        m[::stride, ::stride],
@@ -255,11 +255,10 @@ class GlobalAnalyzer:
                                        linewidth=0,
                                        antialiased=True)
 
-                fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label="m(x,y)")
-                ax.set_title("m(x,y)")
+                #fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5,)
+                ax.set_title("$m(x,y)$ (exemplary)")
                 ax.set_xlabel("X")
                 ax.set_ylabel("Y")
-                ax.set_zlabel("m")
                 break
         else:
             ax = fig.add_subplot(gs)

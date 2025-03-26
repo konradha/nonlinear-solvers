@@ -417,7 +417,7 @@ def parse_args():
                         choices=["sine_gordon",
                                  "double_sine_gordon",
                                  "hyperbolic_sine_gordon",
-                                 "phi4",
+                                 #"phi4", -- temporarily disallow until figured out how to set up params correctly
                                  "klein_gordon"])
 
     parser.add_argument("--phenomenon", type=str, default="kink_field",
