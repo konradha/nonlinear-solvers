@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
   Eigen::Map<Eigen::Matrix<double, -1, -1, Eigen::RowMajor>> u_save_mat(
       u_save.data(), num_snapshots, nx * ny);
   Eigen::Map<Eigen::Matrix<double, -1, -1, Eigen::RowMajor>> v_save_mat(
-      u_save.data(), num_snapshots, nx * ny);
+      v_save.data(), num_snapshots, nx * ny);
 
   u_save_mat.row(0) = u0.transpose();
   v_save_mat.row(0) = v0.transpose();
@@ -107,16 +107,17 @@ int main(int argc, char **argv) {
   for (uint32_t i = 1; i < nt; ++i) {
     KGESolver::step<double>(u, u_past, buf, L, m, dt); 
     neumann_bc_no_velocity<double>(u, nx, ny);
+    v = (u - u_past) / dt; 
     if (i % freq == 0) {
       uint32_t snapshot_idx = i / freq;
       if (snapshot_idx < num_snapshots) {
         u_save_mat.row(snapshot_idx) = u.transpose();
-        v_save_mat.row(snapshot_idx) = ((u - u_past) / dt).transpose();
+        v_save_mat.row(snapshot_idx) = v.transpose();
       }
     }
   }
   const std::vector<uint32_t> shape = {num_snapshots, ny, nx};
   save_to_npy(output_file, u_save, shape);
-  save_to_npy(output_vel, v_save, shape);
+  save_to_npy(output_vel,  v_save, shape);
   return 0;
 }

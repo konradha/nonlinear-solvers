@@ -197,7 +197,7 @@ class Launcher:
             str(self.args.snapshots),
             str(m_file)
         ]
-
+        
         start_time = time.time()
         import subprocess
         result = subprocess.run(
@@ -206,6 +206,7 @@ class Launcher:
             capture_output=True,
             text=True)
         if result.stderr:
+            print("Command used:", " ".join(cmd))
             print(f"Warnings/Errors: {result.stderr}")
 
         end_time = time.time()
@@ -375,8 +376,8 @@ class Launcher:
                 self.save_to_hdf5(
                     i, u0, v0, m, traj_data, vel_data,
                     phenomenon_params, walltime)
-
-                self.cleanup(i)
+                if self.args.delete_intermediates:
+                    self.cleanup(i)
                 post_end = time.time()
                 total_t = walltime + \
                     abs(pre_end - pre_start) + abs(post_end - post_start)

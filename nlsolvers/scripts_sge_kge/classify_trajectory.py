@@ -214,7 +214,6 @@ class SolitonDashboard:
             def potential_lambda(u): return np.sum((u**2 - 1)**2 / 4, axis=(1, 2)) * self.dx * self.dy
         else:
             raise Exception("Invalid system type")
-
         potential = potential_lambda(u)
         return kinetic, gradient_energy, potential
 
