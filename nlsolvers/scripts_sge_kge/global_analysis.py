@@ -54,6 +54,15 @@ class GlobalAnalyzer:
             dx, dy = 2 * Lx / (nx - 1), 2 * Ly / (ny - 1)
 
             metadata = {}
+            metadata['dx'] = dx
+            metadata['dy'] = dy
+            metadata['Lx'] = Lx
+            metadata['Ly'] = Ly
+            metadata['T']  = T 
+            metadata['nt'] = f['time'].attrs['nt']
+            metadata['num_snapshots'] = f['time'].attrs['num_snapshots']
+            metadata['downsampling_strategy'] = metadata['dr_x'] = metadata['dr_y'] = None
+
             if 'metadata' in f:
                 for key, value in f['metadata'].attrs.items():
                     metadata[key] = value
@@ -105,17 +114,16 @@ class GlobalAnalyzer:
                 gradient_e = 0.5 * np.sum(grad_x**2 + grad_y**2) * dx * dy
                 gradient_energy.append(gradient_e)
 
-            # TODO actually correct hamiltonian calculations
             if self.system_type == "sine_gordon":
                 potential = np.sum(1 - np.cos(u), axis=(1, 2)) * dx * dy
             elif self.system_type == "double_sine_gordon":
-                potential = np.sum(1 - np.cos(u), axis=(1, 2)) * dx * dy
+                potential = np.sum((1 - np.cos(u)) + (.6/2)*(1 - np.cos(2*u)), axis=(1, 2)) * dx * dy
             elif self.system_type == "hyperbolic_sine_gordon":
-                potential = np.sum(1 - np.cos(u), axis=(1, 2)) * dx * dy
+                potential = np.sum(np.cosh(u) - 1, axis=(1, 2)) * dx * dy
             elif self.system_type == "klein_gordon":
-                potential = np.sum(1 - np.cos(u), axis=(1, 2)) * dx * dy
+                potential = np.sum(.5 * u ** 2, axis=(1, 2)) * dx * dy
             elif self.system_type == "phi4":
-                potential = np.sum(1 - np.cos(u), axis=(1, 2)) * dx * dy
+                potential = np.sum((u**2 - 1)**2 / 4, axis=(1, 2)) * dx * dy
             else:
                 raise Exception("Invalid system type")
 
@@ -143,7 +151,11 @@ class GlobalAnalyzer:
                 'v0': run_data['v0'],
                 'm': run_data['m'],
                 'X': X,
-                'Y': Y
+                'Y': Y,
+                'snapshots': nt,
+                'T': T,
+                'dx': dx,
+                'dy': dy
             }
 
         return metrics
@@ -200,7 +212,11 @@ class GlobalAnalyzer:
             if key.startswith('phenomenon_'):
                 param_name = key.replace('phenomenon_', '')
                 text += f"{param_name}: {value}\n"
-
+         
+        text += "simulation params:\n"
+        text += f"$L_x = L_y = {metadata['Lx']:.2f}$ $\delta_x = \delta_y = {metadata['dx']:.3e}$, $T={metadata['T']:.2f}$\n"
+        text += f"for ${metadata['nt']}$ steps, collected ${metadata['num_snapshots']}$"
+        # TODO downsampling
         text += f"\ncomparing {len(metrics)} runs with ID: {self.run_id}\n"
 
         ax.text(0.05, 0.95, text, transform=ax.transAxes,

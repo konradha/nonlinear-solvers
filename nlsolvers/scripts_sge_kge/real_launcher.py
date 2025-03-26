@@ -239,7 +239,7 @@ class Launcher:
         h5_file = self.h5_dir / f"run_{self.run_id}_{run_idx:04d}.h5"
         with h5py.File(h5_file, 'w') as f:
             meta = f.create_group('metadata')
-            meta.attrs['problem_type'] = 'sine_gordon'
+            meta.attrs['problem_type'] = self.system_type
             meta.attrs['boundary_condition'] = 'noflux'
             meta.attrs['run_id'] = self.run_id
             meta.attrs['run_index'] = run_idx
@@ -329,7 +329,7 @@ class Launcher:
             raise Exception("Invalid system type")
 
         return (
-            str_start
+            f"{str_start}"
             f"{self.args.phenomenon}, m: {m_string}\n"
             f"domain: [0, T={self.args.T}] x [-{self.args.Lx:.2f}, {self.args.Lx:.2f}] x [-{self.args.Ly:.2f}, {self.args.Ly:.2f}]\n"
             f"resolution n_t={self.args.nt}, n_x={self.args.nx}, n_y={self.args.ny}\n"
