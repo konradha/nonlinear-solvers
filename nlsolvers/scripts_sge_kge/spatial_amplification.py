@@ -81,7 +81,8 @@ def create_grf(nx, ny, Lx, Ly, mean=1.0, std=0.5, scale=2.0):
     smoothed = (smoothed - np.mean(smoothed)) / np.std(smoothed)
     m = mean + std * smoothed
 
-    return m
+    # return 5 * np.arctan(m) # TODO incorporate into general sampler
+    return m.astype(np.float64)
 
 
 def create_morlet_wavelet(X, Y, scale, angle=0):
