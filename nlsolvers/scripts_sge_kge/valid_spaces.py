@@ -217,7 +217,29 @@ def get_parameter_spaces(L):
         "n_qballs": [2, 4, 8],
         "amplitude_range": [(.1, 1.1), (.5, 1.5)],
         "radius_range": [(.5, 2), (.1, 4.)],
+    }
 
+    parameter_spaces["grf_modulated_soliton_field"] = {
+        "system_type": system_types,
+        "grf_length_scale": np.linspace(0.5, 3.0, 6).tolist(),
+        "smoothness_scaling": np.linspace(0.5, 5.0, 5).tolist(),
+        "anisotropy_ratio": [1.0, 1.5, 2.0, 3.0],
+        "anisotropy_angle": np.linspace(0, np.pi, 4).tolist(),
+        "construction_method": ["threshold", "level_set", "continuous"],
+        "mixture_type": ["additive", "maximum", "blending"],
+        "velocity_mode": ["zero", "fitting", "random"],
+        "threshold_values": [
+            [-1.0, 0.0, 1.0],
+            [-2.0, -1.0, 0.0, 1.0, 2.0],
+            [-1.5, -0.5, 0.5, 1.5]
+        ],
+        "soliton_types": [
+            ["kink", "antikink"],
+            ["kink", "breather", "antikink"],
+            ["kink", "breather", "ring", "antikink"]
+        ],
+        "level_set_width": [0.1, 0.2, 0.3, 0.5],
+        "random_velocity_scale": np.linspace(0.1, 0.5, 5).tolist()
     }
 
     return parameter_spaces

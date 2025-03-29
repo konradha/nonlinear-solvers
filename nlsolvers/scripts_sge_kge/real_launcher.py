@@ -426,7 +426,7 @@ def parse_args():
                                  "ring_soliton", "colliding_rings", "multi_ring_state",
                                  "skyrmion_solution", "skyrmion_lattice", "skyrmion_like_field",
                                  "q_ball_solution", "multi_q_ball", "breather_solution",
-                                 "breather_field", "elliptical_soliton"],
+                                 "breather_field", "elliptical_soliton", "grf_modulated_soliton_field"],
                         help="Phenomenon type to simulate")
 
     parser.add_argument("--velocity-type", type=str, default="zero",

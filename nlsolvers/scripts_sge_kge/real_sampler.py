@@ -1149,6 +1149,288 @@ class RealWaveSampler:
 
         return u0, v0
 
+    def grf_modulated_soliton_field(self, system_type: str = 'sine_gordon',
+                                    grf_length_scale: float = 1.0,
+                                    smoothness_scaling: float = 2.0,
+                                    anisotropy_ratio: float = 1.0,
+                                    anisotropy_angle: float = 0.0,
+                                    construction_method: str = 'threshold',
+                                    mixture_type: str = 'additive',
+                                    velocity_mode: str = 'fitting',
+                                    threshold_values: Optional[List[float]] = None,
+                                    soliton_types: Optional[List[str]] = None,
+                                    level_set_width: float = 0.2,
+                                    continuous_range: Optional[Dict[str,
+                                                                    Tuple[float, float]]] = None,
+                                    random_velocity_scale: float = 0.2) -> Tuple[np.ndarray, np.ndarray]:
+        u = np.zeros_like(self.X)
+        v = np.zeros_like(self.X)
+
+        base_grf = self.anisotropic_grf(
+            length_scale=grf_length_scale,
+            anisotropy_ratio=anisotropy_ratio,
+            theta=anisotropy_angle,
+            amplitude=1.0
+        )
+
+        scaled_grf = smoothness_scaling * base_grf
+
+        if construction_method == 'threshold':
+            if threshold_values is None:
+                threshold_values = [-1.0, 0.0, 1.0]
+
+            if soliton_types is None:
+                soliton_types = ['kink', 'breather', 'antikink']
+
+            for i in range(len(threshold_values) - 1):
+                lower_bound = threshold_values[i]
+                upper_bound = threshold_values[i + 1]
+                soliton_type = soliton_types[i % len(soliton_types)]
+
+                mask = (scaled_grf >= lower_bound) & (scaled_grf < upper_bound)
+
+                if soliton_type == 'kink':
+                    width = 0.5 + 1.0 * np.random.rand()
+                    soliton_u = 4 * np.arctan(np.exp(scaled_grf[mask] / width))
+
+                    if velocity_mode == 'fitting':
+                        soliton_v = 4 / \
+                            (width * (np.cosh(scaled_grf[mask] / width)**2))
+                    elif velocity_mode == 'random':
+                        soliton_v = random_velocity_scale * \
+                            (2 * np.random.rand(np.sum(mask)) - 1)
+                    else:
+                        soliton_v = np.zeros(np.sum(mask))
+
+                elif soliton_type == 'antikink':
+                    width = 0.5 + 1.0 * np.random.rand()
+                    soliton_u = -4 * \
+                        np.arctan(np.exp(scaled_grf[mask] / width))
+
+                    if velocity_mode == 'fitting':
+                        soliton_v = -4 / \
+                            (width * (np.cosh(scaled_grf[mask] / width)**2))
+                    elif velocity_mode == 'random':
+                        soliton_v = random_velocity_scale * \
+                            (2 * np.random.rand(np.sum(mask)) - 1)
+                    else:
+                        soliton_v = np.zeros(np.sum(mask))
+
+                elif soliton_type == 'breather':
+                    width = 0.5 + 1.0 * np.random.rand()
+                    amplitude = 0.2 + 0.7 * np.random.rand()
+                    frequency = np.sqrt(1 - amplitude**2)
+                    phase = 2 * np.pi * np.random.rand()
+
+                    soliton_u = 4 * np.arctan(amplitude * np.sin(phase) /
+                                              (frequency * np.cosh(amplitude * scaled_grf[mask] / width)))
+
+                    if velocity_mode == 'fitting':
+                        soliton_v = 4 * amplitude * frequency * np.cos(phase) / (
+                            frequency * np.cosh(amplitude * scaled_grf[mask] / width) *
+                            (1 + (amplitude**2 / frequency**2) * np.sin(phase)**2)
+                        )
+                    elif velocity_mode == 'random':
+                        soliton_v = random_velocity_scale * \
+                            (2 * np.random.rand(np.sum(mask)) - 1)
+                    else:
+                        soliton_v = np.zeros(np.sum(mask))
+
+                elif soliton_type == 'ring':
+                    radius = 0.2 + 0.3 * np.random.rand()
+                    width = 0.3 + 0.5 * np.random.rand()
+
+                    r_term = np.abs(scaled_grf[mask]) - radius
+                    soliton_u = 4 * np.arctan(np.exp(r_term / width))
+
+                    if velocity_mode == 'fitting':
+                        velocity = 0.2 * np.random.rand()
+                        soliton_v = -velocity * 4 / \
+                            (width * (np.cosh(r_term / width)**2))
+                    elif velocity_mode == 'random':
+                        soliton_v = random_velocity_scale * \
+                            (2 * np.random.rand(np.sum(mask)) - 1)
+                    else:
+                        soliton_v = np.zeros(np.sum(mask))
+
+                u[mask] = soliton_u
+                v[mask] = soliton_v
+
+        elif construction_method == 'level_set':
+            if threshold_values is None:
+                threshold_values = [-1.5, -0.5, 0.5, 1.5]
+
+            if soliton_types is None:
+                soliton_types = ['kink', 'breather', 'antikink', 'ring']
+
+            for i, threshold in enumerate(threshold_values):
+                soliton_type = soliton_types[i % len(soliton_types)]
+
+                level_set_weight = np.exp(-(scaled_grf - threshold)
+                                          ** 2 / (2 * level_set_width**2))
+
+                if soliton_type == 'kink':
+                    width = 0.5 + 1.0 * np.random.rand()
+                    orientation = np.pi * np.random.rand()
+                    x_rot = self.X * np.cos(orientation) + \
+                        self.Y * np.sin(orientation)
+
+                    soliton_u = 4 * np.arctan(np.exp(x_rot / width))
+
+                    if velocity_mode == 'fitting':
+                        soliton_v = 4 / (width * (np.cosh(x_rot / width)**2))
+                    elif velocity_mode == 'random':
+                        soliton_v = random_velocity_scale * \
+                            (2 * np.random.rand(*self.X.shape) - 1)
+                    else:
+                        soliton_v = np.zeros_like(self.X)
+
+                elif soliton_type == 'antikink':
+                    width = 0.5 + 1.0 * np.random.rand()
+                    orientation = np.pi * np.random.rand()
+                    x_rot = self.X * np.cos(orientation) + \
+                        self.Y * np.sin(orientation)
+
+                    soliton_u = -4 * np.arctan(np.exp(x_rot / width))
+
+                    if velocity_mode == 'fitting':
+                        soliton_v = -4 / (width * (np.cosh(x_rot / width)**2))
+                    elif velocity_mode == 'random':
+                        soliton_v = random_velocity_scale * \
+                            (2 * np.random.rand(*self.X.shape) - 1)
+                    else:
+                        soliton_v = np.zeros_like(self.X)
+
+                elif soliton_type == 'breather':
+                    width = 0.5 + 1.0 * np.random.rand()
+                    amplitude = 0.2 + 0.7 * np.random.rand()
+                    frequency = np.sqrt(1 - amplitude**2)
+                    phase = 2 * np.pi * np.random.rand()
+
+                    r = np.sqrt(self.X**2 + self.Y**2) / width
+
+                    soliton_u = 4 * np.arctan(amplitude * np.sin(phase) /
+                                              (frequency * np.cosh(amplitude * r)))
+
+                    if velocity_mode == 'fitting':
+                        soliton_v = 4 * amplitude * frequency * np.cos(phase) / (
+                            frequency * np.cosh(amplitude * r) *
+                            (1 + (amplitude**2 / frequency**2) * np.sin(phase)**2)
+                        )
+                    elif velocity_mode == 'random':
+                        soliton_v = random_velocity_scale * \
+                            (2 * np.random.rand(*self.X.shape) - 1)
+                    else:
+                        soliton_v = np.zeros_like(self.X)
+
+                elif soliton_type == 'ring':
+                    radius = 1.0 + 1.0 * np.random.rand()
+                    width = 0.3 + 0.5 * np.random.rand()
+
+                    r = np.sqrt(self.X**2 + self.Y**2)
+                    r_term = r - radius
+
+                    soliton_u = 4 * np.arctan(np.exp(r_term / width))
+
+                    if velocity_mode == 'fitting':
+                        velocity = 0.2 * np.random.rand()
+                        soliton_v = -velocity * 4 / \
+                            (width * (np.cosh(r_term / width)**2))
+                    elif velocity_mode == 'random':
+                        soliton_v = random_velocity_scale * \
+                            (2 * np.random.rand(*self.X.shape) - 1)
+                    else:
+                        soliton_v = np.zeros_like(self.X)
+
+                if mixture_type == 'additive':
+                    u += level_set_weight * soliton_u
+                    v += level_set_weight * soliton_v
+                elif mixture_type == 'maximum':
+                    u = np.maximum(u, level_set_weight * soliton_u)
+                    v = np.where(
+                        u == level_set_weight *
+                        soliton_u,
+                        level_set_weight *
+                        soliton_v,
+                        v)
+                else:
+                    if i == 0:
+                        u = level_set_weight * soliton_u
+                        v = level_set_weight * soliton_v
+                    else:
+                        u = u * (1 - level_set_weight) + \
+                            level_set_weight * soliton_u
+                        v = v * (1 - level_set_weight) + \
+                            level_set_weight * soliton_v
+
+        elif construction_method == 'continuous':
+            if continuous_range is None:
+                continuous_range = {
+                    'amplitude': (0.2, 0.8),
+                    'width': (0.5, 2.0),
+                    'orientation': (0, np.pi)
+                }
+
+            amp_min, amp_max = continuous_range.get('amplitude', (0.2, 0.8))
+            width_min, width_max = continuous_range.get('width', (0.5, 2.0))
+
+            normalized_grf = (scaled_grf - np.min(scaled_grf)) / \
+                (np.max(scaled_grf) - np.min(scaled_grf))
+
+            amplitude = amp_min + (amp_max - amp_min) * normalized_grf
+            width = width_min + (width_max - width_min) * normalized_grf
+
+            if system_type == 'sine_gordon':
+                u = 4 * np.arctan(np.exp(scaled_grf / width))
+
+                if velocity_mode == 'fitting':
+                    v = 4 / (width * (np.cosh(scaled_grf / width)**2))
+                elif velocity_mode == 'random':
+                    v = random_velocity_scale * \
+                        (2 * np.random.rand(*self.X.shape) - 1)
+                else:
+                    v = np.zeros_like(self.X)
+
+            elif system_type == 'phi4':
+                u = amplitude * np.tanh(scaled_grf / width)
+
+                if velocity_mode == 'fitting':
+                    v = amplitude / (width * (np.cosh(scaled_grf / width)**2))
+                elif velocity_mode == 'random':
+                    v = random_velocity_scale * \
+                        (2 * np.random.rand(*self.X.shape) - 1)
+                else:
+                    v = np.zeros_like(self.X)
+
+            elif system_type == 'double_sine_gordon':
+                lambda_param = 0.3
+                k = 1 / np.sqrt(1 + lambda_param)
+
+                u = 4 * np.arctan(np.sqrt((1 + lambda_param) / lambda_param) *
+                                  np.tanh(np.sqrt(lambda_param) * scaled_grf / (2 * width)))
+
+                if velocity_mode == 'fitting':
+                    v = 4 * np.sqrt((1 + lambda_param) / lambda_param) * np.sqrt(lambda_param) / (2 * width) * (
+                        1 - np.tanh(np.sqrt(lambda_param) * scaled_grf / (2 * width))**2)
+                elif velocity_mode == 'random':
+                    v = random_velocity_scale * \
+                        (2 * np.random.rand(*self.X.shape) - 1)
+                else:
+                    v = np.zeros_like(self.X)
+
+            else:
+                u = 4 * np.arctan(np.exp(scaled_grf / width))
+
+                if velocity_mode == 'fitting':
+                    v = 4 / (width * (np.cosh(scaled_grf / width)**2))
+                elif velocity_mode == 'random':
+                    v = random_velocity_scale * \
+                        (2 * np.random.rand(*self.X.shape) - 1)
+                else:
+                    v = np.zeros_like(self.X)
+
+        return u, v
+
     def generate_sample(self, system_type: str = 'sine_gordon', phenomenon_type: str = 'kink_solution',
                         time_param: float = 0.0, velocity_type: str = "fitting",
                         **params) -> Tuple[np.ndarray, np.ndarray]:
@@ -1195,6 +1477,8 @@ class RealWaveSampler:
             return self.soliton_antisoliton_pair(system_type, **params)
         elif phenomenon_type == 'elliptical_soliton':
             return self.elliptical_soliton(system_type, **params)
+        elif phenomenon_type == 'grf_modulated_soliton_field':
+            return self.grf_modulated_soliton_field(system_type, **params)
         else:
             raise ValueError(f"Unknown phenomenon type: {phenomenon_type}")
 
