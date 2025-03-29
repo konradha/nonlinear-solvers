@@ -197,7 +197,7 @@ class Launcher:
             str(self.args.snapshots),
             str(m_file)
         ]
-        
+
         start_time = time.time()
         import subprocess
         result = subprocess.run(
@@ -417,7 +417,7 @@ def parse_args():
                         choices=["sine_gordon",
                                  "double_sine_gordon",
                                  "hyperbolic_sine_gordon",
-                                 #"phi4", -- temporarily disallow until figured out how to set up params correctly
+                                 # "phi4", -- temporarily disallow until figured out how to set up params correctly
                                  "klein_gordon"])
 
     parser.add_argument("--phenomenon", type=str, default="kink_field",

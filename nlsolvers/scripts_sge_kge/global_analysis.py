@@ -58,7 +58,7 @@ class GlobalAnalyzer:
             metadata['dy'] = dy
             metadata['Lx'] = Lx
             metadata['Ly'] = Ly
-            metadata['T']  = T 
+            metadata['T'] = T
             metadata['nt'] = f['time'].attrs['nt']
             metadata['num_snapshots'] = f['time'].attrs['num_snapshots']
             metadata['downsampling_strategy'] = metadata['dr_x'] = metadata['dr_y'] = None
@@ -117,7 +117,8 @@ class GlobalAnalyzer:
             if self.system_type == "sine_gordon":
                 potential = np.sum(1 - np.cos(u), axis=(1, 2)) * dx * dy
             elif self.system_type == "double_sine_gordon":
-                potential = np.sum((1 - np.cos(u)) + (.6/2)*(1 - np.cos(2*u)), axis=(1, 2)) * dx * dy
+                potential = np.sum((1 - np.cos(u)) + (.6 / 2)
+                                   * (1 - np.cos(2 * u)), axis=(1, 2)) * dx * dy
             elif self.system_type == "hyperbolic_sine_gordon":
                 potential = np.sum(np.cosh(u) - 1, axis=(1, 2)) * dx * dy
             elif self.system_type == "klein_gordon":
@@ -212,9 +213,9 @@ class GlobalAnalyzer:
             if key.startswith('phenomenon_'):
                 param_name = key.replace('phenomenon_', '')
                 text += f"{param_name}: {value}\n"
-         
+
         text += "simulation params:\n"
-        text += f"$L_x = L_y = {metadata['Lx']:.2f}$ $\delta_x = \delta_y = {metadata['dx']:.3e}$, $T={metadata['T']:.2f}$\n"
+        text += f"$L_x = L_y = {metadata['Lx']:.2f}$ $\\delta_x = \\delta_y = {metadata['dx']:.3e}$, $T={metadata['T']:.2f}$\n"
         text += f"for ${metadata['nt']}$ steps, collected ${metadata['num_snapshots']}$"
         # TODO downsampling
         text += f"\ncomparing {len(metrics)} runs with ID: {self.run_id}\n"

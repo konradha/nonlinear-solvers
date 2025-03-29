@@ -97,7 +97,7 @@ class SolitonDashboard:
         if self.system_type == "sine_gordon":
             potential_name = f"$\\int (1 - cos(u)) dx dy$"
         elif self.system_type == "double_sine_gordon":
-            potential_name = f"$\\int \left((1 - cos(u)) + (.6/2)(1 - cos(u))  \\right)dx dy$"
+            potential_name = f"$\\int \\left((1 - cos(u)) + (.6/2)(1 - cos(u))  \\right)dx dy$"
         elif self.system_type == "hyperbolic_sine_gordon":
             potential_name = f"$\\int (cosh(u) - 1) dx dy$"
         elif self.system_type == "klein_gordon":
@@ -166,7 +166,7 @@ class SolitonDashboard:
                      * self.dx * self.dy for ut in u]
         # TODO adapt to system_type
         # especially correct computation in "nonlinear"
-        # maybe just keep it to have one thing comparable for all plots 
+        # maybe just keep it to have one thing comparable for all plots
         nonlinear = [np.sum(np.sin(ut)) * self.dx * self.dy for ut in u]
         return {'laplacian': laplacian, 'nonlinear': nonlinear,
                 'ratio': [l / n if n > 0 else 0 for l, n in zip(laplacian, nonlinear)]}
@@ -203,15 +203,20 @@ class SolitonDashboard:
             raise Exception("Invalid system type")
 
         if self.system_type == "sine_gordon":
-            def potential_lambda(u): return np.sum(1 - np.cos(u), axis=(1, 2)) * self.dx * self.dy
+            def potential_lambda(u): return np.sum(
+                1 - np.cos(u), axis=(1, 2)) * self.dx * self.dy
         elif self.system_type == "double_sine_gordon":
-            def potential_lambda(u): return np.sum((1 - np.cos(u)) + (.6/2)*(1 - np.cos(2*u)), axis=(1, 2)) * self.dx * self.dy
+            def potential_lambda(u): return np.sum(
+                (1 - np.cos(u)) + (.6 / 2) * (1 - np.cos(2 * u)), axis=(1, 2)) * self.dx * self.dy
         elif self.system_type == "hyperbolic_sine_gordon":
-            def potential_lambda(u): return np.sum(np.cosh(u) - 1, axis=(1, 2)) * self.dx * self.dy
+            def potential_lambda(u): return np.sum(
+                np.cosh(u) - 1, axis=(1, 2)) * self.dx * self.dy
         elif self.system_type == "klein_gordon":
-            def potential_lambda(u): return np.sum(.5 * u ** 2, axis=(1, 2)) * self.dx * self.dy
+            def potential_lambda(u): return np.sum(.5 * u **
+                                                   2, axis=(1, 2)) * self.dx * self.dy
         elif self.system_type == "phi4":
-            def potential_lambda(u): return np.sum((u**2 - 1)**2 / 4, axis=(1, 2)) * self.dx * self.dy
+            def potential_lambda(u): return np.sum(
+                (u**2 - 1)**2 / 4, axis=(1, 2)) * self.dx * self.dy
         else:
             raise Exception("Invalid system type")
         potential = potential_lambda(u)

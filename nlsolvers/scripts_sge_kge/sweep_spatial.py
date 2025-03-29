@@ -109,8 +109,8 @@ class ParameterSweep:
         m_constant_values = [-10., -5., -1., 1., 5., 10.]
 
         m_grf_params = [
-            (0.0, 1, 2.), (0.0, 10, 2.), (0.0, 40, 2.),
-            (0.0, 1, .4), (0.0, 10, .4), (0.0, 40, .4),
+            (0.0, 1, 2.), (0.0, 10, 2.), (0.0, 20, 2.),
+            (0.0, 1, .4), (0.0, 10, .4), (0.0, 20, .4),
         ]
 
         m_periodic_params = [
@@ -133,7 +133,7 @@ class ParameterSweep:
                     'm_params': {'mean': mean, 'std': std, 'scale': scale}
                 })
 
-                for wavelet_scale in [1.0, 2.0]:
+                for wavelet_scale in [1., 2., 5.]:
                     grid.append({
                         'system_type': system_type,
                         'm_type': 'wavelet_grf',
@@ -145,6 +145,7 @@ class ParameterSweep:
                         }
                     })
 
+            wall_dist = 0.1
             for factor, boxes_per_dim, box_length in m_periodic_params:
                 grid.append({
                     'system_type': system_type,
@@ -153,7 +154,7 @@ class ParameterSweep:
                         'factor': factor,
                         'num_boxes_per_dim': boxes_per_dim,
                         'box_length': box_length,
-                        'wall_dist': 0.1
+                        'wall_dist': wall_dist
                     }
                 })
 
@@ -164,7 +165,7 @@ class ParameterSweep:
                         'factor': factor,
                         'num_gaussians_per_dim': boxes_per_dim,
                         'sigma': box_length,
-                        'wall_dist': 0.1
+                        'wall_dist': wall_dist
                     }
                 })
 
@@ -372,6 +373,7 @@ class ParameterSweep:
                 entropy_data[global_t_idx] = -np.sum(normalized_spectrum[valid_indices] *
                                                      np.log(normalized_spectrum[valid_indices]))
 
+                # we omit nonlinear term for now
                 u_squared = frame**2
                 numerator = np.sum(u_squared**2)
                 denominator = np.sum(u_squared)**2
@@ -816,7 +818,7 @@ class ParameterSweep:
             plt.fill_between(x, mean_curve - std_curve, mean_curve + std_curve,
                              color='b', alpha=0.2, label='±1σ')
 
-            outlier_threshold = 2.0
+            outlier_threshold = 2.0  # ? not sure here
             for j, trajectory in enumerate(metric_data):
                 z_scores = np.abs(
                     (trajectory - mean_curve) / (std_curve + 1e-10))
@@ -833,7 +835,7 @@ class ParameterSweep:
                                  fontsize=8, color='red')
 
             plt.title(f"{system_type}, {m_type}: {metric.capitalize()}")
-            plt.xlabel("Time")
+            plt.xlabel("T / [1]")
             plt.ylabel(metric.capitalize())
             plt.grid(True, alpha=0.3)
 
@@ -1171,21 +1173,21 @@ class ParameterSweep:
 
                 plt.subplot(2, 2, 1)
                 plt.imshow(traj_data[0], cmap='viridis')
-                plt.title("Initial State")
+                plt.title("$u_0$")
                 plt.colorbar()
 
                 plt.subplot(2, 2, 2)
                 plt.imshow(traj_data[-1], cmap='viridis')
-                plt.title("Final State")
+                plt.title("$u_{n_t}$")
                 plt.colorbar()
 
                 plt.subplot(2, 2, 3)
                 time_points = np.linspace(0, self.args.T, len(energy))
                 plt.plot(time_points, energy)
                 plt.grid(True)
-                plt.title("Energy Evolution")
-                plt.xlabel("Time")
-                plt.ylabel("Energy")
+                plt.title("Energy evolution")
+                plt.xlabel("T / [1]")
+                plt.ylabel("E / [1]")
 
                 plt.subplot(2, 2, 4)
                 plt.axis('off')
