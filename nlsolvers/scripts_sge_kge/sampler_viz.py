@@ -742,22 +742,12 @@ if __name__ == '__main__':
     seed = np.random.randint(1 << 10)
 
     sampler = RealWaveSampler(nx=nx, ny=ny, L=L)
-    #run_wave_mapping(
-    #    sampler=sampler,
-    #    n_samples_per_config=5,
-    #    max_configs_per_type=10,
-    #    map_direct=True,
-    #    map_physical=True,
-    #    samples_per_type=4,
-    #    seed=seed
-    #)
-
     run_wave_mapping(
         sampler=sampler,
-        n_samples_per_config=1,
-        max_configs_per_type=1,
+        n_samples_per_config=5,
+        max_configs_per_type=10,
         map_direct=True,
         map_physical=True,
-        samples_per_type=2,
+        samples_per_type=4,
         seed=seed
     )

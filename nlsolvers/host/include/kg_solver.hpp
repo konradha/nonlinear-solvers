@@ -5,7 +5,7 @@
 #include "laplacians.hpp"
 
 /*
-      u_tt + (u_xx + u_yy) + m(x, y) * (u) = 0
+      u_tt - (u_xx + u_yy) + m(x, y) * u = 0
  */
 namespace KGESolver {
 

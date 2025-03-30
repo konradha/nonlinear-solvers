@@ -43,13 +43,11 @@ void step_sv(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
              const Eigen::SparseMatrix<Scalar_t> &L,
              const Eigen::VectorX<Scalar_t> &c,
              const Eigen::VectorX<Scalar_t> &m, const Scalar_t tau) {
-  Eigen::VectorX<Scalar_t> buf2 =
-      u.unaryExpr([&](Scalar_t x) { return std::sin(x); });
-  buf = c.cwiseProduct((L * u)) + m.cwiseProduct(buf2);
-
-  buf2 = u;
+  Eigen::VectorX<Scalar_t> sin_u = u.unaryExpr([](Scalar_t x) { return std::sin(x); });
+  buf = L * u - m.cwiseProduct(sin_u);
+  Eigen::VectorX<Scalar_t> u_cpy = u;
   u = 2 * u - u_past + tau * tau * buf;
-  u_past = buf2;
+  u_past = u_cpy;
 }
 
 template <typename Scalar_t>
@@ -57,19 +55,20 @@ void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
           Eigen::VectorX<Scalar_t> &buf, const Eigen::SparseMatrix<Scalar_t> &L,
           const Eigen::VectorX<Scalar_t> &c, const Eigen::VectorX<Scalar_t> &m,
           const Scalar_t tau) {
+  uint32_t subspace_dim = 10;
   // u_tt + Au = g(u)
   // u_{n+1} =
   // 2 cos (tau \Omega) u_{n} - u_{n-1} + tau² sinc²(tau / 2 \Omega)
   // x g(\phi(tau \Omega)u_{n}))
 
-  Eigen::VectorX<Scalar_t> buf2 = id_sqrt_multiply(L, u, tau);
-  //std::cout << "host: intermediate vals after id_sqrt\n";
-  //for(uint32_t i=0;i<10;++i) std::cout << buf2(i) << " ";
-  //std::cout << "\n";
-  buf2 = buf2.unaryExpr([](Scalar_t x) { return -std::sin(x); });
-  buf2 = sinc2_sqrt_half(L, buf2, tau);
+  // filter
+  Eigen::VectorX<Scalar_t> filtered_u = id_sqrt_multiply(L, u, tau, subspace_dim);
+  Eigen::VectorX<Scalar_t> sin_filtered_u = filtered_u.unaryExpr([](Scalar_t x) { return -std::sin(x); });
+  Eigen::VectorX<Scalar_t> m_sin_filtered_u = m.cwiseProduct(sin_filtered_u); 
+  Eigen::VectorX<Scalar_t> sinc2_term = sinc2_sqrt_half(L, m_sin_filtered_u, tau, subspace_dim);
+  Eigen::VectorX<Scalar_t> cos_term = cos_sqrt_multiply(L, u, tau, subspace_dim);
   Eigen::VectorX<Scalar_t> u_cpy = u;
-  u = 2 * cos_sqrt_multiply(L, u, tau) - u_past + tau * tau * buf2;
+  u = 2 * cos_term - u_past - tau * tau * sinc2_term;
   u_past = u_cpy;
 }
 
