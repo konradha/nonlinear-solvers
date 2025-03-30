@@ -16,6 +16,8 @@ set(HOST_HEADERS
     include/sg_single_solver.hpp 
     include/nlse_cubic_solver.hpp
     include/sg_double_solver.hpp
+
+    include/sg_single_sv_solver.hpp
 )
 
 add_library(host_solvers INTERFACE)

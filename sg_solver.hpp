@@ -63,12 +63,13 @@ void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
 
   // filter
   Eigen::VectorX<Scalar_t> filtered_u = id_sqrt_multiply(L, u, tau, subspace_dim);
+  // Eigen::VectorX<Scalar_t> filtered_u = sinc_sqrt_multiply(L, u, tau, subspace_dim);
   Eigen::VectorX<Scalar_t> sin_filtered_u = filtered_u.unaryExpr([](Scalar_t x) { return -std::sin(x); });
   Eigen::VectorX<Scalar_t> m_sin_filtered_u = m.cwiseProduct(sin_filtered_u); 
   Eigen::VectorX<Scalar_t> sinc2_term = sinc2_sqrt_half(L, m_sin_filtered_u, tau, subspace_dim);
   Eigen::VectorX<Scalar_t> cos_term = cos_sqrt_multiply(L, u, tau, subspace_dim);
   Eigen::VectorX<Scalar_t> u_cpy = u;
-  u = 2 * cos_term - u_past - tau * tau * sinc2_term;
+  u = 2 * cos_term - u_past + tau * tau * sinc2_term;
   u_past = u_cpy;
 }
 

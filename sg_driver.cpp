@@ -1,6 +1,26 @@
 #include "sg_solver.hpp"
 #include "util.hpp"
 
+template <typename Float>
+void neumann_bc_no_velocity(Eigen::VectorX<Float> & u,
+                const uint32_t nx,
+                const uint32_t ny) {
+    // Used because we can save a lot of cycles that way.
+    /*
+     def neumann_bc(self, u, v, i, tau=None,):
+        u[0, 1:-1] = u[1, 1:-1]
+        u[-1, 1:-1] = u[-2, 1:-1]
+        u[:, 0] = u[:, 1]
+        u[:, -1] = u[:, -2]
+     */
+    Eigen::Map<Eigen::Matrix<Float, Eigen::Dynamic, Eigen::Dynamic>> u_map(u.data(), nx, ny);
+    u_map.row(0).segment(1, ny-2) = u_map.row(1).segment(1, ny-2);
+    u_map.row(nx-1).segment(1, ny-2) = u_map.row(nx-2).segment(1, ny-2);
+    u_map.col(0) = u_map.col(1);
+    u_map.col(ny-1) = u_map.col(ny-2);
+}
+
+
 template <typename Float, typename F>
 Eigen::VectorX<Float> apply_function(const Eigen::VectorX<Float> &x,
                                      const Eigen::VectorX<Float> &y, F f) {
@@ -26,22 +46,22 @@ Eigen::VectorX<Float> apply_function_uniform(Float x_min, Float x_max,
 
 int main() {
   using f_ty = double;
-  const uint32_t nx = 120, ny = 120;
-  const f_ty Lx = 5., Ly = 5.;
+  const uint32_t nx = 300, ny = 300;
+  const f_ty Lx = 10., Ly = 10.;
   const f_ty dx = 2 * Lx / (nx + 1), dy = 2 * Ly / (ny + 1);
-  const f_ty T = 10.;
+  const f_ty T = 5.;
   const uint32_t nt = 500;
   const uint32_t num_snapshots = 100;
   const auto freq = nt / num_snapshots;
   const auto dt = T / nt;
 
-  auto f = [](f_ty x, f_ty y) {
-    return 2. * std::atan(std::exp(3. - 5. * std::sqrt(x * x + y * y)));
-  };
-
   // auto f = [](f_ty x, f_ty y) {
-  //   return 4. * std::atan(std::exp(3. - 5. * std::sqrt((x - y) * (x - y) / 3 + (x + y) * (x + y) / 2)));
+  //   return 2. * std::atan(std::exp(3. - 5. * std::sqrt(x * x + y * y)));
   // };
+
+  auto f = [](f_ty x, f_ty y) {
+    return 4. * std::atan(std::exp(3. - 5. * std::sqrt((x - y) * (x - y) / 3 + (x + y) * (x + y) / 2)));
+  };
   auto zero = [](f_ty x, f_ty y) { return 0.; };
   auto one = [](f_ty x, f_ty y) { return 1.; };
   auto neg = [](f_ty x, f_ty y) { return -1.; };
@@ -79,6 +99,7 @@ int main() {
   for (uint32_t i = 1; i < nt; ++i) {
     SGESolver::step_sv<f_ty>(u, u_past, buf, L, c, m, dt); 
     v = (u - u_past) / dt;
+    neumann_bc_no_velocity<f_ty>(u, nx, ny);
 
     if (i % freq == 0) {
       Eigen::Map<Eigen::Matrix<f_ty, -1, -1, Eigen::RowMajor>>(
@@ -113,10 +134,10 @@ int main() {
   u_past = u0 - dt * v0;
   v_past = v0 - dt * dt * (L * u0);
 
-  for (uint32_t i = 1; i < nt; i += 1) { 
+  for (uint32_t i = 1; i < nt; i += 1) {   
     SGESolver::step<f_ty>(u, u_past, buf, L, c, m, dt); 
-    v = (u - u_past) / dt;
-
+    v = (u - u_past) / (dt);
+    neumann_bc_no_velocity<f_ty>(u, nx, ny);
     if (i % freq == 0) {
       Eigen::Map<Eigen::Matrix<f_ty, -1, -1, Eigen::RowMajor>>(
           u_save.data(), num_snapshots, nx * ny)

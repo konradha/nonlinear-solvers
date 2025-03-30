@@ -85,6 +85,26 @@ Eigen::VectorX<Float> cos_sqrt_multiply(const Eigen::SparseMatrix<Float> &L,
 }
 
 template <typename Float>
+Eigen::VectorX<Float> sinc_sqrt_multiply(const Eigen::SparseMatrix<Float> &L,
+                                        const Eigen::VectorX<Float> &u, Float t,
+                                        const uint32_t m = 10) {
+  const auto [V, T, beta] = lanczos_L(L, u, m);
+  Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
+  Eigen::MatrixX<Float> sinc_sqrt_T =
+      (es.eigenvectors() *
+       (t * es.eigenvalues().array().abs().sqrt())
+           .unaryExpr([](Float x) {
+             return std::abs(x) < 1e-8 ? Float(1) : std::sin(x) / x;
+           })
+           .matrix()
+           .asDiagonal() *
+       es.eigenvectors().transpose());
+  Eigen::VectorX<Float> e1 = Eigen::VectorX<Float>::Zero(T.rows());
+  e1(0) = 1.0;
+  return beta * V * sinc_sqrt_T * e1;
+}
+
+template <typename Float>
 Eigen::VectorX<Float> sinc2_sqrt_multiply(const Eigen::SparseMatrix<Float> &L,
                                           const Eigen::VectorX<Float> &u,
                                           Float t, const uint32_t m = 10) {
@@ -169,9 +189,9 @@ Eigen::VectorX<Float> sinc2_sqrt_half(const Eigen::SparseMatrix<Float> &L,
       (es.eigenvectors() *
        (t / 2. * es.eigenvalues().array().abs().sqrt())
            .unaryExpr([](Float x) {
-             return std::abs(x) < 1e-8 ? Float(1) : std::sin(x) / x;
+             return std::abs(x) < 1e-8 ? Float(1) : (std::sin(x) / x) * (std::sin(x) / x);
            })
-           .square()
+           //.square()
            .matrix()
            .asDiagonal() *
        es.eigenvectors().transpose());

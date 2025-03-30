@@ -28,6 +28,12 @@ if(BUILD_SG_SINGLE)
         target_link_libraries(sg_single PRIVATE host_solvers)
         install(TARGETS sg_single RUNTIME DESTINATION bin)
     endif()
+
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sg_single_driver_sv.cpp")
+        add_executable(sg_single_sv sg_single_driver_sv.cpp)
+        target_link_libraries(sg_single_sv PRIVATE host_solvers)
+        install(TARGETS sg_single_sv RUNTIME DESTINATION bin)
+    endif()
 endif()
 
 if(BUILD_SG_DOUBLE)
