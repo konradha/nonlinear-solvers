@@ -13,6 +13,7 @@ from typing import Dict, List, Tuple, Optional, Union, Any
 
 from valid_spaces import get_parameter_spaces
 
+
 class WaveSolutionMapper:
     def __init__(self, sampler, output_dir=None):
         self.sampler = sampler
