@@ -121,6 +121,11 @@ def compute_spectral_dispersion(data, dx, dt):
     k_centers = (k_bins[:-1] + k_bins[1:]) / 2
     return k_centers, dispersion_radial, dispersion_std, dispersion_avg
 
+def focussing(n, L):
+    xn = yn = np.linspace(-L, L, n)
+    X, Y = np.meshgrid(xn, yn)
+    field = 0.5 * np.exp(-(X ** 2 + Y ** 2)/4.0) * np.exp(1j*(X ** 2 + Y ** 2)/2)
+    return field
 
 class NLSEIntegratorComparison:
     def __init__(self, args):
@@ -190,7 +195,7 @@ class NLSEIntegratorComparison:
 
         except Exception as e:
             raise ValueError(f"Unknown ic_type: {self.args.ic_type} or other error {e}")
-
+        
         m = np.ones((max_nx, max_nx)) * self.m_value
         np.save(u0_file, u0)
         np.save(m_file, m)

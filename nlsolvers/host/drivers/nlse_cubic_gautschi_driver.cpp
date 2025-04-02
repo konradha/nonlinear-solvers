@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
   }
 
   for (uint32_t i = 2; i < nt; ++i) {
-    NLSECubicGautschiSolver::step(buf, rho_buf, u, u_prev, L, m, dti);
+    NLSECubicGautschiSolver::step(buf, rho_buf, u, u_prev, (-L).eval(), m, dti);
     neumann_bc_no_velocity<std::complex<double>>(u, nx, ny);   
 
     if (i % freq == 0) {

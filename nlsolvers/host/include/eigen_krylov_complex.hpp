@@ -61,7 +61,7 @@ Eigen::VectorX<Float> expm_multiply(const Eigen::SparseMatrix<Float> &L,
   // std::cout << "Host eigenvalues\n" << es.eigenvalues() << "\n";
   Eigen::MatrixX<Float> exp_T =
       (es.eigenvectors() *
-       (t * es.eigenvalues().array().abs())
+       (t * es.eigenvalues())
            .unaryExpr([](Float x) { return std::exp(x); })
            .matrix()
            .asDiagonal() *
@@ -83,7 +83,7 @@ Eigen::VectorX<Float> sincm_multiply(const Eigen::SparseMatrix<Float> &L,
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
   Eigen::MatrixX<Float> sinc_T =
       (es.eigenvectors() *
-       (t * es.eigenvalues().array().abs())
+       (t * es.eigenvalues())
            .unaryExpr([](Float x) { return std::abs(x) < 1e-8 ? Float(1) : std::sin(x) / x;  })
            .matrix()
            .asDiagonal() *

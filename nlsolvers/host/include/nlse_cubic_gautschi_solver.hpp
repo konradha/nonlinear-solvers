@@ -37,7 +37,7 @@ void step(Eigen::VectorX<Scalar_t> &buf, Eigen::VectorX<Scalar_t> &rho_buf,
   assert(std::abs(tau.real()) < 1e-12); // real part should be close to 0
   assert(std::abs(tau.imag()) > 1e-7);  // imag part should carry our time step
   
-  Eigen::VectorX<Scalar_t> phi_s_B_un = sincm_multiply(L, buf, -real_tau);
+  Eigen::VectorX<Scalar_t> phi_s_B_un = sincm_multiply(L, buf, real_tau);
   Eigen::VectorX<Scalar_t> exp_phi_s_B_un = expm_multiply(L, phi_s_B_un, tau);
 
   // e^{-2i*tau*Delta} on u^{n-1}
