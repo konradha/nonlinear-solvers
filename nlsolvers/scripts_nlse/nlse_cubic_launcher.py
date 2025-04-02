@@ -88,6 +88,8 @@ class NLSELauncher:
             **phenomenon_params
         )
 
+        print(np.min(np.abs(u0 ** 2)))
+
         if isinstance(u0, torch.Tensor):
             u0 = u0.detach().numpy()
 
