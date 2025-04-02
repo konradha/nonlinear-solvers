@@ -326,6 +326,7 @@ class NLSELauncher:
         for i in range(self.args.num_runs):
             try:
                 u0, phenomenon_params = self.generate_initial_condition(i)
+                print(f"Run {i+1}/{self.args.num_runs}", phenomenon_params)
                 m = self.generate_spatial_amplification(i)
                 traj_data, walltime = self.run_simulation(i, u0, m)
                 traj_data = self.downsample_trajectory(traj_data)
@@ -336,9 +337,6 @@ class NLSELauncher:
                     self.create_visualization(
                         i, traj_data, m, phenomenon_params, walltime)
                 self.cleanup(i)
-
-                print(
-                    f"Run {i+1}/{self.args.num_runs} ({self.args.phenomenon}, {self.args.m_type})")
                 print(f"Walltime: {walltime:.4f} seconds")
 
             except Exception as e:
@@ -361,6 +359,7 @@ def parse_args():
                                  "logarithmic_singularity_adapted", "turbulent_condensate",
                                  "topological_defect_network", "akhmediev_breather",
                                  "self_similar_pattern"],
+                        required=True,
                         help="Phenomenon type to simulate")
 
     parser.add_argument("--m_type", type=str, default="constant",
@@ -417,8 +416,8 @@ def parse_args():
         help="Output directory")
     parser.add_argument(
         "--exe",
+        required=True,
         type=str,
-        default=None,
         help="Path to executable")
     parser.add_argument("--num-runs", type=int, default=1,
                         help="Number of runs to perform")
@@ -426,7 +425,7 @@ def parse_args():
     parser.add_argument("--dr-x", type=int, default=128,
                         help="Number of gridpoints to sample down for in x-direction")
     parser.add_argument("--dr-y", type=int, default=128,
-                        help="Number of gridpoints to sample down for in x-direction")
+                        help="Number of gridpoints to sample down for in y-direction")
     parser.add_argument("--dr-strategy", choices=["FFT", "interpolation", "none"],
                         default="interpolation",
                         help="Downsampling strategy: Default is interpolation due to " +

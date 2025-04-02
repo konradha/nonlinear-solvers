@@ -4,6 +4,14 @@
 #include "eigen_krylov_complex.hpp"
 #include "laplacians.hpp"
 
+/*
+ *
+ * This solver has issues: It's not an actually Gautschi-like integraor.
+ * Formally, we can see that the time stepping needs to be adjusted much
+ * more carefully than, say, the SS2 integrator's.
+ * Hence, we'll use it for comparison purposes, not really for data generation!
+ */
+
 
 namespace NLSECubicGautschiSolver {
 // scalar type is either
