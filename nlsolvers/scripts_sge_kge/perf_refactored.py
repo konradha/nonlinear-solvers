@@ -202,8 +202,8 @@ class IntegratorComparison:
         v0_file = self.ic_dir / f"reference_v0_{self.run_id}.npy"
 
         m = np.ones((max_nx, max_nx))
-        u0 = u0 / np.max(np.abs(u0))
-        #v0 = v0 / np.max(np.abs(v0))
+        # u0 = u0 / np.max(np.abs(u0))
+        # v0 = v0 / np.max(np.abs(v0))
 
         np.save(u0_file, u0)
         np.save(v0_file, v0)

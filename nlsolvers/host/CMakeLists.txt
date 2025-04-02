@@ -17,6 +17,8 @@ set(HOST_HEADERS
     include/nlse_cubic_solver.hpp
     include/sg_double_solver.hpp
 
+    nlse_cubic_gautschi_solver.hpp # let's try and bring the sEWI integrator to life
+
     include/sg_single_sv_solver.hpp
 )
 

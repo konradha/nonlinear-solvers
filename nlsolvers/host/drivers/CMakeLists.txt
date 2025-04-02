@@ -4,6 +4,13 @@ if(BUILD_NLSE_CUBIC)
         target_link_libraries(nlse_cubic PRIVATE host_solvers)
         install(TARGETS nlse_cubic RUNTIME DESTINATION bin)
     endif()
+
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/nlse_cubic_gautschi_driver.cpp")
+        add_executable(nlse_cubic_gautschi nlse_cubic_gautschi_driver.cpp)
+        target_link_libraries(nlse_cubic_gautschi PRIVATE host_solvers)
+        install(TARGETS nlse_cubic_gautschi RUNTIME DESTINATION bin)
+    endif()
+
 endif()
 
 if(BUILD_NLSE_CUBIC_QUINTIC)
