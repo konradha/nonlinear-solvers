@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 import argparse
 import os
 import time
@@ -124,8 +125,9 @@ def compute_spectral_dispersion(data, dx, dt):
 def focussing(n, L):
     xn = yn = np.linspace(-L, L, n)
     X, Y = np.meshgrid(xn, yn)
-    field = 0.5 * np.exp(-(X ** 2 + Y ** 2)/4.0) * np.exp(1j*(X ** 2 + Y ** 2)/2)
+    field = np.exp(-(X ** 2 + Y ** 2)/4.) * np.exp(-1j*(X ** 2 + Y ** 2)/2.)
     return field
+
 
 class NLSEIntegratorComparison:
     def __init__(self, args):
@@ -144,6 +146,8 @@ class NLSEIntegratorComparison:
         self.setup_directories()
         max_n = max(args.nx_values)
         self.sampler = NLSEPhenomenonSampler(max_n, max_n, args.Lx)
+
+        self.traj_files = list() # let's keep track of them to remove after done
 
     def setup_directories(self):
         self.output_dir = Path(self.args.output_dir)
@@ -196,6 +200,7 @@ class NLSEIntegratorComparison:
         except Exception as e:
             raise ValueError(f"Unknown ic_type: {self.args.ic_type} or other error {e}")
         
+        #u0 = focussing(max_nx, self.Lx)
         m = np.ones((max_nx, max_nx)) * self.m_value
         np.save(u0_file, u0)
         np.save(m_file, m)
@@ -212,17 +217,35 @@ class NLSEIntegratorComparison:
                 m.reshape(1, *m.shape), (nx, nx), self.Lx, self.Ly)[0] 
         else:
             u0_nx, m_nx = u0, m
+        """
+                    self.nx_values = args.nx_values
+                    self.nt_values = args.nt_values
+                    self.Lx = args.Lx
+                    self.Ly = args.Ly
+                    self.T = args.T
+        """
+        dt = self.T / nt
+        dx = dy = 2 * self.Lx / (nx + 1)
+        k_nyquist_x = np.pi / dx  
+        k_nyquist_y = np.pi / dy
+        k_max = np.sqrt(k_nyquist_x**2 + k_nyquist_y**2)
+        dt_max = np.pi / k_max
+        if dt > min(dx**2 / 4., dt_max):
+            print(f"Warning: {nx=}, {nt=} yields {dt_max=:.2f} and {(dx**2 / 4)=:.2e}.,"
+                   "ie. augmented CFL condition violated")
+
 
         np.save(u0_nx_file, u0_nx)
         np.save(m_nx_file, m_nx)
 
         traj_file = self.traj_dir / f"{integrator_type}_{nx}_{nt}_{self.run_id}.npy"
+        self.traj_files.append(traj_file)
 
         exe_path = Path(self.executables[integrator_type])
         if not exe_path.exists():
             raise FileNotFoundError(f"Executable {exe_path} not found")
 
-        snapshots = min(100, nt // 10)
+        snapshots = nt // 10 # min(100, nt // 10)
         self.snapshots = snapshots
 
         cmd = [
@@ -801,6 +824,126 @@ class NLSEIntegratorComparison:
             f"computational_efficiency_{self.run_id}.png",
             dpi=300)
         plt.close()
+    def generate_stability_map(self, metrics_all):
+        fig, ax = plt.subplots(figsize=(10, 8))
+
+        cell_size = 1.0
+        nx_values = self.nx_values
+        nt_values = self.nt_values
+
+        for i, nx in enumerate(nx_values):
+            for j, nt in enumerate(nt_values):
+                x = i * cell_size
+                y = j * cell_size
+
+                gautschi_result = metrics_all.get((nx, nt), {}).get('gautschi', {})
+                ss2_result = metrics_all.get((nx, nt), {}).get('ss2', {})
+
+                has_gautschi_data = len(gautschi_result) > 0
+                has_ss2_data = len(ss2_result) > 0
+
+                g_stable = has_gautschi_data and not (np.any(np.isnan(gautschi_result.get('mass_values', [0]))) or
+                                                   np.any(np.isnan(gautschi_result.get('total_energy', [0]))))
+                ss2_stable = has_ss2_data and not (np.any(np.isnan(ss2_result.get('mass_values', [0]))) or
+                                                np.any(np.isnan(ss2_result.get('total_energy', [0]))))
+
+                ax.add_patch(plt.Rectangle((x, y), 0.5, 1.0, color='green' if g_stable else 'red'))
+                ax.add_patch(plt.Rectangle((x + 0.5, y), 0.5, 1.0, color='green' if ss2_stable else 'red'))
+
+                ax.text(x + 0.25, y + 0.5, "G", ha='center', va='center', fontsize=12,
+                      color='black' if g_stable else 'white')
+                ax.text(x + 0.75, y + 0.5, "S", ha='center', va='center', fontsize=12,
+                      color='black' if ss2_stable else 'white')
+
+        ax.set_xlim(0, len(nx_values) * cell_size)
+        ax.set_ylim(0, len(nt_values) * cell_size)
+        ax.set_xticks(np.arange(len(nx_values)) * cell_size + 0.5)
+        ax.set_yticks(np.arange(len(nt_values)) * cell_size + 0.5)
+        ax.set_xticklabels(nx_values)
+        ax.set_yticklabels(nt_values)
+        ax.set_xlabel('Grid Size (nx)')
+        ax.set_ylabel('Time Steps (nt)')
+
+        ax.set_title('Stability Map: Gautschi (G) vs SS2 (S)')
+
+        plt.tight_layout()
+        fig.savefig(self.plots_dir / f"stability_map_{self.run_id}.png", dpi=300)
+        plt.close(fig)
+
+    def generate_metrics_map(self, metrics_all):
+        fig, ax = plt.subplots(figsize=(12, 10))
+
+        cell_size = 1.0
+        nx_values = self.nx_values
+        nt_values = self.nt_values
+
+        for i, nx in enumerate(nx_values):
+            for j, nt in enumerate(nt_values):
+                x = i * cell_size
+                y = j * cell_size
+
+                gautschi_result = metrics_all.get((nx, nt), {}).get('gautschi', {})
+                ss2_result = metrics_all.get((nx, nt), {}).get('ss2', {})
+
+                has_gautschi_data = len(gautschi_result) > 0
+                has_ss2_data = len(ss2_result) > 0
+
+                g_stable = has_gautschi_data and not (np.any(np.isnan(gautschi_result.get('mass_values', [0]))) or
+                                                   np.any(np.isnan(gautschi_result.get('total_energy', [0]))))
+                ss2_stable = has_ss2_data and not (np.any(np.isnan(ss2_result.get('mass_values', [0]))) or
+                                                np.any(np.isnan(ss2_result.get('total_energy', [0]))))
+
+                if has_gautschi_data and has_ss2_data and g_stable and ss2_stable:
+                    g_l2 = np.max(gautschi_result.get('amplitude_errors', [0]))
+                    ss2_l2 = np.max(ss2_result.get('amplitude_errors', [0]))
+
+                    best_l2 = min(g_l2, ss2_l2)
+                    g_l2_norm = g_l2 / best_l2 if best_l2 > 0 else 1.0
+                    ss2_l2_norm = ss2_l2 / best_l2 if best_l2 > 0 else 1.0
+
+                    g_energy_err = np.max(gautschi_result.get('energy_error', [0]))
+                    ss2_energy_err = np.max(ss2_result.get('energy_error', [0]))
+
+                    l2_cmap = plt.cm.coolwarm
+                    ax.add_patch(plt.Rectangle((x, y), 0.5, 0.5, color=l2_cmap(min(g_l2_norm, 2.0)/2.0)))
+                    ax.add_patch(plt.Rectangle((x + 0.5, y), 0.5, 0.5, color=l2_cmap(min(ss2_l2_norm, 2.0)/2.0)))
+
+                    ax.add_patch(plt.Rectangle((x, y+0.5), 0.5, 0.5,
+                                             color=plt.cm.viridis(min(1.0, g_energy_err*10))))
+                    ax.add_patch(plt.Rectangle((x + 0.5, y+0.5), 0.5, 0.5,
+                                             color=plt.cm.viridis(min(1.0, ss2_energy_err*10))))
+
+                    ax.text(x + 0.25, y + 0.75, f"{g_energy_err:.1e}", ha='center', va='center', fontsize=6)
+                    ax.text(x + 0.75, y + 0.75, f"{ss2_energy_err:.1e}", ha='center', va='center', fontsize=6)
+                    ax.text(x + 0.25, y + 0.25, f"{g_l2:.1e}", ha='center', va='center', fontsize=6)
+                    ax.text(x + 0.75, y + 0.25, f"{ss2_l2:.1e}", ha='center', va='center', fontsize=6)
+                else:
+                    ax.add_patch(plt.Rectangle((x, y), 1.0, 1.0, color='lightgray'))
+
+        ax.set_xlim(0, len(nx_values) * cell_size)
+        ax.set_ylim(0, len(nt_values) * cell_size)
+        ax.set_xticks(np.arange(len(nx_values)) * cell_size + 0.5)
+        ax.set_yticks(np.arange(len(nt_values)) * cell_size + 0.5)
+        ax.set_xticklabels(nx_values)
+        ax.set_yticklabels(nt_values)
+        ax.set_xlabel('Grid Size (nx)')
+        ax.set_ylabel('Time Steps (nt)')
+
+        ax.set_title('Metrics Map: Gautschi vs SS2')
+
+        l2_sm = plt.cm.ScalarMappable(cmap=l2_cmap, norm=Normalize(0, 1))
+        l2_sm.set_array([])
+        l2_cbar = plt.colorbar(l2_sm, ax=ax, location='right', pad=0.1)
+        l2_cbar.set_label('L2 Distance (normalized)')
+
+        e_sm = plt.cm.ScalarMappable(cmap=plt.cm.viridis, norm=Normalize(0, 0.1))
+        e_sm.set_array([])
+        e_cbar = plt.colorbar(e_sm, ax=ax, location='right', pad=0.15)
+        e_cbar.set_label('Energy Error')
+
+        plt.tight_layout()
+        fig.savefig(self.plots_dir / f"metrics_map_{self.run_id}.png", dpi=300)
+        plt.close(fig)
 
     def execute_comparison(self):
         u0, m, u0_file, m_file = self.generate_base_conditions()
@@ -812,6 +955,9 @@ class NLSEIntegratorComparison:
             walltime_data[nx] = {}
             for nt in self.nt_values:
                 print(f"Running comparison for nx={nx}, nt={nt}")
+                
+
+
                 metrics_by_integrator = {}
                 walltime_data[nx][nt] = {}
 
@@ -857,11 +1003,15 @@ class NLSEIntegratorComparison:
 
         self.plot_metric_vs_resolution(metrics_all)
         self.plot_computational_efficiency(walltime_data, metrics_all)
+        self.generate_stability_map(metrics_all)
+        self.generate_metrics_map(metrics_all)
+
+        
         if 'gautschi_traj' in locals() and 'ss2_traj' in locals():
             self.plot_detailed_comparison(
                 max(self.nx_values), max(self.nt_values),
                 gautschi_traj, ss2_traj, gautschi_metrics, ss2_metrics)
-
+ 
         return metrics_all
 
 
@@ -913,6 +1063,8 @@ def main():
     comparison = NLSEIntegratorComparison(args)
     metrics_all = comparison.execute_comparison()
     print(f"results in {args.output_dir}")
+    for traj_file in comparison.traj_files:
+        os.unlink(traj_file)
 
 
 if __name__ == "__main__":
