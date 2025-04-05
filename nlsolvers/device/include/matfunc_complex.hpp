@@ -16,7 +16,7 @@ __global__ void transform_eigenvals_exp(thrust::complex<double> *out,
                                         const uint32_t m) {
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   if (i < m) {
-    out[i] = thrust::exp(dt * abs(eigvals[i]));
+    out[i] = thrust::exp(dt * eigvals[i]);
   }
 }
 

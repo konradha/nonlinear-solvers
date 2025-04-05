@@ -336,65 +336,61 @@ class NLSEIntegratorComparison:
         return metrics, traj_data
 
     def plot_conservation_comparison(self, nt, metrics_by_nx):
-        for i, nx in enumerate(sorted(metrics_by_nx.keys())):
-            plt.figure(figsize=(15, 10))
-            
-            plt.subplot(2, 2, 1)
-            for integrator, metrics in metrics_by_nx[nx].items():
-                plt.plot(
-                    metrics['time_points'],
-                    metrics['mass_error'],
-                    label=f"{integrator}")
-            plt.title(f"Mass Error (nx={nx}, nt={nt})")
-            plt.xlabel("Time")
-            plt.ylabel("Relative Mass Error")
-            plt.yscale('log')
-            plt.grid(True)
-            plt.legend()
-            
-            plt.subplot(2, 2, 2)
-            for integrator, metrics in metrics_by_nx[nx].items():
-                plt.plot(
-                    metrics['time_points'],
-                    metrics['energy_error'],
-                    label=f"{integrator}")
-            plt.title(f"Energy Error (nx={nx}, nt={nt})")
-            plt.xlabel("Time")
-            plt.ylabel("Relative Energy Error")
-            plt.yscale('log')
-            plt.grid(True)
-            plt.legend()
-            
-            plt.subplot(2, 2, 3)
-            for integrator, metrics in metrics_by_nx[nx].items():
-                plt.plot(
-                    metrics['time_points'][1:],
-                    metrics['conservation_metric_mass'][1:],
-                    label=f"{integrator}")
-            plt.title(f"Log Mass Error (nx={nx}, nt={nt})")
-            plt.xlabel("Time")
-            plt.ylabel("Log Mass Error")
-            plt.grid(True)
-            plt.legend()
-            
-            plt.subplot(2, 2, 4)
-            for integrator, metrics in metrics_by_nx[nx].items():
-                plt.plot(
-                    metrics['time_points'][1:],
-                    metrics['conservation_metric_energy'][1:],
-                    label=f"{integrator}")
-            plt.title(f"Log Energy Error (nx={nx}, nt={nt})")
-            plt.xlabel("Time")
-            plt.ylabel("Log Energy Error")
-            plt.grid(True)
-            plt.legend()
+        for nx in sorted(metrics_by_nx.keys()):
+            fig, axes = plt.subplots(2, 2, figsize=(15, 10), sharex=True)
+            ax_mass_evol, ax_energy_evol, ax_log_mass_err, ax_log_energy_err = axes.flatten()
 
-            plt.tight_layout()
-            plt.savefig(
-                self.plots_dir /
-                f"conservation_comparison_nt{nt}_nx{nx}_{self.run_id}.png",
-                dpi=300)
-            plt.close()
+            metrics_dict = metrics_by_nx[nx]
+
+            for integrator, metrics in metrics_dict.items():
+                time_points = metrics['time_points']
+                ax_mass_evol.plot(
+                    time_points,
+                    metrics['mass_values'],
+                    label=f"{integrator}"
+                )
+                ax_energy_evol.plot(
+                    time_points,
+                    metrics['total_energy'],
+                    label=f"{integrator}"
+                )
+                ax_log_mass_err.plot(
+                    time_points[1:],
+                    metrics['conservation_metric_mass'][1:],
+                    label=f"{integrator}"
+                )
+                ax_log_energy_err.plot(
+                    time_points[1:],
+                    metrics['conservation_metric_energy'][1:],
+                    label=f"{integrator}"
+                )
+
+            ax_mass_evol.set_title(f"Mass Evolution (nx={nx}, nt={nt})")
+            ax_mass_evol.set_ylabel("Total Mass")
+            ax_mass_evol.grid(True)
+            ax_mass_evol.legend()
+
+            ax_energy_evol.set_title(f"Energy Evolution (nx={nx}, nt={nt})")
+            ax_energy_evol.set_ylabel("Total Energy")
+            ax_energy_evol.grid(True)
+            ax_energy_evol.legend()
+
+            ax_log_mass_err.set_title(f"Log Mass Error (nx={nx}, nt={nt})")
+            ax_log_mass_err.set_xlabel("T / [1]")
+            ax_log_mass_err.set_ylabel("Log Abs Mass Error")
+            ax_log_mass_err.grid(True)
+            ax_log_mass_err.legend()
+
+            ax_log_energy_err.set_title(f"Log Energy Error (nx={nx}, nt={nt})")
+            ax_log_energy_err.set_xlabel("T / [1]")
+            ax_log_energy_err.set_ylabel("Log Abs Energy Error")
+            ax_log_energy_err.grid(True)
+            ax_log_energy_err.legend()
+
+            fig.tight_layout()
+            plot_filename = self.plots_dir / f"conservation_comparison_nt{nt}_nx{nx}_{self.run_id}.png"
+            fig.savefig(plot_filename, dpi=300)
+            plt.close(fig)
 
     def plot_structure_comparison(self, nt, metrics_by_nx):
         for i, nx in enumerate(sorted(metrics_by_nx.keys())):
@@ -407,7 +403,7 @@ class NLSEIntegratorComparison:
                     metrics['structure_similarity'],
                     label=f"{integrator}")
             plt.title(f"Structure Similarity (nx={nx}, nt={nt})")
-            plt.xlabel("Time")
+            plt.xlabel("T / [1]")
             plt.ylabel("SSIM")
             plt.grid(True)
             plt.legend()
@@ -419,7 +415,7 @@ class NLSEIntegratorComparison:
                     metrics['phase_errors'],
                     label=f"{integrator}")
             plt.title(f"Phase Error (nx={nx}, nt={nt})")
-            plt.xlabel("Time")
+            plt.xlabel("T / [1]")
             plt.ylabel("Mean Phase Error")
             plt.grid(True)
             plt.legend()
@@ -431,7 +427,7 @@ class NLSEIntegratorComparison:
                     metrics['amplitude_errors'],
                     label=f"{integrator}")
             plt.title(f"Amplitude Error (nx={nx}, nt={nt})")
-            plt.xlabel("Time")
+            plt.xlabel("T / [1]")
             plt.ylabel("RMS Amplitude Error")
             plt.grid(True)
             plt.legend()
@@ -448,7 +444,7 @@ class NLSEIntegratorComparison:
                     '--',
                     label=f"PE {integrator}")
             plt.title(f"Energy Components (nx={nx}, nt={nt})")
-            plt.xlabel("Time")
+            plt.xlabel("T / [1]")
             plt.ylabel("Relative Energy")
             plt.grid(True)
             plt.legend()
@@ -631,7 +627,7 @@ class NLSEIntegratorComparison:
             gautschi_metrics['potential_energy'],
             label='Potential (G)')
         plt.title("Energy Components (Gautschi)")
-        plt.xlabel("Time")
+        plt.xlabel("T / [1]")
         plt.grid(True)
         plt.legend()
 
@@ -647,7 +643,7 @@ class NLSEIntegratorComparison:
             '--',
             label='Potential (SS2)')
         plt.title("Energy Components (SS2)")
-        plt.xlabel("Time")
+        plt.xlabel("T / [1]")
         plt.grid(True)
         plt.legend()
 
@@ -662,7 +658,7 @@ class NLSEIntegratorComparison:
             '--',
             label='SSIM (SS2)')
         plt.title("Structure Similarity")
-        plt.xlabel("Time")
+        plt.xlabel("T / [1]")
         plt.grid(True)
         plt.legend()
 
@@ -1000,7 +996,7 @@ class NLSEIntegratorComparison:
                 metrics_by_nx = {nx: metrics_by_integrator}
                 self.plot_conservation_comparison(nt, metrics_by_nx)
                 self.plot_structure_comparison(nt, metrics_by_nx)
-
+               
         self.plot_metric_vs_resolution(metrics_all)
         self.plot_computational_efficiency(walltime_data, metrics_all)
         self.generate_stability_map(metrics_all)

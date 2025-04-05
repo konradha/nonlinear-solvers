@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
   Eigen::VectorXcd rho_buf(nx * ny);
 
 
-  uint32_t pre_steps = 10;
+  uint32_t pre_steps = 2;
   auto dti_small = dti / static_cast<double>(pre_steps);
   Eigen::VectorXcd u_prev = u0;
   Eigen::SparseLU<Eigen::SparseMatrix<std::complex<double>>> solver;
@@ -113,7 +113,6 @@ int main(int argc, char **argv) {
   for(uint32_t k = 0;k<pre_steps;++k) {
     // take #pre_steps of SS2 
     NLSESolver::step<std::complex<double>>(buf, rho_buf, u, L, m, dti_small);
-
     // repeatedly apply 1st order approx as suggested
     // const auto B = compute_B(u);  
     // const auto filtered = NLSECubicGautschiSolver::phi1m_multiply<std::complex<double>>
@@ -124,7 +123,7 @@ int main(int argc, char **argv) {
   }
 
   for (uint32_t i = 2; i < nt; ++i) {
-    NLSECubicGautschiSolver::step(buf, rho_buf, u, u_prev, (-L).eval(), m, dti);
+    NLSECubicGautschiSolver::step(buf, rho_buf, u, u_prev, L, m, dti);
     neumann_bc_no_velocity<std::complex<double>>(u, nx, ny);   
 
     if (i % freq == 0) {

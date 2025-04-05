@@ -76,13 +76,13 @@ public:
     device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
                                                ny_);
     device::nonlin_part<<<grid_dim_, block_dim_>>>(d_buf_, d_u_, d_density_,
-                                                   -.5 * tau, nx_, ny_);
-    matfunc_->apply(d_u_, d_buf_, -tau);
+                                                   .5 * tau, nx_, ny_);
+    matfunc_->apply(d_u_, d_buf_, tau);
 
     device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
                                                ny_);
     device::nonlin_part<<<grid_dim_, block_dim_>>>(d_u_, d_u_, d_density_,
-                                                   -.5 * tau, nx_, ny_);
+                                                   .5 * tau, nx_, ny_);
     if (step_number % params_.snapshot_freq == 0) {
       store_snapshot(step_number);
     }
