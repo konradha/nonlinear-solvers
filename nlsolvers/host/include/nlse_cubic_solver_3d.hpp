@@ -17,13 +17,13 @@ void step(Eigen::VectorX<Scalar_t> &buf, Eigen::VectorX<Scalar_t> &rho_buf,
   rho_buf =
       (m.cwiseProduct((u.real().cwiseProduct(u.real())) +
                       (u.imag()).cwiseProduct(u.imag())))
-          .unaryExpr([&tau](Scalar_t x) { return std::exp(-.5 * tau * x); })
+          .unaryExpr([&tau](Scalar_t x) { return std::exp(.5 * tau * x); })
           .cwiseProduct(u);
 
-  buf = expm_multiply(L, rho_buf, -tau);
+  buf = expm_multiply(L, rho_buf, tau);
   u = (m.cwiseProduct((buf.real().cwiseProduct(buf.real())) +
                       (buf.imag()).cwiseProduct(buf.imag())))
-          .unaryExpr([&tau](Scalar_t x) { return std::exp(-.5 * tau * x); })
+          .unaryExpr([&tau](Scalar_t x) { return std::exp(.5 * tau * x); })
           .cwiseProduct(buf);
 }
 }; // namespace NLSESolver3d

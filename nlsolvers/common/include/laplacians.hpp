@@ -52,6 +52,57 @@ Eigen::SparseMatrix<Float> build_laplacian_noflux(uint32_t nx, uint32_t ny,
 }
 
 template <typename Float>
+Eigen::SparseMatrix<Float>
+build_anisotropic_laplacian_noflux(uint32_t nx, uint32_t ny, Float dx, Float dy,
+                                   const Eigen::VectorX<Float> &c) {
+  /*
+   * Let's hope this works: Assume div(c(x,y)grad(u))
+   * Then we make use of averaged cell values for c_ij (a finite volume
+   * approach).
+   */
+  assert(nx == ny);
+  assert(std::abs(dx - dy) < 1e-10);
+  assert(c.size() == (nx + 2) * (nx + 2));
+
+  const uint32_t N = (nx + 2) * (nx + 2);
+  const uint32_t nnz = N + 4 * (N - 1) - 4;
+  using T = Eigen::Triplet<Float>;
+  std::vector<T> triplets;
+  triplets.reserve(nnz);
+
+  std::vector<Float> diagonal_sums(N, 0.0);
+
+  for (uint32_t i = 0; i < N - 1; ++i) {
+    if ((i + 1) % (nx + 2) != 0) {
+      Float avg_c = (c[i] + c[i + 1]) / 2.0;
+      triplets.emplace_back(i, i + 1, avg_c);
+      triplets.emplace_back(i + 1, i, avg_c);
+      diagonal_sums[i] += avg_c;
+      diagonal_sums[i + 1] += avg_c;
+    }
+  }
+
+  for (uint32_t i = 0; i < N - (nx + 2); ++i) {
+    Float avg_c = (c[i] + c[i + (nx + 2)]) / 2.0;
+    triplets.emplace_back(i, i + (nx + 2), avg_c);
+    triplets.emplace_back(i + (nx + 2), i, avg_c);
+    diagonal_sums[i] += avg_c;
+    diagonal_sums[i + (nx + 2)] += avg_c;
+  }
+
+  for (uint32_t i = 0; i < N; ++i) {
+    triplets.emplace_back(i, i, -diagonal_sums[i]);
+  }
+
+  Eigen::SparseMatrix<Float> L(N, N);
+  L.setFromTriplets(triplets.begin(), triplets.end());
+  L.makeCompressed();
+  L *= static_cast<Float>(1.0) / (dx * dy);
+
+  return L;
+}
+
+template <typename Float>
 Eigen::SparseMatrix<Float> build_laplacian_noflux_3d(uint32_t nx, uint32_t ny,
                                                      uint32_t nz, Float dx,
                                                      Float dy, Float dz) {
@@ -94,6 +145,68 @@ Eigen::SparseMatrix<Float> build_laplacian_noflux_3d(uint32_t nx, uint32_t ny,
   for (uint32_t i = 0; i < N - plane_size; ++i) {
     triplets.emplace_back(i, i + plane_size, static_cast<Float>(1.0));
     triplets.emplace_back(i + plane_size, i, static_cast<Float>(1.0));
+  }
+
+  Eigen::SparseMatrix<Float> L(N, N);
+  L.setFromTriplets(triplets.begin(), triplets.end());
+  L.makeCompressed();
+  L *= static_cast<Float>(1.0) / (dx * dx);
+
+  return L;
+}
+
+template <typename Float>
+Eigen::SparseMatrix<Float>
+build_anisotropic_laplacian_noflux_3d(uint32_t nx, uint32_t ny, uint32_t nz,
+                                      Float dx, Float dy, Float dz,
+                                      const Eigen::VectorX<Float> &c) {
+  /*
+   * Similar to the case above. Assume div(c(x,y,z)grad(u))
+   *  = (c u_x)_x + (c u_y)_y + (c u_)z
+   *  {(cu_x)_x}_ijk = ((cu_x)i+1/2,j,k - (cu_x)i-1/2,j,k) / dx etc
+   */
+  assert(nx == ny && ny == nz);
+  assert(std::abs(dx - dy) < 1e-10 && std::abs(dy - dz) < 1e-10);
+  assert(c.size() == (nx + 2) * (ny + 2) * (nz + 2));
+
+  const uint32_t plane_size = (nx + 2) * (ny + 2);
+  const uint32_t N = plane_size * (nz + 2);
+  const uint32_t nnz = N + 6 * (N - 1);
+
+  using T = Eigen::Triplet<Float>;
+  std::vector<T> triplets;
+  triplets.reserve(nnz);
+
+  std::vector<Float> diagonal_sums(N, 0.0);
+
+  for (uint32_t i = 0; i < N - 1; ++i) {
+    if ((i + 1) % (nx + 2) != 0) {
+      Float avg_c = (c[i] + c[i + 1]) / 2.0;
+      triplets.emplace_back(i, i + 1, avg_c);
+      triplets.emplace_back(i + 1, i, avg_c);
+      diagonal_sums[i] += avg_c;
+      diagonal_sums[i + 1] += avg_c;
+    }
+  }
+
+  for (uint32_t i = 0; i < N - (nx + 2); ++i) {
+    Float avg_c = (c[i] + c[i + (nx + 2)]) / 2.0;
+    triplets.emplace_back(i, i + (nx + 2), avg_c);
+    triplets.emplace_back(i + (nx + 2), i, avg_c);
+    diagonal_sums[i] += avg_c;
+    diagonal_sums[i + (nx + 2)] += avg_c;
+  }
+
+  for (uint32_t i = 0; i < N - plane_size; ++i) {
+    Float avg_c = (c[i] + c[i + plane_size]) / 2.0;
+    triplets.emplace_back(i, i + plane_size, avg_c);
+    triplets.emplace_back(i + plane_size, i, avg_c);
+    diagonal_sums[i] += avg_c;
+    diagonal_sums[i + plane_size] += avg_c;
+  }
+
+  for (uint32_t i = 0; i < N; ++i) {
+    triplets.emplace_back(i, i, -diagonal_sums[i]);
   }
 
   Eigen::SparseMatrix<Float> L(N, N);

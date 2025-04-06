@@ -17,9 +17,18 @@ set(HOST_HEADERS
     include/nlse_cubic_solver.hpp
     include/sg_double_solver.hpp
 
-    nlse_cubic_gautschi_solver.hpp # let's try and bring the sEWI integrator to life
+    include/nlse_cubic_gautschi_solver.hpp # let's try and bring the sEWI integrator to life 
+    include/nlse_cubic_quintic_gautschi_solver.hpp
+    include/nlse_saturating_gautschi_solver.hpp
 
+    include/kg_sv_solver.hpp
+    include/phi4_sv_solver.hpp
+    include/sg_double_sv_solver.hpp
+    include/sg_hyperbolic_sv_solver.hpp
     include/sg_single_sv_solver.hpp
+
+    include/nlse_cubic_solver_3d.hpp
+    include/nlse_cubic_gautschi_solver_3d.hpp
 )
 
 add_library(host_solvers INTERFACE)

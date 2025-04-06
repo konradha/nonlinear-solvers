@@ -17,15 +17,15 @@ void step(Eigen::VectorX<Scalar_t> &buf, Eigen::VectorX<Scalar_t> &rho_buf,
       (u.real().cwiseProduct(u.real())) + (u.imag()).cwiseProduct(u.imag());
   rho_buf =
       m.cwiseProduct(s1 * rho_buf + s2 * rho_buf.cwiseProduct(rho_buf))
-          .unaryExpr([&tau](Scalar_t x) { return std::exp(-.5 * tau * x); })
+          .unaryExpr([&tau](Scalar_t x) { return std::exp(.5 * tau * x); })
           .cwiseProduct(u);
 
-  buf = expm_multiply(L, rho_buf, -tau);
+  buf = expm_multiply(L, rho_buf, tau);
   rho_buf =
       (u.real().cwiseProduct(u.real())) + (u.imag()).cwiseProduct(u.imag());
 
   u = m.cwiseProduct(s1 * rho_buf + s2 * rho_buf.cwiseProduct(rho_buf))
-          .unaryExpr([&tau](Scalar_t x) { return std::exp(-.5 * tau * x); })
+          .unaryExpr([&tau](Scalar_t x) { return std::exp(.5 * tau * x); })
           .cwiseProduct(buf);
 }
 }; // namespace NLSEQuinticSolver

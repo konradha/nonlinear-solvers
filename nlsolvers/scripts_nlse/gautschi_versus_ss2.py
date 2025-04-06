@@ -245,7 +245,7 @@ class NLSEIntegratorComparison:
         if not exe_path.exists():
             raise FileNotFoundError(f"Executable {exe_path} not found")
 
-        snapshots = nt // 10 # min(100, nt // 10)
+        snapshots = min(100, nt // 10) # might need adapting
         self.snapshots = snapshots
 
         cmd = [

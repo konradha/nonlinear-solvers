@@ -19,16 +19,16 @@ void step(Eigen::VectorX<Scalar_t> &buf, Eigen::VectorX<Scalar_t> &rho_buf,
       (u.real().cwiseProduct(u.real())) + (u.imag()).cwiseProduct(u.imag());
   rho_buf =
       m.cwiseProduct(rho_buf.cwiseProduct(ones_buf))
-          .unaryExpr([&tau](Scalar_t x) { return std::exp(-.5 * tau * x); })
+          .unaryExpr([&tau](Scalar_t x) { return std::exp(.5 * tau * x); })
           .cwiseProduct(u);
 
-  buf = expm_multiply(L, rho_buf, -tau);
+  buf = expm_multiply(L, rho_buf, tau);
   ones_buf =
       (Eigen::VectorX<Scalar_t>::Ones(L.rows()) + kappa * buf).cwiseInverse();
   rho_buf =
       (u.real().cwiseProduct(u.real())) + (u.imag()).cwiseProduct(u.imag());
   u = m.cwiseProduct(rho_buf.cwiseProduct(ones_buf))
-          .unaryExpr([&tau](Scalar_t x) { return std::exp(-.5 * tau * x); })
+          .unaryExpr([&tau](Scalar_t x) { return std::exp(.5 * tau * x); })
           .cwiseProduct(buf);
 }
 }; // namespace NLSESaturatingSolver

@@ -14,7 +14,7 @@ void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
              const Eigen::VectorX<Scalar_t> &m, const Scalar_t tau) {
   Eigen::VectorX<Scalar_t> buf2 =
       u.unaryExpr([&](Scalar_t x) { return std::sin(x); });
-  buf = L * u + m.cwiseProduct(buf2);
+  buf = L * u - m.cwiseProduct(buf2);
   buf2 = u;
   u = 2 * u - u_past + tau * tau * buf;
   u_past = buf2;

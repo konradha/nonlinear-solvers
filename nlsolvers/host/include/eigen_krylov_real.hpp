@@ -75,7 +75,7 @@ Eigen::VectorX<Float> cos_sqrt_multiply(const Eigen::SparseMatrix<Float> &L,
 
   Eigen::MatrixX<Float> cos_sqrt_T =
       (es.eigenvectors() *
-       (t * es.eigenvalues().array().abs().sqrt()).cos().matrix().asDiagonal() *
+       (t * es.eigenvalues().array().sqrt()).cos().matrix().asDiagonal() *
        es.eigenvectors().transpose());
 
   // find decomposition T = Q D Q.T
@@ -110,7 +110,7 @@ Eigen::VectorX<Float> sinc2_sqrt_multiply(const Eigen::SparseMatrix<Float> &L,
 
   Eigen::MatrixX<Float> sinc2_sqrt_T =
       (es.eigenvectors() *
-       (t * es.eigenvalues().array().abs().sqrt())
+       (t * es.eigenvalues().array().sqrt())
            .unaryExpr(sinc)
            .square()
            .matrix()
@@ -143,7 +143,7 @@ Eigen::VectorX<Float> id_sqrt_multiply(const Eigen::SparseMatrix<Float> &L,
 
   Eigen::MatrixX<Float> id_T =
       (es.eigenvectors() *
-       (t * es.eigenvalues().array().abs().sqrt()).matrix().asDiagonal() *
+       (t * es.eigenvalues().array().sqrt()).matrix().asDiagonal() *
        es.eigenvectors().transpose());
   Eigen::VectorX<Float> e1 = Eigen::VectorX<Float>::Zero(T.rows());
   e1(0) = 1.0;
@@ -168,7 +168,7 @@ Eigen::VectorX<Float> sinc2_sqrt_half(const Eigen::SparseMatrix<Float> &L,
 
   Eigen::MatrixX<Float> sinc_sqrt_T =
       (es.eigenvectors() *
-       (t / 2. * es.eigenvalues().array().abs().sqrt())
+       (t / 2. * es.eigenvalues().array().sqrt())
            .unaryExpr([](Float x) {
              return std::abs(x) < 1e-8 ? Float(1) : std::sin(x) / x;
            })
