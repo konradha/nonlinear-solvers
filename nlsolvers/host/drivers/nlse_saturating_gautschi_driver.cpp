@@ -2,7 +2,7 @@
 #include "eigen_krylov_complex.hpp"
 #include "laplacians.hpp"
 #include "nlse_cubic_solver.hpp" // needed for initial step (SS2 is nice for symmetry)
-#include "nlse_cubic_quintic_gautschi_solver.hpp"
+#include "nlse_saturating_gautschi_solver.hpp"
 #include "util.hpp"
 
 #include <Eigen/Dense>
@@ -17,16 +17,16 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  if (argc != 12 && argc != 13) {
+  if (argc != 11 && argc != 12) {
     std::cerr << "Usage: " << argv[0]
-              << " nx ny Lx Ly s1 s2 input_u0.npy output_traj.npy T nt "
+              << " nx ny Lx Ly kappa input_u0.npy output_traj.npy T nt "
                  "num_snapshots [input_m.npy]\n";
-    std::cerr << "Example: " << argv[0]
-              << " 256 256 10.0 10.0 0.6 -0.6 initial.npy evolution.npy 1.5 "
-                 "500 100\n";
+    std::cerr
+        << "Example: " << argv[0]
+        << " 256 256 10.0 10.0 1. initial.npy evolution.npy 1.5 500 100\n";
     std::cerr << "Example with m(x,y): " << argv[0]
-              << " 256 256 10.0 10.0 0.6 -0.6 initial.npy evolution.npy 1.5 "
-                 "500 100 focusing.npy\n";
+              << " 256 256 10.0 10.0 1. initial.npy evolution.npy 1.5 500 100 "
+                 "focusing.npy\n";
     return 1;
   }
 
@@ -34,19 +34,17 @@ int main(int argc, char **argv) {
   const uint32_t ny = std::stoul(argv[2]);
   const double Lx = std::stod(argv[3]);
   const double Ly = std::stod(argv[4]);
-  const double s1 = std::stod(argv[5]);
-  const double s2 = std::stod(argv[6]);
-  const std::string input_file = argv[7];
-  const std::string output_file = argv[8];
-  const double T = std::stod(argv[9]);
-  const uint32_t nt = std::stoul(argv[10]);
-  const uint32_t num_snapshots = std::stoul(argv[11]);
+  const double kappa = std::stod(argv[5]);
+  const std::string input_file = argv[6];
+  const std::string output_file = argv[7];
+  const double T = std::stod(argv[8]);
+  const uint32_t nt = std::stoul(argv[9]);
+  const uint32_t num_snapshots = std::stoul(argv[10]);
 
   std::optional<std::string> m_file;
-  if (argc == 13) {
-    m_file = argv[12];
+  if (argc == 12) {
+    m_file = argv[11];
   }
-
 
   const double dx = 2 * Lx / (nx - 1);
   const double dy = 2 * Ly / (ny - 1);
@@ -107,10 +105,12 @@ int main(int argc, char **argv) {
   Eigen::SparseLU<Eigen::SparseMatrix<std::complex<double>>> solver;
   Eigen::SparseMatrix<std::complex<double>> scaled_L = dti_small * L;
   solver.compute(scaled_L);
-  auto compute_B = [&m, &s1, &s2](const Eigen::VectorX<Scalar_t> & u) {
+  auto compute_B = [&m, &L, &kappa](const Eigen::VectorX<Scalar_t> & u) {
     auto u_abs_squared = u.real().cwiseProduct(u.real()) +
                         u.imag().cwiseProduct(u.imag());
-    return -(m.cwiseProduct(s1 * u_abs_squared + s2 * u_abs_squared.cwiseProduct(u_abs_squared))).cwiseProduct(u);
+    Eigen::VectorX<Scalar_t> ones_buf = Eigen::VectorX<Scalar_t>::Ones(L.rows());
+    ones_buf = (ones_buf + kappa * u_abs_squared).cwiseInverse();
+    return -m.cwiseProduct(u_abs_squared.cwiseProduct(ones_buf)).cwiseProduct(u);
   };
 
 
@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
   }
 
   for (uint32_t i = 2; i < nt; ++i) {
-    NLSECubicQuinticGautschiSolver::step(buf, rho_buf, u, u_prev, L, m, dti, s1, s2);
+    NLSESaturatingGautschiSolver::step(buf, rho_buf, u, u_prev, L, m, dti, kappa);
     neumann_bc_no_velocity<std::complex<double>>(u, nx, ny);   
 
     if (i % freq == 0) {

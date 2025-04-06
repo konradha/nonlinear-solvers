@@ -1,3 +1,8 @@
+# TODO:
+# [ ] all Gautschi-type integrators (sEWI, NLSE)
+# [ ] all SV-type integrators (KGE, SGE ...)
+# [ ] comparison runners: distance, energies, for all phenomena to check
+
 if(BUILD_NLSE_CUBIC)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/nlse_cubic_driver.cpp")
         add_executable(nlse_cubic nlse_cubic_driver.cpp)

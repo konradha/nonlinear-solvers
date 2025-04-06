@@ -2,7 +2,7 @@
 #include "eigen_krylov_complex.hpp"
 #include "laplacians.hpp"
 #include "nlse_cubic_solver.hpp" // needed for initial step (SS2 is nice for symmetry)
-#include "nlse_cubic_gautschi_solver.hpp"
+#include "nlse_cubic_quintic_gautschi_solver.hpp"
 #include "util.hpp"
 
 #include <Eigen/Dense>

@@ -9,7 +9,8 @@
 namespace NLSESaturatingGautschiSolver {
 template <typename Scalar_t>
 void step(Eigen::VectorX<Scalar_t> &buf, Eigen::VectorX<Scalar_t> &rho_buf,
-          Eigen::VectorX<Scalar_t> &u, const Eigen::SparseMatrix<Scalar_t> &L,
+          Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_prev,
+          const Eigen::SparseMatrix<Scalar_t> &L,
           const Eigen::VectorX<double> &m, const Scalar_t tau,
           const double kappa) {
  
