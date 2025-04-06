@@ -7,7 +7,7 @@
 
 // i u_t + \Delta u + m(\sigma_1 |u| + \sigma_2 |u|²) u = 0
 
-namespace NLSEQuinticGautschiSolver {
+namespace NLSECubicQuinticGautschiSolver {
 template <typename Scalar_t>
 void step(Eigen::VectorX<Scalar_t> &buf, Eigen::VectorX<Scalar_t> &rho_buf,
           Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_prev,
@@ -37,5 +37,5 @@ void step(Eigen::VectorX<Scalar_t> &buf, Eigen::VectorX<Scalar_t> &rho_buf,
   u = exp_u_prev - 2. * tau * exp_phi_s_B_un;
   u_prev = rho_buf; 
 }
-}; // namespace NLSEQuinticSolver
+}; // namespace NLSECubicQuinticSolver
 #endif

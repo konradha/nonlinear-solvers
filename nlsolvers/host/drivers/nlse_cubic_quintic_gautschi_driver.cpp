@@ -2,6 +2,7 @@
 #include "eigen_krylov_complex.hpp"
 #include "laplacians.hpp"
 #include "nlse_cubic_solver.hpp" // needed for initial step (SS2 is nice for symmetry)
+#include "nlse_cubic_gautschi_solver.hpp"
 #include "nlse_cubic_quintic_gautschi_solver.hpp"
 #include "util.hpp"
 
@@ -107,7 +108,7 @@ int main(int argc, char **argv) {
   Eigen::SparseLU<Eigen::SparseMatrix<std::complex<double>>> solver;
   Eigen::SparseMatrix<std::complex<double>> scaled_L = dti_small * L;
   solver.compute(scaled_L);
-  auto compute_B = [&m, &s1, &s2](const Eigen::VectorX<Scalar_t> & u) {
+  auto compute_B = [&m, &s1, &s2](const Eigen::VectorX<std::complex<double>> & u) {
     auto u_abs_squared = u.real().cwiseProduct(u.real()) +
                         u.imag().cwiseProduct(u.imag());
     return -(m.cwiseProduct(s1 * u_abs_squared + s2 * u_abs_squared.cwiseProduct(u_abs_squared))).cwiseProduct(u);

@@ -117,14 +117,14 @@ int main(int argc, char **argv) {
         (solver, scaled_L, B, dti_small);
     Eigen::VectorX<std::complex<double>> exp_v = expm_multiply(L, u, dti_small);
     u = exp_v - dti_small * filtered;
-    neumann_bc_no_velocity<std::complex<double>>(u, nx, ny);
+    neumann_bc_no_velocity_3d<std::complex<double>>(u, nx, ny);
   }
 
   Eigen::VectorXcd u_prev = u0;
 
   for (uint32_t i = 2; i < nt; ++i) {
     NLSECubicGautschiSolver::step(buf, rho_buf, u, u_prev, L, m, dti);
-    neumann_bc_no_velocity<std::complex<double>>(u, nx, ny);
+    neumann_bc_no_velocity_3d<std::complex<double>>(u, nx, ny, nz);
 
     if (i % freq == 0) {
       uint32_t snapshot_idx = i / freq;
