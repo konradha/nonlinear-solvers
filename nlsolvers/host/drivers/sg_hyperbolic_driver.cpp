@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
   }
 
   const Eigen::SparseMatrix<double> L =
-      build_laplacian_noflux<double>(nx - 2, ny - 2, dx, dy);
+      (-build_laplacian_noflux<double>(nx - 2, ny - 2, dx, dy)).eval();
 
   Eigen::VectorXd u_save(num_snapshots * nx * ny);
   Eigen::VectorXd v_save(num_snapshots * nx * ny);

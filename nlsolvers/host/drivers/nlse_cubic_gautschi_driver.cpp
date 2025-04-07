@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
   Eigen::VectorXcd rho_buf(nx * ny);
 
 
-  uint32_t pre_steps = 10;
+  uint32_t pre_steps = 2;
   auto dti_small = dti / static_cast<double>(pre_steps);
   Eigen::VectorXcd u_prev = u0;
   Eigen::SparseLU<Eigen::SparseMatrix<std::complex<double>>> solver;

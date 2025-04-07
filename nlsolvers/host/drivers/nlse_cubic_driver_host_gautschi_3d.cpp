@@ -5,6 +5,7 @@
 #include "nlse_cubic_solver_3d.hpp"
 #include "nlse_cubic_solver.hpp" // initial step 
 #include "nlse_cubic_gautschi_solver.hpp"
+#include "nlse_cubic_gautschi_solver_3d.hpp"
 
 #include "util.hpp"
 
@@ -117,13 +118,13 @@ int main(int argc, char **argv) {
         (solver, scaled_L, B, dti_small);
     Eigen::VectorX<std::complex<double>> exp_v = expm_multiply(L, u, dti_small);
     u = exp_v - dti_small * filtered;
-    neumann_bc_no_velocity_3d<std::complex<double>>(u, nx, ny);
+    neumann_bc_no_velocity_3d<std::complex<double>>(u, nx, ny, nz);
   }
 
   Eigen::VectorXcd u_prev = u0;
 
   for (uint32_t i = 2; i < nt; ++i) {
-    NLSECubicGautschiSolver::step(buf, rho_buf, u, u_prev, L, m, dti);
+    NLSEGautschiSolver3d::step<std::complex<double>>(buf, rho_buf, u, u_prev, L, m, dti);
     neumann_bc_no_velocity_3d<std::complex<double>>(u, nx, ny, nz);
 
     if (i % freq == 0) {

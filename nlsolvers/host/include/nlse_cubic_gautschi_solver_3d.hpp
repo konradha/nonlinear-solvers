@@ -1,17 +1,18 @@
-#ifndef NLSE_CUBIC_GAUTSCHI_SOLVER_HPP
-#define NLSE_CUBIC_GAUTSCHI_SOLVER_HPP
+#ifndef NLSE_CUBIC_GAUTSCHI_SOLVER_3D_HPP
+#define NLSE_CUBIC_GAUTSCHI_SOLVER_3D_HPP
 
 #include "eigen_krylov_complex.hpp"
 
 namespace NLSEGautschiSolver3d {
 template <typename Scalar_t>
 void step(Eigen::VectorX<Scalar_t> &buf, Eigen::VectorX<Scalar_t> &rho_buf,
-          Eigen::VectorX<Scalar_t> &u, const Eigen::SparseMatrix<Scalar_t> &L,
+          Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_prev,
+          const Eigen::SparseMatrix<Scalar_t> &L,
           const Eigen::VectorX<Scalar_t> &m, const Scalar_t tau)
 {
   rho_buf = u;
   // B(u^n) = -m(x,y)V(|u|^2)u
-  auto compute_B = [&m, &s1, &s2](const Eigen::VectorX<Scalar_t> & u) {
+  auto compute_B = [&m](const Eigen::VectorX<Scalar_t> & u) {
     auto u_abs_squared = u.real().cwiseProduct(u.real()) +
                         u.imag().cwiseProduct(u.imag());
     return -m.cwiseProduct(u_abs_squared.cwiseProduct(u));
