@@ -25,7 +25,7 @@ def compute_hamiltonian_nlse_cubic(u, dx, dy, m, **kwargs):
     kinetic = 0.5 * compute_gradient_sq_norm(u, dx, dy)
     u_reshaped = u.reshape(m.shape)
     potential = -0.5 * np.sum(m[1:-1, 1:-1] * np.abs(u_reshaped[1:-1, 1:-1])**4) * dx * dy
-    return kinetic + potential
+    return kinetic, potential
 
 def compute_hamiltonian_nlse_cq(u, dx, dy, m, sigma1, sigma2, **kwargs):
     kinetic = 0.5 * compute_gradient_sq_norm(u, dx, dy)
@@ -33,14 +33,14 @@ def compute_hamiltonian_nlse_cq(u, dx, dy, m, sigma1, sigma2, **kwargs):
     u4 = np.abs(u_reshaped[1:-1, 1:-1])**4
     u6 = np.abs(u_reshaped[1:-1, 1:-1])**6
     potential = - np.sum(m[1:-1, 1:-1] * (sigma1 * 0.5 * u4 + sigma2 * (1./3.) * u6)) * dx * dy
-    return kinetic + potential
+    return kinetic, potential
 
 def compute_hamiltonian_nlse_sat(u, dx, dy, m, kappa, **kwargs):
     kinetic = 0.5 * compute_gradient_sq_norm(u, dx, dy)
     u_reshaped = u.reshape(m.shape)
     u2 = np.abs(u_reshaped[1:-1, 1:-1])**2
     potential = - np.sum(m[1:-1, 1:-1] / (kappa + 1e-15) * np.log(1.0 + kappa * u2)) * dx * dy
-    return kinetic + potential
+    return kinetic, potential
 
 SYSTEM_CONFIG_NLSE = {
     'NLSE_cubic': {
@@ -148,9 +148,9 @@ class NlseComparer:
         except subprocess.CalledProcessError as e:
             print(f"ERROR running {integrator_name}:\nCmd: {' '.join(e.cmd)}\nCode: {e.returncode}\nStdout: {e.stdout}\nStderr: {e.stderr}")
             raise
-        except subprocess.TimeoutExpired as e:
-             print(f"TIMEOUT running {integrator_name} after {e.timeout}s:\nCmd: {' '.join(e.cmd)}")
-             raise
+        except Exception:
+             raise Exception
+
         end_time = time.time()
         walltime = end_time - start_time
         print(f"{integrator_name} finished in {walltime:.2f}s")
@@ -172,8 +172,60 @@ class NlseComparer:
             m_flat = m_np # Assume m is already shaped correctly for func
             h_args = {'u': u_snap, 'dx': dx, 'dy': dy, 'm': m_flat}
             h_args.update(params_dict)
-            hamiltonian_values[i] = hamiltonian_func(**h_args).real
+            k, p = hamiltonian_func(**h_args)
+            hamiltonian_values[i] = k.real + p.real
         return hamiltonian_values
+
+    def _calculate_hamiltonian_closer(self, traj_data, m_np):
+        hamiltonian_func = self.system_config['hamiltonian_func']
+        num_snapshots = traj_data.shape[0]
+        kinetic_values   = np.zeros(num_snapshots)
+        potential_values = np.zeros(num_snapshots)
+
+        dx = 2 * self.args.Lx / (self.args.nx - 1)
+        dy = 2 * self.args.Ly / (self.args.ny - 1)
+        params_dict = {k: getattr(self.args, k) for k in self.system_config['params']}
+        for i in range(num_snapshots):
+            u_snap = traj_data[i].flatten()
+            m_flat = m_np # Assume m is already shaped correctly for func
+            h_args = {'u': u_snap, 'dx': dx, 'dy': dy, 'm': m_flat}
+            h_args.update(params_dict)
+            k, p = hamiltonian_func(**h_args)
+            kinetic_values[i] = k.real
+            potential_values[i] = p.real 
+        return kinetic_values, potential_values
+
+    def _plot_energy_closer(self, time, traj1, traj2, name1, name2, m_np):
+        fig, axes = plt.subplots(1, 3, figsize=(15, 6))
+        k1, p1 = self._calculate_hamiltonian_closer(traj1, m_np) 
+        k2, p2 = self._calculate_hamiltonian_closer(traj2, m_np)
+
+        ax1, ax2, ax_diff = axes.flatten()
+        colors = ["red", "blue"]
+        markers = [10, 'x']
+        labels = ["kinetic", "potential"]
+        for i, d in enumerate([k1, p1]):
+            ax1.plot(time, d, color=colors[i], marker=markers[0], label=labels[i])
+        for i, d in enumerate([k2, p2]):
+            ax2.plot(time, d, color=colors[i], marker=markers[1], label=labels[i])
+        for i, d in enumerate([np.abs(k1 - k2), np.abs(p1 - p2)]):
+            ax_diff.plot(time, d, color=colors[i], linestyle='-.', label=labels[i])
+
+        ax1.set_title(f"{name1}")
+        ax2.set_title(f"{name2}")
+        ax_diff.set_title("$|E_{1} - E_{2}|$")
+
+        for ax in [ax1, ax2, ax_diff]:
+            ax.legend()
+            ax.grid(True)
+        fig.suptitle(f"{name1} vs {name2}")
+        ax_diff.set_yscale("log")
+
+        plot_filename = self.plots_dir / f"closer_energy_{name1}_vs_{name2}_{self.args.system_type}_{self.run_id}.png"
+        fig.tight_layout(rect=[0, 0.03, 1, 0.93])
+        fig.savefig(plot_filename, dpi=300)
+        plt.close(fig)
+        print(f"Closer energy comparison plot saved to {plot_filename}")
 
     def _analyze_trajectory(self, traj_path):
         traj_data = self._load_trajectory(traj_path)
@@ -219,7 +271,7 @@ class NlseComparer:
 
         plot_filename = self.plots_dir / f"state_difference_{name1}_vs_{name2}_{self.args.system_type}_{self.run_id}.png"
         fig.tight_layout(rect=[0, 0.03, 1, 0.93])
-        fig.savefig(plot_filename, dpi=150)
+        fig.savefig(plot_filename, dpi=300)
         plt.close(fig)
         print(f"State difference plot saved to {plot_filename}")
 
@@ -244,7 +296,7 @@ class NlseComparer:
 
         plot_filename = self.plots_dir / f"state_{name}_{self.args.system_type}_{self.run_id}.png"
         fig.tight_layout(rect=[0, 0.03, 1, 0.93])
-        fig.savefig(plot_filename, dpi=150)
+        fig.savefig(plot_filename, dpi=300)
         plt.close(fig)
         print(f"States {name} plot saved to {plot_filename}")
 
@@ -265,7 +317,7 @@ class NlseComparer:
         fig.suptitle(f"Comparison: {name1} vs {name2} ({self.args.system_type}, nx={self.args.nx}, nt={self.args.nt}, T={self.args.T})")
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
         plot_filename = self.plots_dir / f"comparison_{name1}_vs_{name2}_{self.args.system_type}_{self.run_id}.png"
-        fig.savefig(plot_filename, dpi=150)
+        fig.savefig(plot_filename, dpi=300)
         plt.close(fig)
         print(f"Plot saved to {plot_filename}")
 
@@ -284,6 +336,8 @@ class NlseComparer:
         self._plot_state_differences(traj1_data, traj2_data, self.args.name1, self.args.name2)
         self._plot_states(traj1_data, self.args.name1)
         self._plot_states(traj2_data, self.args.name2)
+        m_np = np.load(m_path)
+        self._plot_energy_closer(metrics1['time_points'], traj1_data, traj2_data, self.args.name1, self.args.name2, m_np)
         if not getattr(self.args, 'keep_temps', False):
             try:
                 for f in self.temp_dir.glob('*'): os.unlink(f)
