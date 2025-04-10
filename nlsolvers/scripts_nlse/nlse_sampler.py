@@ -1000,13 +1000,25 @@ class NLSEPhenomenonSampler:
                                   spatial_distribution=None, domain_size=None,
                                   temperature=1.0, core_size=0.5, apply_envelope=True,
                                   envelope_width=0.8, interaction_strength=0.7):
+        choice1 = ['vortex'] 
+        choice2 = ['domain_wall']
+        choice3 = ['antivortex']
+
         if domain_size is None:
             domain_size = 0.7 * self.L
             
         if defect_types is None:
-            defect_types = np.random.choice([
-                ['vortex', 'antivortex'], ['domain_wall']
-                ])
+            defect_types = np.random.choice(
+                list(range(3)))
+            if defect_types == 0:
+                defect_types = choice1 + choice3
+            elif defect_types == 1:
+                defect_types = choice2
+            elif defect_types == 2:
+                defect_types = choice3
+            else:
+                raise
+
 
         if spatial_distribution is None:
             spatial_distribution = np.random.choice([

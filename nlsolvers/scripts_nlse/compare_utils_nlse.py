@@ -11,9 +11,10 @@ import sys
 
 try:
     from nlse_sampler import NLSEPhenomenonSampler
+    from valid_spaces import get_parameter_spaces
 except ImportError:
-    print("Warning: nlse_sampler not found. Using default IC.")
-    NLSEPhenomenonSampler = None
+    print("Warning: nlse_sampler not found.")
+    raise Exception
 
 def compute_gradient_sq_norm(u, dx, dy):
     u = u.reshape(int(np.sqrt(u.size)), -1)
@@ -66,6 +67,7 @@ class NlseComparer:
         self.sampler = None
         self.setup_directories()
         sampler = self._get_sampler()
+        self.param_spaces = get_parameter_spaces()
 
     def setup_directories(self):
         self.output_dir = Path(self.args.output_dir)
@@ -88,7 +90,11 @@ class NlseComparer:
         m_path = self.temp_dir / "m.npy"
 
         if self.sampler: 
-            u0_np = self.sampler.generate_ensemble(self.args.ic_type, n_samples=1)
+            ic_params = self.param_spaces[self.args.ic_type]  
+            import random # quick fix: np.random.choice has issues with non-1-dimensional data
+            ic_params_choice = {k: random.choice(v) for k, v in ic_params.items()}
+            self.params = ic_params_choice
+            u0_np = self.sampler.generate_ensemble(self.args.ic_type, n_samples=1, **ic_params_choice)
             if hasattr(u0_np, 'numpy'):
                 u0_np = u0_np.numpy()
             u0_np = u0_np.squeeze().astype(self.dtype)
@@ -195,12 +201,107 @@ class NlseComparer:
             potential_values[i] = p.real 
         return kinetic_values, potential_values
 
+    #def _plot_ic(self, u0, m):
+    #    fig, axes = plt.subplots(1, 3, figsize=(15, 6))
+    #    cmaps = ['viridis', 'RdBu_r', 'twilight']
+    #    ax_u0_angle, ax_u0_abs, ax_m = axes
+    #    ax_u0_angle.imshow(np.angle(u0), extent=[-self.args.Lx, self.args.Lx, -self.args.Ly, self.args.Ly], cmap=cmaps[0])
+    #    ax_u0_abs.imshow(np.abs(u0), extent=[-self.args.Lx, self.args.Lx, -self.args.Ly, self.args.Ly], cmap=cmaps[1])
+    #    ax_m.imshow(m, extent=[-self.args.Lx, self.args.Lx, -self.args.Ly, self.args.Ly], cmap=cmaps[2])
+    #    ax_u0_angle.set_title(f"$u_0$ angle")
+    #    ax_u0_abs.set_title(f"$|u_0|$ angle")
+    #    ax_m.set_title(f"$m(x,y)$ angle") 
+    #    for i in range(3):         
+    #        axes[i].set_xlabel("x")
+    #        axes[i].set_ylabel("y")
+
+    #    fig.suptitle(f"Initial conditions, {self.params}")
+    #    plot_filename = self.plots_dir / f"IC_{self.args.system_type}_{self.run_id}.png"
+    #    plt.savefig(plot_filename, dpi=300)
+    #    plt.close()
+    #    print(f"Initial condition view saved to {plot_filename}")
+
+
+    #def _plot_energy_closer(self, time, traj1, traj2, name1, name2, m_np):
+    #    fig, axes = plt.subplots(1, 3, figsize=(15, 6))
+    #    k1, p1 = self._calculate_hamiltonian_closer(traj1, m_np) 
+    #    k2, p2 = self._calculate_hamiltonian_closer(traj2, m_np)
+
+    #    ax1, ax2, ax_diff = axes.flatten()
+    #    colors = ["red", "blue"]
+    #    markers = [10, 'x']
+    #    labels = ["kinetic", "potential"]
+    #    for i, d in enumerate([k1, p1]):
+    #        ax1.plot(time, d, color=colors[i], marker=markers[0], label=labels[i])
+    #    for i, d in enumerate([k2, p2]):
+    #        ax2.plot(time, d, color=colors[i], marker=markers[1], label=labels[i])
+    #    for i, d in enumerate([np.abs(k1 - k2), np.abs(p1 - p2)]):
+    #        ax_diff.plot(time, d, color=colors[i], linestyle='-.', label=labels[i])
+
+    #    ax1.set_title(f"{name1}")
+    #    ax2.set_title(f"{name2}")
+    #    ax_diff.set_title("$\log |E_{1} - E_{2}|$")
+
+    #    for ax in [ax1, ax2, ax_diff]:
+    #        ax.legend()
+    #        ax.grid(True)
+    #    fig.suptitle(f"{name1} vs {name2}\n{self.params}")
+    #    ax_diff.set_yscale("log")
+
+    #    plot_filename = self.plots_dir / f"closer_energy_{name1}_vs_{name2}_{self.args.system_type}_{self.run_id}.png"
+    #    fig.tight_layout(rect=[0, 0.03, 1, 0.93])
+    #    fig.savefig(plot_filename, dpi=300)
+    #    plt.close(fig)
+    #    print(f"Closer energy comparison plot saved to {plot_filename}")
+    def _plot_ic(self, u0, m):
+        fig = plt.figure(figsize=(15, 8))
+        grid = plt.GridSpec(4, 3, height_ratios=[1, 5, 5, 1])
+        
+        param_ax = fig.add_subplot(grid[0, :])
+        param_ax.axis('off')
+        
+        ax_u0_angle = fig.add_subplot(grid[1:3, 0])
+        ax_u0_abs = fig.add_subplot(grid[1:3, 1])
+        ax_m = fig.add_subplot(grid[1:3, 2])
+
+        cmaps = ['viridis', 'RdBu_r', 'twilight']
+        ax_u0_angle.imshow(np.angle(u0), extent=[-self.args.Lx, self.args.Lx, -self.args.Ly, self.args.Ly], cmap=cmaps[0])
+        ax_u0_abs.imshow(np.abs(u0), extent=[-self.args.Lx, self.args.Lx, -self.args.Ly, self.args.Ly], cmap=cmaps[1])
+        ax_m.imshow(m, extent=[-self.args.Lx, self.args.Lx, -self.args.Ly, self.args.Ly], cmap=cmaps[2])
+        ax_u0_angle.set_title(f"$u_0$ angle")
+        ax_u0_abs.set_title(f"$|u_0|$")
+        ax_m.set_title(f"$m(x,y)$") 
+        
+        for ax in [ax_u0_angle, ax_u0_abs, ax_m]:
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
+
+        import json
+        dict_str = json.dumps(self.params,)
+        dict_str = '\n'.join(dict_str[i:i+45] for i in range(0, len(dict_str), 45))
+
+        param_ax.text(0.5, 0.5, f"Parameters:\n{dict_str}", 
+                     ha='center', va='center', 
+                     fontfamily='monospace', fontsize=8,
+                     bbox=dict(boxstyle="round,pad=0.5", facecolor='lightgrey', alpha=0.8))
+        fig.add_subplot(grid[3, :]).axis('off')
+        fig.suptitle("Initial conditions")
+        plot_filename = self.plots_dir / f"IC_{self.args.system_type}_{self.run_id}.png"
+        plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Initial condition view saved to {plot_filename}")
+
     def _plot_energy_closer(self, time, traj1, traj2, name1, name2, m_np):
-        fig, axes = plt.subplots(1, 3, figsize=(15, 6))
+        fig = plt.figure(figsize=(15, 8))
+        grid = plt.GridSpec(4, 3, height_ratios=[1, 5, 5, 1])
+        param_ax = fig.add_subplot(grid[0, :])
+        param_ax.axis('off')
+        ax1 = fig.add_subplot(grid[1:3, 0])
+        ax2 = fig.add_subplot(grid[1:3, 1])
+        ax_diff = fig.add_subplot(grid[1:3, 2])
         k1, p1 = self._calculate_hamiltonian_closer(traj1, m_np) 
         k2, p2 = self._calculate_hamiltonian_closer(traj2, m_np)
-
-        ax1, ax2, ax_diff = axes.flatten()
+        
         colors = ["red", "blue"]
         markers = [10, 'x']
         labels = ["kinetic", "potential"]
@@ -210,20 +311,31 @@ class NlseComparer:
             ax2.plot(time, d, color=colors[i], marker=markers[1], label=labels[i])
         for i, d in enumerate([np.abs(k1 - k2), np.abs(p1 - p2)]):
             ax_diff.plot(time, d, color=colors[i], linestyle='-.', label=labels[i])
-
         ax1.set_title(f"{name1}")
         ax2.set_title(f"{name2}")
-        ax_diff.set_title("$|E_{1} - E_{2}|$")
-
+        ax_diff.set_title("$\log |E_{1} - E_{2}|$")
         for ax in [ax1, ax2, ax_diff]:
             ax.legend()
             ax.grid(True)
-        fig.suptitle(f"{name1} vs {name2}")
+        
         ax_diff.set_yscale("log")
+        ax_diff.set_ylim(bottom=1e-16)
+        import json
+        dict_str = json.dumps(self.params)
+        dict_str = '\n'.join(dict_str[i:i+45] for i in range(0, len(dict_str), 45))
+        param_ax.text(0.5, 0.5, f"Parameters:\n{dict_str}", 
+                     ha='center', va='center', 
+                     fontfamily='monospace', fontsize=8,
+                     bbox=dict(boxstyle="round,pad=0.5", facecolor='lightgrey', alpha=0.8))
+        title_ax = fig.add_subplot(grid[3, 1])
+        title_ax.axis('off')
+        title_ax.text(0.5, 0.2, f"{name1} vs {name2}", 
+                     ha='center', va='center', 
+                     fontsize=12, fontweight='bold')
 
+        fig.text(0.5, 0.01, "Time", ha='center', fontsize=10)
         plot_filename = self.plots_dir / f"closer_energy_{name1}_vs_{name2}_{self.args.system_type}_{self.run_id}.png"
-        fig.tight_layout(rect=[0, 0.03, 1, 0.93])
-        fig.savefig(plot_filename, dpi=300)
+        plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
         plt.close(fig)
         print(f"Closer energy comparison plot saved to {plot_filename}")
 
@@ -314,7 +426,9 @@ class NlseComparer:
         ax_diff.set_title(f"$L_2$ (difference between solutions)")
         ax_diff.set_xlabel("T / [1]"); ax_diff.set_ylabel("$L_2$")
         ax_diff.set_yscale('log'); ax_diff.legend(); ax_diff.grid(True)
-        fig.suptitle(f"Comparison: {name1} vs {name2} ({self.args.system_type}, nx={self.args.nx}, nt={self.args.nt}, T={self.args.T})")
+        fig.suptitle(
+                f"Comparison: {name1} vs {name2} ({self.args.system_type}, nx={self.args.nx}," +\
+                f"nt={self.args.nt}, T={self.args.T})\n{self.params}")
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
         plot_filename = self.plots_dir / f"comparison_{name1}_vs_{name2}_{self.args.system_type}_{self.run_id}.png"
         fig.savefig(plot_filename, dpi=300)
@@ -327,6 +441,9 @@ class NlseComparer:
         print(f"Integrator 2: {self.args.name2} ({self.args.exe2})")
         print(f"Grid: nx={self.args.nx}, nt={self.args.nt}, T={self.args.T}, L={self.args.Lx}")
         u0_path, m_path = self._generate_initial_conditions()
+        u0 = np.load(u0_path)
+        m_np = np.load(m_path)
+        self._plot_ic(u0, m_np)
         traj1_path, walltime1 = self._run_single_simulation(self.args.name1, self.args.exe1, u0_path, m_path)
         traj2_path, walltime2 = self._run_single_simulation(self.args.name2, self.args.exe2, u0_path, m_path)
         metrics1, traj1_data = self._analyze_trajectory(traj1_path)
@@ -335,8 +452,7 @@ class NlseComparer:
         self._plot_comparison(metrics1, self.args.name1, metrics2, self.args.name2, diff_metrics)
         self._plot_state_differences(traj1_data, traj2_data, self.args.name1, self.args.name2)
         self._plot_states(traj1_data, self.args.name1)
-        self._plot_states(traj2_data, self.args.name2)
-        m_np = np.load(m_path)
+        self._plot_states(traj2_data, self.args.name2) 
         self._plot_energy_closer(metrics1['time_points'], traj1_data, traj2_data, self.args.name1, self.args.name2, m_np)
         if not getattr(self.args, 'keep_temps', False):
             try:
