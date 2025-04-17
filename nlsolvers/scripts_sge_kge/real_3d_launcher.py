@@ -31,6 +31,8 @@ from valid_spaces import get_parameter_spaces_3d
 from classify_trajectory import batch_process_solutions
 from global_analysis import analyze_all_runs
 
+from nonlinearity_profiles_3d import highlight_profiles 
+
 
 class Launcher:
     def __init__(self, args):
@@ -343,8 +345,14 @@ class Launcher:
             try:
                 pre_start = time.time()
                 (u0, v0), phenomenon_params = self.generate_initial_condition(i)
-                m = self.generate_spatial_amplification(i)
-                c = self.generate_anisotropy(i)
+                # m = self.generate_spatial_amplification(i)
+                # c = self.generate_anisotropy(i)
+                profiles = highlight_profiles(self.args.nx, self.args.Lx)
+                choices = list(profiles.keys())
+                choice = np.random.choice(choices)
+                c, m = profiles[choice]
+                print(choice, "from", choices)
+
                 pre_end = time.time()
                 (traj_data, vel_data), walltime = self.run_simulation(i, u0, v0, m, c)
                 post_start = time.time()
