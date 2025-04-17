@@ -234,6 +234,7 @@ def anisotropic_wavespeed(n, L, base_value=1.0, strength=0.8):
     
     return c_profile
 
+
 def highlight_profiles(n, L):
     profiles = {} 
     profiles['optimal'] = (
@@ -284,5 +285,13 @@ def highlight_profiles(n, L):
         anisotropic_wavespeed(n, L, base_value=1.0, strength=0.8),
         sign_changing_mass(n, L, regions='checkerboard', scale=3, sharpness=6.0)
     )
+
+    profiles['maybe_blowup'] = (
+        focusing_lens_c(n, L, base_value=1.0, strength=-0.95,
+                               focus_point=(0,0,0), width=0.2),
+        sign_changing_mass(n, L, base_value=-2.0,
+                                 regions='checkerboard', scale=2,
+                                 sharpness=10.0)
+        )
     
     return profiles

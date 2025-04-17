@@ -16,24 +16,26 @@ from spatial_amplification_3d import (
     create_constant_m
 )
 
+from nonlinearity_profiles_3d import highlight_profiles
+
 from downsampling import (
         downsample_fft_3d, downsample_interpolation_3d
         )
 
-from real_sampler import RealWaveSampler3d as RealWaveSampler
+
 from visualization import (
         animate_isosurface, extrema_tracking,
         comparative_animation
         )
 
+
+from real_sampler import RealWaveSampler3d as RealWaveSampler
 from valid_spaces import get_parameter_spaces_3d
 
 from classify_trajectory import batch_process_solutions
 from global_analysis import analyze_all_runs
 
-from nonlinearity_profiles_3d import highlight_profiles 
-
-
+ 
 class Launcher:
     def __init__(self, args):
         self.args = args
@@ -345,14 +347,13 @@ class Launcher:
             try:
                 pre_start = time.time()
                 (u0, v0), phenomenon_params = self.generate_initial_condition(i)
-                # m = self.generate_spatial_amplification(i)
-                # c = self.generate_anisotropy(i)
-                profiles = highlight_profiles(self.args.nx, self.args.Lx)
-                choices = list(profiles.keys())
-                choice = np.random.choice(choices)
-                c, m = profiles[choice]
-                print(choice, "from", choices)
-
+                if self.args.c_m_pair is None:
+                    m = self.generate_spatial_amplification(i)
+                    c = self.generate_anisotropy(i)
+                else:
+                    profiles = highlight_profiles(self.args.nx, self.args.Lx) 
+                    c, m = profiles[self.args.c_m_pair]
+                
                 pre_end = time.time()
                 (traj_data, vel_data), walltime = self.run_simulation(i, u0, v0, m, c)
                 post_start = time.time()
@@ -416,6 +417,10 @@ def parse_args():
     parser.add_argument("--phenomenon", type=str, default="kink_field",
                         choices=["kink_field"],
                         help="Phenomenon type to simulate")
+    parser.add_argument("--c-m-pair", type=str, choices=['optimal',
+        'resonant_cavity', 'focusing_soliton', 'sharp_interfaces',
+        'multi_scale', 'fractal_nonlinear', 'waveguide', 'grf_threshold',
+        'anisotropic', 'maybe_blowup'], default=None, help="Choose pair between c(x,y,z) and m(x,y,z)")
 
     parser.add_argument("--velocity-type", type=str, default="zero",
                         choices=["zero", "fitting", "random"])

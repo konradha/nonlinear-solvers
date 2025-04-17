@@ -238,15 +238,15 @@ def comparative_animation(X, Y, Z, data, T, c, m, title, fname, fps=10, duration
         mask = current_data > threshold
         nonlin_mask = current_nonlin > nonlin_threshold
 
-        x_plot = X[mask]
-        y_plot = Y[mask]
-        z_plot = Z[mask]
-        c_plot = current_data[mask]
+        x_plot = X[mask][1:-1]
+        y_plot = Y[mask][1:-1]
+        z_plot = Z[mask][1:-1]
+        c_plot = current_data[mask][1:-1]
 
-        x_nonlin = X[nonlin_mask]
-        y_nonlin = Y[nonlin_mask]
-        z_nonlin = Z[nonlin_mask]
-        c_nonlin = current_nonlin[nonlin_mask]
+        x_nonlin = X[nonlin_mask][1:-1]
+        y_nonlin = Y[nonlin_mask][1:-1]
+        z_nonlin = Z[nonlin_mask][1:-1]
+        c_nonlin = current_nonlin[nonlin_mask][1:-1]
 
         ax1.scatter(x_plot, y_plot, z_plot, c=c_plot, cmap='viridis',
                    s=30, alpha=0.7)
