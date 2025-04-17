@@ -2,6 +2,9 @@ set(DEVICE_HEADERS
     include/boundaries.cuh
     include/sg_single.cuh
     include/sg_single_dev.hpp
+
+    include/common_kernels.cuh
+    include/kg_single_dev.hpp
 )
 
 add_library(device_solvers INTERFACE)
