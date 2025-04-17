@@ -1639,6 +1639,158 @@ def tsne_on_samples(samples, perplexity=30, n_iter=1000):
     embedding = tsne.fit_transform(features_array)
     return embedding
 
+class RealWaveSampler3d:
+    def __init__(self, nx: int, ny: int, nz: int, L: float):
+        self.nx = nx
+        self.ny = ny
+        self.nz = nz
+        self.L = L
+
+        self._setup_grid()
+
+    def _setup_grid(self):
+        self.x = np.linspace(-self.L, self.L, self.nx)
+        self.y = np.linspace(-self.L, self.L, self.ny)
+        self.z = np.linspace(-self.L, self.L, self.nz)
+
+        self.X, self.Y, self.Z = np.meshgrid(self.x, self.y, self.z,)
+        self.r = np.sqrt(self.X**2 + self.Y**2 + self.Z**2)
+        self.theta = np.arctan2(self.Y, self.X)
+
+        self.dx = 2 * self.L / (self.nx - 1) # reminder: ghost cells
+        self.dy = 2 * self.L / (self.ny - 1)
+        self.dy = 2 * self.L / (self.nz - 1)
+
+        self.kx = 2 * np.pi * np.fft.fftfreq(self.nx, d=2 * self.L / self.nx)
+        self.ky = 2 * np.pi * np.fft.fftfreq(self.ny, d=2 * self.L / self.ny)
+        self.kz = 2 * np.pi * np.fft.fftfreq(self.nz, d=2 * self.L / self.nz)
+        
+        self.KX, self.KY, self.KZ = np.meshgrid(self.kx, self.ky, self.kz)
+        self.K_mag = np.sqrt(self.KX**2 + self.KY**2 + self.KZ**2)
+
+    def nonlinear_potential(self, u: np.ndarray,
+                            system_type: str = 'sine_gordon') -> np.ndarray:
+        if system_type == 'klein_gordon':
+            return u
+        else:
+            raise NotImplemented
+
+    def anisotropic_grf(self, length_scale: float = 1.0,
+                      anisotropy_xy: float = 2.0,
+                      anisotropy_xz: float = 2.0,
+                      theta_xy: float = 30.0,
+                      theta_xz: float = 30.0,
+                      theta_yz: float = 30.0,
+                      power: float = 2.0,
+                      amplitude: float = 1.0) -> np.ndarray:
+        theta_xy_rad = np.deg2rad(theta_xy)
+        theta_xz_rad = np.deg2rad(theta_xz)
+        theta_yz_rad = np.deg2rad(theta_yz)
+        ell_x = length_scale * np.sqrt(anisotropy_xy * anisotropy_xz)
+        ell_y = length_scale * np.sqrt(1/anisotropy_xy)
+        ell_z = length_scale * np.sqrt(1/anisotropy_xz)
+        KX_rot = self.KX * np.cos(theta_xy_rad) - self.KY * np.sin(theta_xy_rad)
+        KY_rot = self.KX * np.sin(theta_xy_rad) + self.KY * np.cos(theta_xy_rad)
+        KZ_rot = self.KZ
+        KX_rot_2 = KX_rot * np.cos(theta_xz_rad) - KZ_rot * np.sin(theta_xz_rad)
+        KY_rot_2 = KY_rot
+        KZ_rot_2 = KX_rot * np.sin(theta_xz_rad) + KZ_rot * np.cos(theta_xz_rad)
+
+        KX_rot_3 = KX_rot_2
+        KY_rot_3 = KY_rot_2 * np.cos(theta_yz_rad) - KZ_rot_2 * np.sin(theta_yz_rad)
+        KZ_rot_3 = KY_rot_2 * np.sin(theta_yz_rad) + KZ_rot_2 * np.cos(theta_yz_rad)
+
+        spectrum = np.exp(-((KX_rot_3 / ell_x)**2 +
+                           (KY_rot_3 / ell_y)**2 +
+                           (KZ_rot_3 / ell_z)**2)**(power / 2))
+
+        noise = np.random.randn(self.nx, self.ny, self.nz) + \
+                1j * np.random.randn(self.nx, self.ny, self.nz)
+        field = np.fft.ifftn(np.fft.fftn(noise) * np.sqrt(spectrum)).real
+        field = field / np.std(field) * amplitude
+        return field
+
+    def kink_field(self, system_type: str = 'klein_gordon',
+                 winding_x: int = 1, winding_y: int = 0, winding_z: int = 0,
+                 width_range: Tuple[float, float] = (0.5, 3.0),
+                 randomize_positions: bool = True, velocity_type: str = 'zero') -> Tuple[np.ndarray, np.ndarray]:
+
+        u0 = np.zeros_like(self.X)
+        if winding_x != 0:
+            width_x = width_range[0] + (width_range[1] - width_range[0]) * np.random.rand()
+            positions_x = []
+
+            if randomize_positions:
+                for i in range(abs(winding_x)):
+                    positions_x.append(self.L * (2 * np.random.rand() - 1))
+            else:
+                for i in range(abs(winding_x)):
+                    positions_x.append(self.L * (-0.8 + 1.6 * i / (abs(winding_x))))
+
+            sign_x = 1 if winding_x > 0 else -1
+            for x0 in positions_x:
+                kink_width = width_x * (0.8 + 0.4 * np.random.rand())
+                u0 += sign_x * 4 * np.arctan(np.exp((self.X - x0) / kink_width))
+
+        if winding_y != 0:
+            width_y = width_range[0] + (width_range[1] - width_range[0]) * np.random.rand()
+            positions_y = []
+
+            if randomize_positions:
+                for i in range(abs(winding_y)):
+                    positions_y.append(self.L * (2 * np.random.rand() - 1))
+            else:
+                for i in range(abs(winding_y)):
+                    positions_y.append(self.L * (-0.8 + 1.6 * i / (abs(winding_y))))
+
+            sign_y = 1 if winding_y > 0 else -1
+            for y0 in positions_y:
+                kink_width = width_y * (0.8 + 0.4 * np.random.rand())
+                u0 += sign_y * 4 * np.arctan(np.exp((self.Y - y0) / kink_width))
+
+        if winding_z != 0:
+            width_z = width_range[0] + (width_range[1] - width_range[0]) * np.random.rand()
+            positions_z = []
+
+            if randomize_positions:
+                for i in range(abs(winding_z)):
+                    positions_z.append(self.L * (2 * np.random.rand() - 1))
+            else:
+                for i in range(abs(winding_z)):
+                    positions_z.append(self.L * (-0.8 + 1.6 * i / (abs(winding_z))))
+
+            sign_z = 1 if winding_z > 0 else -1
+            for z0 in positions_z:
+                kink_width = width_z * (0.8 + 0.4 * np.random.rand())
+                u0 += sign_z * 4 * np.arctan(np.exp((self.Z - z0) / kink_width))
+
+        if velocity_type == 'zero':
+            v0 = np.zeros_like(u0)
+        else:
+            v0 = self.anisotropic_grf(
+                length_scale=np.mean(width_range) * 2.0,
+                amplitude=np.max(np.abs(u0)) * 0.1)
+        return u0, v0
+
+    def generate_sample(self, system_type: str = 'klein_gordon', phenomenon_type: str = 'kink_field',
+                        time_param: float = 0.0, velocity_type: str = "fitting",
+                        **params) -> Tuple[np.ndarray, np.ndarray]:
+        if phenomenon_type == 'kink_field':
+            return self.kink_field(system_type, **params)
+        else:
+            raise ValueError(f"Unknown phenomenon type: {phenomenon_type}")
+
+    def generate_initial_condition(self, system_type: str = 'klein_gordon',
+                                   phenomenon_type: List[str] = None,
+                                   velocity_type: str = 'fitting', **params) -> Tuple[np.ndarray, np.ndarray]:
+        if phenomenon_type is None:
+            raise Exception
+        u0, v0 = self.generate_sample(system_type=system_type,
+                                      phenomenon_type=phenomenon_type,
+                                      velocity_type=velocity_type,
+                                      **params)
+        return (u0, v0)
+
 
 if __name__ == '__main__':
     nx = ny = 128

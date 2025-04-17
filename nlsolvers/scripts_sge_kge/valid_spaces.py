@@ -243,3 +243,19 @@ def get_parameter_spaces(L):
     }
 
     return parameter_spaces
+
+def get_parameter_spaces_3d(L):
+    parameter_spaces = {}
+    parameter_spaces["kink_field"] = {
+        "system_type": ["klein_gordon"],
+        "winding_x": list(range(-4, 5)),
+        "winding_y": list(range(-4, 5)),
+        "winding_z": list(range(-4, 5)),
+        "width_range": [
+            (min_w, max_w) for min_w in [0.3, 0.5, 0.7]
+            for max_w in [1.5, 2.0, 3.0]
+        ],
+        "randomize_positions": [True, False],
+        "velocity_type": ["zero", "grf"]
+    }
+    return parameter_spaces 

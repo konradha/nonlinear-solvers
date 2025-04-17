@@ -18,7 +18,7 @@
 // for all equations in u_tt
 
 int main(int argc, char **argv) {
-  if (argc != 14) {
+  if (argc != 16) {
     std::cerr << "Usage: " << argv[0]
               << " nx ny nz Lx Ly Lz input_u0.npy input_v0.npy output_traj.npy output_vel.npy T nt "
                  "num_snapshots input_m.npy input_c.npy\n";
@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
   const uint32_t num_snapshots = std::stoul(argv[13]);
   const std::string m_file = argv[14];
   const std::string c_file = argv[15];
-  
+ 
 
   const double dx = 2 * Lx / (nx - 1);
   const double dy = 2 * Ly / (ny - 1);
