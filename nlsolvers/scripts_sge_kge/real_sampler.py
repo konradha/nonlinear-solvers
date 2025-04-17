@@ -1772,11 +1772,32 @@ class RealWaveSampler3d:
                 amplitude=np.max(np.abs(u0)) * 0.1)
         return u0, v0
 
+    def q_ball_soliton(self, system_type: str = 'klein_gordon',
+            position=None, omega=0.8, amplitude=1.0, w=0.5,
+            velocity_type='fitting'):
+        X, Y, Z = self.X, self.Y, self.Z
+        if position is None:
+            xc, yc, zc = .5 * np.random.uniform(-self.L, self.L, 3)
+        else:
+            xc, yc, zc = position
+
+        R = np.sqrt((X - xc)**2 + (Y - yc)**2 + (Z - zc)**2)
+        profile = amplitude * np.exp(-R**2/(2*w**2))
+
+        u0 = profile * np.cos(omega)
+        if velocity_type == 'fitting':
+            v0 = -omega * profile * np.sin(omega)
+        else:
+            v0 = np.zeros_like(u0)
+        return u0, v0
+
     def generate_sample(self, system_type: str = 'klein_gordon', phenomenon_type: str = 'kink_field',
                         time_param: float = 0.0, velocity_type: str = "fitting",
                         **params) -> Tuple[np.ndarray, np.ndarray]:
         if phenomenon_type == 'kink_field':
             return self.kink_field(system_type, **params)
+        elif phenomenon_type == 'q_ball_soliton':
+            return self.q_ball_soliton(system_type, **params)
         else:
             raise ValueError(f"Unknown phenomenon type: {phenomenon_type}")
 

@@ -258,4 +258,11 @@ def get_parameter_spaces_3d(L):
         "randomize_positions": [True, False],
         "velocity_type": ["zero", "grf"]
     }
+
+    parameter_spaces["q_ball_soliton"] = {
+        "omega": [.3, 0.6, 0.8],
+        "amplitude": [-.2, .2, .45],
+        "w": [.1, .4, .5],
+        "velocity_type": ["zero", "fitting"]
+    }
     return parameter_spaces 

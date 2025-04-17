@@ -140,9 +140,13 @@ def soliton_enhancing_m(n, L, base_value=1.0, transition_width=0.1):
     return m_profile
 
 def resonant_cavity_pair(n, L, base_c=1.0, base_m=1.0, cavity_size=0.4, 
-                        c_contrast=3.0, m_contrast=2.0):
+                        c_contrast=-1., m_contrast=-1.):
     X, Y, Z = make_grid(n, L) 
-    R = np.sqrt(X**2 + Y**2 + Z**2) / L 
+
+    cavity_center = np.random.uniform(-.4 * L, .4 * L, 3)
+    xc, yc, zc = cavity_center
+
+    R = np.sqrt((X - xc)**2 + (Y - yc)**2 + (Z - zc)**2) / L 
     c_profile = base_c * (1 + (c_contrast - 1) * (R > cavity_size)) 
     m_profile = base_m * (m_contrast * (R <= cavity_size) - (R > cavity_size)) 
     return c_profile, m_profile
@@ -181,7 +185,7 @@ def fractal_interfaces(n, L, base_value=1.0, num_octaves=4, lacunarity=2.0, pers
     
     return profile
 
-def nonlinear_waveguide(n, L, base_c=1.0, base_m=1.0, width=0.2, length=0.8):
+def simple_waveguide(n, L, base_c=1.0, base_m=1.0, width=0.2, length=0.8):
     X, Y, Z = make_grid(n, L)
     width_scaled = width * L
     length_scaled = length * L
@@ -196,7 +200,66 @@ def nonlinear_waveguide(n, L, base_c=1.0, base_m=1.0, width=0.2, length=0.8):
     c_profile[waveguide_mask] = base_c * 0.5
     
     m_profile = np.ones((n, n, n)) * base_m
-    m_profile[waveguide_mask] = -base_m
+    m_profile[waveguide_mask] = -base_m 
+    return c_profile, m_profile
+
+def nonlinear_waveguide(n, L, num_nodes=5, num_connections=8, 
+                     width=0.1, node_radius=0.15,
+                     c_contrast=3.0, m_contrast=2.0, 
+                     random_nodes=True, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+        
+    X, Y, Z = make_grid(n, L)
+    c_profile = np.ones((n, n, n)) * c_contrast
+    m_profile = np.ones((n, n, n)) * -1.0
+    
+    nodes = []
+    
+    if random_nodes:
+        for _ in range(num_nodes):
+            node = np.random.uniform(-0.7, 0.7, 3) * L
+            nodes.append(node)
+    else:
+        spacing = 1.4 * L / np.ceil(np.cbrt(num_nodes))
+        idx = 0
+        for i in range(int(np.ceil(np.cbrt(num_nodes)))):
+            for j in range(int(np.ceil(np.cbrt(num_nodes)))):
+                for k in range(int(np.ceil(np.cbrt(num_nodes)))):
+                    if idx < num_nodes:
+                        node = np.array([
+                            -0.7*L + i*spacing,
+                            -0.7*L + j*spacing,
+                            -0.7*L + k*spacing
+                        ])
+                        nodes.append(node)
+                        idx += 1
+    
+    for node in nodes:
+        r_sq = (X - node[0])**2 + (Y - node[1])**2 + (Z - node[2])**2
+        mask = r_sq < (node_radius * L)**2
+        c_profile[mask] = 1.0
+        m_profile[mask] = m_contrast * 1.5
+    
+    connections = []
+    for _ in range(num_connections):
+        i, j = np.random.choice(range(len(nodes)), 2, replace=False)
+        connections.append((i, j))
+    
+    for i, j in connections:
+        node1, node2 = nodes[i], nodes[j]
+        direction = node2 - node1
+        length = np.linalg.norm(direction)
+        direction = direction / length
+        
+        t_values = np.linspace(0, 1, int(length / (0.02 * L)))
+        
+        for t in t_values:
+            point = node1 + t * (node2 - node1)
+            r_sq = (X - point[0])**2 + (Y - point[1])**2 + (Z - point[2])**2
+            mask = r_sq < (width * L)**2
+            c_profile[mask] = 1.0
+            m_profile[mask] = m_contrast
     
     return c_profile, m_profile
 
@@ -254,7 +317,7 @@ def highlight_profiles(n, L):
                                                      base_c=1.0, 
                                                      base_m=1.0,
                                                      cavity_size=0.4,
-                                                     c_contrast=2.5, 
+                                                     c_contrast=1.5, 
                                                      m_contrast=1.5)
     
     profiles['focusing_soliton'] = (
@@ -276,8 +339,12 @@ def highlight_profiles(n, L):
         multiscale_grf(n, L, base_value=1.0, scales=[0.05, 0.15, 0.3], weights=[0.5, 0.3, 0.2]),
         fractal_interfaces(n, L, base_value=1.0, num_octaves=5, persistence=0.6)
     )
-    
-    profiles['waveguide'] = nonlinear_waveguide(n, L, base_c=1.0, base_m=1.0, width=0.15, length=0.9)
+
+    profiles['simple_waveguide'] = simple_waveguide(n, L, base_c=1.0, base_m=1.0, width=0.15, length=0.9)
+
+    num_nodes = np.random.randint(2, 20)
+    profiles['waveguide'] = nonlinear_waveguide(n, L, num_nodes=num_nodes, num_connections=2 * num_nodes,
+                            c_contrast=1.5, m_contrast=5., node_radius=0.1)
     
     profiles['grf_threshold'] = nonlinear_grf_pair(n, L, base_c=1.0, base_m=1.0, c_scale=0.2, m_scale=0.15)
     

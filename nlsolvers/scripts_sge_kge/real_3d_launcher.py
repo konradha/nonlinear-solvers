@@ -289,14 +289,14 @@ class Launcher:
         extrema_output = self.traj_dir / f"extrema_{self.run_id}_{run_idx:04d}.mp4"
         comparative_output = self.traj_dir / f"compare_{self.run_id}_{run_idx:04d}.mp4" 
         print(extrema_output)
-        print(comparative_output) 
+        #print(comparative_output) 
 
         # small hack even though we originally disallowed ...
-        m_dr = self.downsample_trajectory(m.reshape((1, self.args.nx, self.args.ny, self.args.nz)))
-        c_dr = self.downsample_trajectory(c.reshape((1, self.args.nx, self.args.ny, self.args.nz)))
+        # m_dr = self.downsample_trajectory(m.reshape((1, self.args.nx, self.args.ny, self.args.nz)))
+        # c_dr = self.downsample_trajectory(c.reshape((1, self.args.nx, self.args.ny, self.args.nz)))
 
         extrema_tracking(self.X_dr, self.Y_dr, self.Z_dr, traj_data, animation_title, extrema_output, T=self.args.T)
-        comparative_animation(self.X_dr, self.Y_dr, self.Z_dr, traj_data, self.args.T, c_dr, m_dr, animation_title, comparative_output)
+        #comparative_animation(self.X_dr, self.Y_dr, self.Z_dr, traj_data, self.args.T, c_dr, m_dr, animation_title, comparative_output)
 
 
     def generate_animation_title(self, phenomenon_params, walltime):
@@ -414,8 +414,8 @@ def parse_args():
     parser.add_argument("--system-type", type=str, default="klein_gordon",
                         choices=["klein_gordon"])
 
-    parser.add_argument("--phenomenon", type=str, default="kink_field",
-                        choices=["kink_field"],
+    parser.add_argument("--phenomenon", type=str, default="q_ball_soliton",
+                        choices=["kink_field", "q_ball_soliton"],
                         help="Phenomenon type to simulate")
     parser.add_argument("--c-m-pair", type=str, choices=['optimal',
         'resonant_cavity', 'focusing_soliton', 'sharp_interfaces',
