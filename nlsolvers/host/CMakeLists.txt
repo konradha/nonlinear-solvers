@@ -29,6 +29,9 @@ set(HOST_HEADERS
 
     include/nlse_cubic_solver_3d.hpp
     include/nlse_cubic_gautschi_solver_3d.hpp
+
+    include/kg_sv_solver_3d.hpp
+    include/kg_solver_3d.hpp
 )
 
 add_library(host_solvers INTERFACE)
