@@ -12,6 +12,7 @@ import sys
 try:
     from nlse_sampler import NLSEPhenomenonSampler
     from valid_spaces import get_parameter_spaces
+    from visualization import animate_simulation
 except ImportError:
     print("Warning: nlse_sampler not found.")
     raise Exception
@@ -454,6 +455,15 @@ class NlseComparer:
         self._plot_states(traj1_data, self.args.name1)
         self._plot_states(traj2_data, self.args.name2) 
         self._plot_energy_closer(metrics1['time_points'], traj1_data, traj2_data, self.args.name1, self.args.name2, m_np)
+
+        ########
+        X, Y = np.meshgrid(np.linspace(-self.args.Lx, self.args.Lx, self.args.nx),
+                np.linspace(-self.args.Ly, self.args.Ly, self.args.ny))
+        viz_name1 = self.plots_dir / f"viz_{self.args.name1}_{self.args.ic_type}_{self.run_id}.mp4"
+        viz_name2 = self.plots_dir / f"viz_{self.args.name2}_{self.args.ic_type}_{self.run_id}.mp4"
+        animate_simulation(X, Y, traj1_data, traj1_data.shape[0], viz_name1, is_complex=True, title=f"{self.args.name1}")
+        animate_simulation(X, Y, traj2_data, traj2_data.shape[0], viz_name2, is_complex=True, title=f"{self.args.name2}") 
+        ########
         if not getattr(self.args, 'keep_temps', False):
             try:
                 for f in self.temp_dir.glob('*'): os.unlink(f)

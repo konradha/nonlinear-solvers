@@ -1,10 +1,32 @@
+# TODO add SV/Gautschi includes for all
 set(DEVICE_HEADERS
-    include/boundaries.cuh
+    include/boundaries.cuh # templated boundary update
+    include/common_kernels.cuh # mostly to collect velocity in real-wave integrators
+    # others such as spmv.hpp omitted to avoid cluttering
+
     include/sg_single.cuh
     include/sg_single_dev.hpp
-
-    include/common_kernels.cuh
+ 
+    include/kg_dev.cuh
     include/kg_single_dev.hpp
+
+    include/nlse.cuh
+    include/nlse_dev.hpp
+
+    include/nlse_cubic_quintic.cuh
+    include/nlse_cubic_quintic_dev.hpp
+
+    include/nlse_saturating.cuh
+    include/nlse_saturating_dev.hpp
+
+    include/phi4_dev.hpp
+    include/phi4_single.cuh
+
+    include/sg_double.cuh
+    include/sg_double_dev.hpp
+
+    include/sg_hyperbolic.cuh
+    include/sg_hyperbolic_dev.hpp                                                        
 )
 
 add_library(device_solvers INTERFACE)
