@@ -205,7 +205,7 @@ def simple_waveguide(n, L, base_c=1.0, base_m=1.0, width=0.2, length=0.8):
 
 def nonlinear_waveguide(n, L, num_nodes=5, num_connections=8, 
                      width=0.1, node_radius=0.15,
-                     c_contrast=3.0, m_contrast=2.0, 
+                     c_contrast=1.5, m_contrast=1.5, 
                      random_nodes=True, seed=None):
     if seed is not None:
         np.random.seed(seed)
@@ -343,8 +343,8 @@ def highlight_profiles(n, L):
     profiles['simple_waveguide'] = simple_waveguide(n, L, base_c=1.0, base_m=1.0, width=0.15, length=0.9)
 
     num_nodes = np.random.randint(2, 20)
-    profiles['waveguide'] = nonlinear_waveguide(n, L, num_nodes=num_nodes, num_connections=2 * num_nodes,
-                            c_contrast=1.5, m_contrast=5., node_radius=0.1)
+    profiles['waveguide'] = nonlinear_waveguide(n, L, num_nodes=num_nodes, num_connections=int(1.5 * num_nodes),
+                            c_contrast=0.5, m_contrast=0.05, node_radius=0.3)
     
     profiles['grf_threshold'] = nonlinear_grf_pair(n, L, base_c=1.0, base_m=1.0, c_scale=0.2, m_scale=0.15)
     
