@@ -176,6 +176,11 @@ public:
     scale_first_col<<<grid_1d_, block_1d_>>>(d_work_large_, result, beta, n_);
   }
 
+  // unsafe, but without full refactoring we take this choice now
+  DeviceSpMV<thrust::complex<double>> * expose_spmv() {
+      return spmv_;
+  };
+
 private:
   void compute_eigen_decomposition() {
     cudaMemcpy(d_eigenvectors_, krylov_.T, m_ * m_ * sizeof(cuDoubleComplex),

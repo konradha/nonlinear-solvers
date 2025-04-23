@@ -24,6 +24,8 @@ endif()
 
 if(BUILD_KG)
     add_cuda_driver(kg_dev kg_driver_dev.cpp)
+    add_cuda_driver(kg_3d_dev kg_driver_dev_3d.cpp)
+    add_cuda_driver(kg_sv_3d_dev kg_sv_driver_dev_3d.cpp)
 endif()
 
 if(BUILD_PHI4)

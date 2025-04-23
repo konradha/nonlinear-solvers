@@ -300,6 +300,10 @@ def anisotropic_wavespeed(n, L, base_value=1.0, strength=0.8):
 
 def highlight_profiles(n, L):
     profiles = {} 
+    profiles['constant'] = (
+        piecewise_constant(n, L, num_layers=1, base_value=1.0,),
+        piecewise_constant(n, L, num_layers=1, base_value=1.0,)
+    )
     profiles['optimal'] = (
         localized_perturbations(n, L, 
                               num_perturbations=4, 
