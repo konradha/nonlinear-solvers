@@ -20,6 +20,17 @@ __global__ void transform_eigenvals_exp(thrust::complex<double> *out,
   }
 }
 
+__global__ void transform_eigenvals_sinc(thrust::complex<double> *out,
+                                        const double *eigvals,
+                                        thrust::complex<double> dt,
+                                        const uint32_t m) {
+  int i = threadIdx.x + blockIdx.x * blockDim.x;
+  if (i < m) {
+    const auto val = dt * eigvals[i];
+    out[i] = std::abs(val) < 1e-8? {1., 0.} : thrust::sin(val) / val;
+  }
+}
+
 __global__ void matrix_multiply_QDQ(const thrust::complex<double> *Q,
                                     const thrust::complex<double> *D,
                                     thrust::complex<double> *result,
