@@ -35,6 +35,18 @@ target_include_directories(device_solvers INTERFACE
 )
 target_link_libraries(device_solvers INTERFACE common)
 
+add_library(device_common INTERFACE)
+target_include_directories(device_common INTERFACE 
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(device_common INTERFACE common)
+
+# Add the unified binaries to the device drivers
+if(ENABLE_GPU)
+    add_dependencies(nlwave_bin_real device_common)
+    add_dependencies(nlwave_bin_nlse device_common)
+endif()
+
 add_subdirectory(drivers)
 
 install(FILES ${DEVICE_HEADERS}

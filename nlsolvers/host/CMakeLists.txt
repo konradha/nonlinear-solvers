@@ -45,3 +45,106 @@ install(FILES ${HOST_HEADERS}
 )
 
 add_subdirectory(drivers)
+
+add_library(host_common STATIC
+  include/eigen_krylov_real.hpp
+  include/eigen_krylov_complex.hpp
+  include/kg_solver.hpp
+  include/kg_solver_3d.hpp
+  include/kg_sv_solver.hpp
+  include/kg_sv_solver_3d.hpp
+  include/sg_single_solver.hpp
+  include/sg_single_sv_solver.hpp
+  include/sg_double_solver.hpp
+  include/sg_double_sv_solver.hpp
+  include/sg_hyperbolic_solver.hpp
+  include/sg_hyperbolic_sv_solver.hpp
+  include/phi4_solver.hpp
+  include/phi4_sv_solver.hpp
+  include/nlse_cubic_solver.hpp
+  include/nlse_cubic_solver_3d.hpp
+  include/nlse_cubic_gautschi_solver.hpp
+  include/nlse_cubic_gautschi_solver_3d.hpp
+  include/nlse_cubic_quintic_solver.hpp
+  include/nlse_cubic_quintic_gautschi_solver.hpp
+  include/nlse_saturating_solver.hpp
+  include/nlse_saturating_gautschi_solver.hpp
+)
+
+target_include_directories(host_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(host_common PUBLIC common)
+
+# Unified binaries
+add_executable(nlwave_bin_real drivers/nlwave_bin_real.cpp)
+target_link_libraries(nlwave_bin_real PRIVATE host_common)
+
+add_executable(nlwave_bin_nlse drivers/nlwave_bin_nlse.cpp)
+target_link_libraries(nlwave_bin_nlse PRIVATE host_common)
+
+# Individual binaries for backward compatibility
+if(BUILD_KG)
+  add_executable(kg_driver drivers/kg_driver.cpp)
+  target_link_libraries(kg_driver PRIVATE host_common)
+
+  add_executable(kg_driver_3d drivers/kg_driver_3d.cpp)
+  target_link_libraries(kg_driver_3d PRIVATE host_common)
+
+  add_executable(kg_sv_driver drivers/kg_sv_driver.cpp)
+  target_link_libraries(kg_sv_driver PRIVATE host_common)
+
+  add_executable(kg_sv_driver_3d drivers/kg_sv_driver_3d.cpp)
+  target_link_libraries(kg_sv_driver_3d PRIVATE host_common)
+endif()
+
+if(BUILD_SG_SINGLE)
+  add_executable(sg_single_driver drivers/sg_single_driver.cpp)
+  target_link_libraries(sg_single_driver PRIVATE host_common)
+
+  add_executable(sg_single_driver_sv drivers/sg_single_driver_sv.cpp)
+  target_link_libraries(sg_single_driver_sv PRIVATE host_common)
+endif()
+
+if(BUILD_SG_DOUBLE)
+  add_executable(sg_double_driver drivers/sg_double_driver.cpp)
+  target_link_libraries(sg_double_driver PRIVATE host_common)
+endif()
+
+if(BUILD_SG_HYPERBOLIC)
+  add_executable(sg_hyperbolic_driver drivers/sg_hyperbolic_driver.cpp)
+  target_link_libraries(sg_hyperbolic_driver PRIVATE host_common)
+endif()
+
+if(BUILD_PHI4)
+  add_executable(phi4_driver drivers/phi4_driver.cpp)
+  target_link_libraries(phi4_driver PRIVATE host_common)
+endif()
+
+if(BUILD_NLSE_CUBIC)
+  add_executable(nlse_cubic_driver drivers/nlse_cubic_driver.cpp)
+  target_link_libraries(nlse_cubic_driver PRIVATE host_common)
+
+  add_executable(nlse_cubic_driver_host_3d drivers/nlse_cubic_driver_host_3d.cpp)
+  target_link_libraries(nlse_cubic_driver_host_3d PRIVATE host_common)
+
+  add_executable(nlse_cubic_driver_host_gautschi_3d drivers/nlse_cubic_driver_host_gautschi_3d.cpp)
+  target_link_libraries(nlse_cubic_driver_host_gautschi_3d PRIVATE host_common)
+
+  add_executable(nlse_cubic_gautschi_driver drivers/nlse_cubic_gautschi_driver.cpp)
+  target_link_libraries(nlse_cubic_gautschi_driver PRIVATE host_common)
+endif()
+
+if(BUILD_NLSE_CUBIC_QUINTIC)
+  add_executable(nlse_cubic_quintic_driver drivers/nlse_cubic_quintic_driver.cpp)
+  target_link_libraries(nlse_cubic_quintic_driver PRIVATE host_common)
+
+  add_executable(nlse_cubic_quintic_gautschi_driver drivers/nlse_cubic_quintic_gautschi_driver.cpp)
+  target_link_libraries(nlse_cubic_quintic_gautschi_driver PRIVATE host_common)
+endif()
+
+if(BUILD_NLSE_SATURATING)
+  add_executable(nlse_saturating_driver drivers/nlse_saturating_driver.cpp)
+  target_link_libraries(nlse_saturating_driver PRIVATE host_common)
+
+  add_executable(nlse_saturating_gautschi_driver drivers/nlse_saturating_gautschi_driver.cpp)
+  target_link_libraries(nlse_saturating_gautschi_driver PRIVATE host_common)
+endif()
