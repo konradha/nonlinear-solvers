@@ -1,5 +1,4 @@
-# TODO add gautschi/sv drivers for all
-
+# Function to add CUDA driver
 function(add_cuda_driver name source)
     add_executable(${name} ${source})
     set_source_files_properties(${source} PROPERTIES LANGUAGE CUDA)
@@ -8,8 +7,13 @@ function(add_cuda_driver name source)
         CUDA_SEPARABLE_COMPILATION ON
         CUDA_RESOLVE_DEVICE_SYMBOLS ON)
     install(TARGETS ${name} RUNTIME DESTINATION bin)
-endfunction()
+endfunction(add_cuda_driver)
 
+# Unified drivers
+add_cuda_driver(nlse_dev_unified nlse_driver_dev_unified.cpp)
+add_cuda_driver(realspace_dev_unified realspace_driver_dev_unified.cpp)
+
+# Legacy drivers - these will be removed once the unified drivers are stable
 if(BUILD_SG_SINGLE)
     add_cuda_driver(sg_single_dev sg_single_driver_dev.cpp)
 endif()
@@ -41,5 +45,3 @@ endif()
 if(BUILD_NLSE_SATURATING)
     add_cuda_driver(nlse_saturating_dev nlse_saturating_driver_dev.cpp)
 endif()
-
-
