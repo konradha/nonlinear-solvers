@@ -23,6 +23,9 @@ option(BUILD_SG_HYPERBOLIC "Build sGE with sinh(u)" ON)
 option(BUILD_KG "Build KGE" ON)
 option(BUILD_PHI4 "Build phi-4 model" ON)
 
+option(BUILD_LEGACY_DRIVERS "Build legacy driver binaries" OFF)
+option(BUILD_UNIFIED_DRIVERS "Build unified driver binaries" ON)
+
 if(ENABLE_GPU)
   enable_language(CUDA)
   set(CMAKE_CUDA_STANDARD 17)
@@ -83,4 +86,8 @@ add_subdirectory(host)
 
 if(ENABLE_GPU)
   add_subdirectory(device)
+endif()
+
+if(BUILD_UNIFIED_DRIVERS)
+  add_subdirectory(drivers)
 endif()
