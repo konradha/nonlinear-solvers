@@ -1,7 +1,7 @@
 #include "boundaries_3d.hpp"
 #include "eigen_krylov_real.hpp"
-#include "kg_solver_3d.hpp"
 #include "laplacians.hpp"
+#include "kg_dev.hpp"
 #include "util.hpp"
 
 #include <Eigen/Dense>

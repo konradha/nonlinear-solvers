@@ -34,6 +34,7 @@ endif()
 
 if(BUILD_NLSE_CUBIC)
     add_cuda_driver(nlse_dev nlse_driver_dev.cpp)
+    add_cuda_driver(nlse_3d_dev nlse_cubic_driver_3d.cpp)
 endif()
 
 if(BUILD_NLSE_CUBIC_QUINTIC)

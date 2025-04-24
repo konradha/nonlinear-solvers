@@ -1,7 +1,6 @@
 #include "boundaries_3d.hpp"
-#include "eigen_krylov_complex.hpp"
 #include "laplacians.hpp"
-#include "nlse_cubic_solver_3d.hpp"
+#include "nlse_dev.hpp"
 #include "util.hpp"
 
 #include <Eigen/Dense>
@@ -117,9 +116,6 @@ int main(int argc, char **argv) {
     solver.apply_bc();
   }
   solver.transfer_snapshots(u_save.data());
-  const std::vector<uint32_t> shape = {num_snapshots, ny, nx};
-  save_to_npy(output_file, u_save, shape);
-
   const std::vector<uint32_t> shape = {num_snapshots, nz, ny, nx};
   save_to_npy(output_file, u_save, shape);
   return 0;

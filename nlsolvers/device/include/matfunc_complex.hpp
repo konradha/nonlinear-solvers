@@ -165,7 +165,8 @@ public:
   }
 
   void apply(thrust::complex<double> *result,
-             const thrust::complex<double> *input, std::complex<double> dt) {
+             const thrust::complex<double> *input, std::complex<double> dt,
+	     const std::string func = "exp") {
     reset_data();
     lanczos_iteration_complex(spmv_, &krylov_, input);
     // cudaDeviceSynchronize();
@@ -176,8 +177,12 @@ public:
     compute_eigen_decomposition();
 
     // thrust::apply
-    transform_eigenvals_exp<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_,
+    if (func == "exp")
+    	transform_eigenvals_exp<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_,
                                                      dt, m_);
+    else
+	transform_eigenvals_sinc<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_,
+                                                     dt, m_);	
 
     matrix_multiply_QDQ<<<grid_QDQ_, block_2d_>>>(d_eigenvectors_, d_diag_,
                                                   d_work_, m_);
