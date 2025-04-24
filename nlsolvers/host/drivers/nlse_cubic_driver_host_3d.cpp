@@ -18,14 +18,17 @@
 
 int main(int argc, char **argv) {
   if (argc != 12 && argc != 13) {
-    std::cerr << "Usage: " << argv[0]
-              << " nx ny nz Lx Ly Lz input_u0.npy output_traj.npy T nt num_snapshots "
-                 "[input_m.npy]\n";
+    std::cerr
+        << "Usage: " << argv[0]
+        << " nx ny nz Lx Ly Lz input_u0.npy output_traj.npy T nt num_snapshots "
+           "[input_m.npy]\n";
     std::cerr << "Example: " << argv[0]
-              << " 256 256 256 10.0 10.0 10.0 initial.npy evolution.npy 1.5 500 100\n";
-    std::cerr << "Example with m(x,y): " << argv[0]
-              << " 256 256 256 10.0 10.0 10.0 initial.npy evolution.npy 1.5 500 100 "
-                 "focusing.npy\n";
+              << " 256 256 256 10.0 10.0 10.0 initial.npy evolution.npy 1.5 "
+                 "500 100\n";
+    std::cerr
+        << "Example with m(x,y): " << argv[0]
+        << " 256 256 256 10.0 10.0 10.0 initial.npy evolution.npy 1.5 500 100 "
+           "focusing.npy\n";
     return 1;
   }
 
@@ -58,8 +61,9 @@ int main(int argc, char **argv) {
   Eigen::VectorXcd u0 =
       read_from_npy<std::complex<double>>(input_file, input_shape);
 
-  if (input_shape.size() != 3 || input_shape[0] != nx || input_shape[1] != ny || input_shape[2] != nz) {
-    std::cerr << "Error: Input array dimensions mismatch\n"; 
+  if (input_shape.size() != 3 || input_shape[0] != nx || input_shape[1] != ny ||
+      input_shape[2] != nz) {
+    std::cerr << "Error: Input array dimensions mismatch\n";
     return 1;
   }
 
@@ -69,7 +73,8 @@ int main(int argc, char **argv) {
     try {
       std::vector<uint32_t> m_shape;
       m = read_from_npy<std::complex<double>>(m_file.value(), m_shape);
-      if (m_shape.size() != 3 || m_shape[0] != nx || m_shape[1] != ny || m_shape[2] != nz) {
+      if (m_shape.size() != 3 || m_shape[0] != nx || m_shape[1] != ny ||
+          m_shape[2] != nz) {
         std::cerr << "Error: Focusing array dimensions mismatch\n";
         std::cerr << "Using default m=1.0 everywhere\n";
       }
@@ -80,8 +85,9 @@ int main(int argc, char **argv) {
   }
 
   const Eigen::SparseMatrix<std::complex<double>> L =
-      build_laplacian_noflux_3d<std::complex<double>>(nx - 2, ny - 2, nz - 2, dx, dy, dz);
-  
+      build_laplacian_noflux_3d<std::complex<double>>(nx - 2, ny - 2, nz - 2,
+                                                      dx, dy, dz);
+
   Eigen::VectorXcd u_save(num_snapshots * nx * ny * nz);
   Eigen::Map<Eigen::Matrix<std::complex<double>, -1, -1, Eigen::RowMajor>>
       u_save_mat(u_save.data(), num_snapshots, nx * ny * nz);
@@ -94,7 +100,7 @@ int main(int argc, char **argv) {
 
   for (uint32_t i = 1; i < nt; ++i) {
     NLSESolver3d::step<std::complex<double>>(buf, rho_buf, u, L, m, dti);
-    neumann_bc_no_velocity_3d<std::complex<double>>(u, nx, ny, nz);  
+    neumann_bc_no_velocity_3d<std::complex<double>>(u, nx, ny, nz);
     if (i % freq == 0) {
       uint32_t snapshot_idx = i / freq;
       if (snapshot_idx < num_snapshots) {

@@ -31,18 +31,17 @@ __global__ void gautschi_kernel(double *u_next, const double *u,
   }
 }
 
-__global__ void sv_kernel(double * u, double * u_past,
-        double * l, double * nl, // linear operator, nonlinear operator
-        const double tau,
-        const uint32_t n) {
+__global__ void sv_kernel(double *u, double *u_past, double *l,
+                          double *nl, // linear operator, nonlinear operator
+                          const double tau, const uint32_t n) {
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n) {
-    u[idx] = 2 * u[idx] - u_past[idx] + tau * tau * (l[idx] - nl[idx]);  
+    u[idx] = 2 * u[idx] - u_past[idx] + tau * tau * (l[idx] - nl[idx]);
   }
 }
 
-void step(double *d_v, double *d_u, double *d_u_past, double *d_buf, double *d_buf2,
-          double *d_buf3, MatrixFunctionApplicatorReal *matfunc,
+void step(double *d_v, double *d_u, double *d_u_past, double *d_buf,
+          double *d_buf2, double *d_buf3, MatrixFunctionApplicatorReal *matfunc,
           const double *d_m, const double tau, const uint32_t n,
           const dim3 grid, const dim3 block) {
   cudaMemcpy(d_buf, d_u, n * sizeof(double), cudaMemcpyDeviceToDevice);
@@ -58,16 +57,15 @@ void step(double *d_v, double *d_u, double *d_u_past, double *d_buf, double *d_b
   velocity_kernel<<<grid, block>>>(d_v, d_u, d_u_past, tau, n);
 }
 
-void step_sv(double *d_v, double *d_u, double *d_u_past, double *d_buf, double *d_buf2,
-          double *d_buf3, MatrixFunctionApplicatorReal *matfunc,
-          const double *d_m, const double tau, const uint32_t n,
-          const dim3 grid, const dim3 block) {
+void step_sv(double *d_v, double *d_u, double *d_u_past, double *d_buf,
+             double *d_buf2, double *d_buf3,
+             MatrixFunctionApplicatorReal *matfunc, const double *d_m,
+             const double tau, const uint32_t n, const dim3 grid,
+             const dim3 block) {
   // 2 u_n - u_{n-1} + dt² (Lu_n - m f(u))
-  matfunc->expose_spmv()->multiply(d_u, d_buf);  
-  neg_kernel<<<grid, block>>>(d_buf2, d_u, d_m, n); 
-  sv_kernel<<<grid, block>>>(d_u, d_u_past,
-        d_buf, d_buf2,
-        tau, n);   
+  matfunc->expose_spmv()->multiply(d_u, d_buf);
+  neg_kernel<<<grid, block>>>(d_buf2, d_u, d_m, n);
+  sv_kernel<<<grid, block>>>(d_u, d_u_past, d_buf, d_buf2, tau, n);
   velocity_kernel<<<grid, block>>>(d_v, d_u, d_u_past, tau, n);
 }
 

@@ -37,14 +37,13 @@ int main(int argc, char **argv) {
   const double Lx = std::stod(argv[4]);
   const double Ly = std::stod(argv[5]);
   const double Lz = std::stod(argv[6]);
-  const std::string input_file = argv[7]; 
-  const std::string output_file = argv[8]; 
+  const std::string input_file = argv[7];
+  const std::string output_file = argv[8];
   const double T = std::stod(argv[9]);
   const uint32_t nt = std::stoul(argv[10]);
   const uint32_t num_snapshots = std::stoul(argv[11]);
   const std::string m_file = argv[12];
   const std::string c_file = argv[13];
- 
 
   const double dx = 2 * Lx / (nx - 1);
   const double dy = 2 * Ly / (ny - 1);
@@ -56,10 +55,12 @@ int main(int argc, char **argv) {
   std::vector<uint32_t> input_shape;
   Eigen::VectorXcd u0 = read_from_npy<double>(input_file, input_shape);
 
-  if (input_shape.size() != 3 || input_shape[0] != nz || input_shape[1] != ny || input_shape[2] != nx) {
+  if (input_shape.size() != 3 || input_shape[0] != nz || input_shape[1] != ny ||
+      input_shape[2] != nx) {
     std::cerr << "Error: Input array dimensions mismatch\n";
     std::cerr << "Expected: " << ny << "x" << nx << "\n";
-    std::cerr << "Got: " << input_shape[0] << "x" << input_shape[1] << "x" << input_shape[2] << "\n";
+    std::cerr << "Got: " << input_shape[0] << "x" << input_shape[1] << "x"
+              << input_shape[2] << "\n";
     return 1;
   }
 
@@ -69,11 +70,14 @@ int main(int argc, char **argv) {
   try {
     std::vector<uint32_t> m_shape;
     m = read_from_npy<double>(m_file, m_shape);
-    if (m_shape.size() != 3 || m_shape[0] != nz || m_shape[1] != ny || m_shape[2] != nx) {
+    if (m_shape.size() != 3 || m_shape[0] != nz || m_shape[1] != ny ||
+        m_shape[2] != nx) {
       std::cerr << "Error: Coupling array dimensions mismatch\n";
       std::cerr << "Expected: " << nz << "x" << ny << "x" << nx << "\n";
-      std::cerr << "Got: " << m_shape[0] << "x" << m_shape[1] << "x" << m_shape[2] << "\n";
-      throw std::runtime_error("Faulty m (1)"); // we don't default here from now on (3d cases only)  
+      std::cerr << "Got: " << m_shape[0] << "x" << m_shape[1] << "x"
+                << m_shape[2] << "\n";
+      throw std::runtime_error(
+          "Faulty m (1)"); // we don't default here from now on (3d cases only)
     }
   } catch (const std::exception &e) {
     std::cerr << "Error loading m(x, y, z): " << e.what() << "\n";
@@ -83,33 +87,37 @@ int main(int argc, char **argv) {
   try {
     std::vector<uint32_t> c_shape;
     c = read_from_npy<double>(c_file, c_shape);
-    if (c_shape.size() != 3 || c_shape[0] != nz || c_shape[1] != ny || c_shape[2] != nx) {
+    if (c_shape.size() != 3 || c_shape[0] != nz || c_shape[1] != ny ||
+        c_shape[2] != nx) {
       std::cerr << "Error: Coupling array dimensions mismatch\n";
       std::cerr << "Expected: " << nz << "x" << ny << "x" << nx << "\n";
-      std::cerr << "Got: " << c_shape[0] << "x" << c_shape[1] << "x" << c_shape[2] << "\n";
-      throw std::runtime_error("Faulty m (1)"); // we don't default here from now on (3d cases only)  
+      std::cerr << "Got: " << c_shape[0] << "x" << c_shape[1] << "x"
+                << c_shape[2] << "\n";
+      throw std::runtime_error(
+          "Faulty m (1)"); // we don't default here from now on (3d cases only)
     }
   } catch (const std::exception &e) {
     std::cerr << "Error loading c(x, y, z): " << e.what() << "\n";
     throw std::runtime_error("Faulty c (2)");
   }
 
-  
   const Eigen::SparseMatrix<std::complex<double>> L =
-      (build_anisotropic_laplacian_noflux_3d<std::complex<double>>(nx - 2, ny - 2, nz - 2, dx, dy, dz, c)).eval();
+      (build_anisotropic_laplacian_noflux_3d<std::complex<double>>(
+           nx - 2, ny - 2, nz - 2, dx, dy, dz, c))
+          .eval();
   Eigen::VectorXcd u_save(num_snapshots * nx * ny * nz);
 
-  Eigen::Map<Eigen::Matrix<std::complex<double>, -1, -1, Eigen::RowMajor>> u_save_mat(
-      u_save.data(), num_snapshots, nx * ny * nz);
+  Eigen::Map<Eigen::Matrix<std::complex<double>, -1, -1, Eigen::RowMajor>>
+      u_save_mat(u_save.data(), num_snapshots, nx * ny * nz);
 
   u_save_mat.row(0) = u0.transpose();
-  
+
   Eigen::VectorXcd u = u0;
   Eigen::VectorXcd buf(nx * ny * nz);
   Eigen::VectorXcd rho_buf(nx * ny * nz);
-  for (uint32_t i = 1; i < nt; ++i) { 
+  for (uint32_t i = 1; i < nt; ++i) {
     NLSESolver3d::step<std::complex<double>>(buf, rho_buf, u, L, m, dti);
-    neumann_bc_no_velocity_3d<std::complex<double>>(u, nx, ny, nz); 
+    neumann_bc_no_velocity_3d<std::complex<double>>(u, nx, ny, nz);
     if (i % freq == 0) {
       uint32_t snapshot_idx = i / freq;
       if (snapshot_idx < num_snapshots) {

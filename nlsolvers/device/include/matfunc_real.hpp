@@ -233,9 +233,7 @@ public:
   }
 
   // unsafe, workaround for now
-  DeviceSpMV<double> * expose_spmv() const {
-    return spmv_;
-  }
+  DeviceSpMV<double> *expose_spmv() const { return spmv_; }
 
 private:
   void compute_eigen_decomposition() {

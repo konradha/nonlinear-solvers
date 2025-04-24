@@ -30,12 +30,12 @@ public:
                   uint32_t nnz, const double *host_u0, const double *host_v0,
                   double dt, const Parameters &params = Parameters())
       : n_(n), current_snapshot_(0), params_(params), dt_(dt) {
- 
+
     nx_ = ny_ = std::sqrt(n);
     if (nx_ * ny_ != n) {
-        is_3d_ = true;
-        nx_ = ny_ = nz_ = std::cbrt(n);
-        assert(nx_ * ny_ * nz_ == n);
+      is_3d_ = true;
+      nx_ = ny_ = nz_ = std::cbrt(n);
+      assert(nx_ * ny_ * nz_ == n);
     }
 
     cudaMalloc(&d_u_, n * sizeof(double));
@@ -87,13 +87,13 @@ public:
   }
 
   void step() {
-    device::KGESolver::step(d_v_, d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_, matfunc_,
-                            d_m_, dt_, n_, grid_dim_, block_dim_);
+    device::KGESolver::step(d_v_, d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_,
+                            matfunc_, d_m_, dt_, n_, grid_dim_, block_dim_);
   }
 
   void step_sv() {
-    device::KGESolver::step_sv(d_v_, d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_, matfunc_,
-                            d_m_, dt_, n_, grid_dim_, block_dim_);
+    device::KGESolver::step_sv(d_v_, d_u_, d_u_past_, d_buf_, d_buf2_, d_buf3_,
+                               matfunc_, d_m_, dt_, n_, grid_dim_, block_dim_);
   }
 
   void transfer_snapshots(double *dst_u, double *dst_v) {
@@ -106,10 +106,10 @@ public:
   }
 
   void apply_bc() {
-      if (!is_3d_)
-        neumann_bc_no_velocity_blocking<double>(d_u_, nx_, ny_);
-      else
-       neumann_bc_no_velocity_blocking_3d<double>(d_u_, nx_, ny_, nz_);
+    if (!is_3d_)
+      neumann_bc_no_velocity_blocking<double>(d_u_, nx_, ny_);
+    else
+      neumann_bc_no_velocity_blocking_3d<double>(d_u_, nx_, ny_, nz_);
   }
 
   void store_snapshot(const uint32_t snapshot_idx) {

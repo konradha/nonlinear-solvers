@@ -74,17 +74,18 @@ Eigen::VectorX<Float> expm_multiply(const Eigen::SparseMatrix<Float> &L,
   return beta * V * exp_T * e1;
 }
 
-
 template <typename Float>
 Eigen::VectorX<Float> sincm_multiply(const Eigen::SparseMatrix<Float> &L,
-                                    const Eigen::VectorX<Float> &u, Float t,
-                                    const uint32_t m = 10) {
+                                     const Eigen::VectorX<Float> &u, Float t,
+                                     const uint32_t m = 10) {
   const auto [V, T, beta] = lanczos_L(L, u, m);
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
   Eigen::MatrixX<Float> sinc_T =
       (es.eigenvectors() *
        (t * es.eigenvalues())
-           .unaryExpr([](Float x) { return std::abs(x) < 1e-8 ? Float(1) : std::sin(x) / x;  })
+           .unaryExpr([](Float x) {
+             return std::abs(x) < 1e-8 ? Float(1) : std::sin(x) / x;
+           })
            .matrix()
            .asDiagonal() *
        es.eigenvectors().adjoint());

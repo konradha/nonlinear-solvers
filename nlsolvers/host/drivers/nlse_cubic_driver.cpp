@@ -95,8 +95,8 @@ int main(int argc, char **argv) {
 
   for (uint32_t i = 1; i < nt; ++i) {
     NLSESolver::step<std::complex<double>>(buf, rho_buf, u, L, m, dti);
-    neumann_bc_no_velocity<std::complex<double>>(u, nx, ny); 
-    //experimental_nlse_envelope_bc(u, nx-2, ny-2, dx, dy, m);
+    neumann_bc_no_velocity<std::complex<double>>(u, nx, ny);
+    // experimental_nlse_envelope_bc(u, nx-2, ny-2, dx, dy, m);
     if (i % freq == 0) {
       uint32_t snapshot_idx = i / freq;
       if (snapshot_idx < num_snapshots) {
@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
   const std::vector<uint32_t> shape = {num_snapshots, ny, nx};
   save_to_npy(output_file, u_save, shape);
 
-  //std::cout << std::scientific << std::setprecision(4);
-  //std::cout << "walltime: " << compute_time / 1.e6 << " seconds\n";
+  // std::cout << std::scientific << std::setprecision(4);
+  // std::cout << "walltime: " << compute_time / 1.e6 << " seconds\n";
   return 0;
 }

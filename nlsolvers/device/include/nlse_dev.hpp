@@ -53,19 +53,19 @@ public:
 
     // TODO check dims here
     uint32_t threads = 256;
-    if (!is_3d_) { 
+    if (!is_3d_) {
       block_dim_ = dim3(16, 16, 1);
       grid_dim_ = dim3((nx_ + block_dim_.x - 1) / block_dim_.x,
-                     (ny_ + block_dim_.y - 1) / block_dim_.y);
+                       (ny_ + block_dim_.y - 1) / block_dim_.y);
     } else {
       block_dim_ = dim3(8, 8, 4);
       grid_dim_ = dim3((nx_ + block_dim_.x - 1) / block_dim_.x,
-                         (ny_ + block_dim_.y - 1) / block_dim_.y,
-                         (nz_ + block_dim_.z - 1) / block_dim_.z);
+                       (ny_ + block_dim_.y - 1) / block_dim_.y,
+                       (nz_ + block_dim_.z - 1) / block_dim_.z);
     }
-    //block_dim_ = dim3(threads / 16, threads / 16);
-    //grid_dim_ = dim3((nx_ + block_dim_.x - 1) / block_dim_.x,
-    //                 (ny_ + block_dim_.y - 1) / block_dim_.y);
+    // block_dim_ = dim3(threads / 16, threads / 16);
+    // grid_dim_ = dim3((nx_ + block_dim_.x - 1) / block_dim_.x,
+    //                  (ny_ + block_dim_.y - 1) / block_dim_.y);
 
     cudaDeviceSynchronize();
     cudaError_t err = cudaGetLastError();
@@ -83,14 +83,16 @@ public:
     cudaFree(d_density_);
     cudaFree(d_m_);
     cudaFree(d_u_trajectory_);
-    if (d_u_prev_ != nullptr) cudaFree(d_u_prev_);
+    if (d_u_prev_ != nullptr)
+      cudaFree(d_u_prev_);
   }
 
   void apply_bc() {
     if (!is_3d_) {
       neumann_bc_no_velocity_blocking<thrust::complex<double>>(d_u_, nx_, ny_);
     } else {
-      neumann_bc_no_velocity_blocking_3d<thrust::complex<double>>(d_u_, nx_, ny_, nz_);
+      neumann_bc_no_velocity_blocking_3d<thrust::complex<double>>(d_u_, nx_,
+                                                                  ny_, nz_);
     }
   }
 
@@ -118,13 +120,13 @@ public:
   void step_sewi(const std::complex<double> tau, const uint32_t step_number) {
     // initial step is symmetric SS2, see publication for reference
     if (step_number == 1) {
-      cudaMalloc(&d_u_prev_, n_ * sizeof(thrust::complex<double>)); 
+      cudaMalloc(&d_u_prev_, n_ * sizeof(thrust::complex<double>));
       cudaMemcpy(d_u_prev_, d_u_, n_ * sizeof(thrust::complex<double>),
-               cudaMemcpyDeviceToDevice);
-      step(tau, 1); 
+                 cudaMemcpyDeviceToDevice);
+      step(tau, 1);
     } else {
       // TODO: complete
-      // ie. add sincm_multiply as well! 
+      // ie. add sincm_multiply as well!
     }
   }
 
@@ -143,7 +145,8 @@ private:
 
   MatrixFunctionApplicatorComplex *matfunc_;
   thrust::complex<double> *d_u_;
-  thrust::complex<double> *d_u_prev_ = nullptr; // for first step set to nullptr?
+  thrust::complex<double> *d_u_prev_ =
+      nullptr; // for first step set to nullptr?
   thrust::complex<double> *d_buf_;
   thrust::complex<double> *d_density_;
   thrust::complex<double> *d_u_trajectory_;

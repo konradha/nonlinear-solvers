@@ -125,7 +125,6 @@ int main(int argc, char **argv) {
   if (freq == 1)
     u_save_mat.row(1) = u.transpose();
 
-
   for (uint32_t i = 2; i < nt; ++i) {
     NLSECubicGautschiSolver::step(buf, rho_buf, u, u_prev, L, m, dti);
     neumann_bc_no_velocity<std::complex<double>>(u, nx, ny);

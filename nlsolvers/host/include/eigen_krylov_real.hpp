@@ -183,27 +183,28 @@ Eigen::VectorX<Float> sinc2_sqrt_half(const Eigen::SparseMatrix<Float> &L,
 
 template <typename Float>
 Eigen::VectorX<Float> mod_cosine_multiply(const Eigen::SparseMatrix<Float> &L,
-                                      const Eigen::VectorX<Float> &u, Float t,
-                                      const uint32_t m = 10) {
+                                          const Eigen::VectorX<Float> &u,
+                                          Float t, const uint32_t m = 10) {
   const auto [V, T, beta] = lanczos_L(L, u, m);
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
-  Eigen::MatrixX<Float> mod_T =
-      (es.eigenvectors() *
-       (t * es.eigenvalues().array().abs().sqrt())
-           .unaryExpr([](Float x) {
-               const auto theta = x;
-               if (std::abs(theta) < 1e-12) return 1.0;
-               double half_theta = theta/2.0;
-               return std::cos(half_theta)*std::cos(half_theta)*std::sin(theta)/theta;
-           })
-           .square()
-           .matrix()
-           .asDiagonal() *
-       es.eigenvectors().transpose());
+  Eigen::MatrixX<Float> mod_T = (es.eigenvectors() *
+                                 (t * es.eigenvalues().array().abs().sqrt())
+                                     .unaryExpr([](Float x) {
+                                       const auto theta = x;
+                                       if (std::abs(theta) < 1e-12)
+                                         return 1.0;
+                                       double half_theta = theta / 2.0;
+                                       return std::cos(half_theta) *
+                                              std::cos(half_theta) *
+                                              std::sin(theta) / theta;
+                                     })
+                                     .square()
+                                     .matrix()
+                                     .asDiagonal() *
+                                 es.eigenvectors().transpose());
   Eigen::VectorX<Float> e1 = Eigen::VectorX<Float>::Zero(T.rows());
   e1(0) = 1.0;
   return beta * V * mod_T * e1;
 }
-
 
 #endif

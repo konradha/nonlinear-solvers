@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
     }
   }
   solver.transfer_snapshots(u_save.data());
- 
+
   const std::vector<uint32_t> shape = {num_snapshots, ny, nx};
   save_to_npy(output_file, u_save, shape);
 

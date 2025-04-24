@@ -21,13 +21,14 @@ __global__ void transform_eigenvals_exp(thrust::complex<double> *out,
 }
 
 __global__ void transform_eigenvals_sinc(thrust::complex<double> *out,
-                                        const double *eigvals,
-                                        thrust::complex<double> dt,
-                                        const uint32_t m) {
+                                         const double *eigvals,
+                                         thrust::complex<double> dt,
+                                         const uint32_t m) {
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   if (i < m) {
     const auto val = dt * eigvals[i];
-    out[i] = thrust::abs(val) < 1e-8 ? thrust::complex<double>(1.0, 0.0) : thrust::sin(val) / val;
+    out[i] = thrust::abs(val) < 1e-8 ? thrust::complex<double>(1.0, 0.0)
+                                     : thrust::sin(val) / val;
   }
 }
 
@@ -188,9 +189,7 @@ public:
   }
 
   // unsafe, but without full refactoring we take this choice now
-  DeviceSpMV<thrust::complex<double>> * expose_spmv() {
-      return spmv_;
-  };
+  DeviceSpMV<thrust::complex<double>> *expose_spmv() { return spmv_; };
 
 private:
   void compute_eigen_decomposition() {

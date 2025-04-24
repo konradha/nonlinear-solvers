@@ -98,39 +98,41 @@ int main(int argc, char **argv) {
   Eigen::VectorXcd buf = u0;
   Eigen::VectorXcd rho_buf(nx * ny);
 
-
   uint32_t pre_steps = 10;
   auto dti_small = dti / static_cast<double>(pre_steps);
   Eigen::VectorXcd u_prev = u0;
   Eigen::SparseLU<Eigen::SparseMatrix<std::complex<double>>> solver;
   Eigen::SparseMatrix<std::complex<double>> scaled_L = dti_small * L;
   solver.compute(scaled_L);
-  auto compute_B = [&m, &L, &kappa](const Eigen::VectorX<Scalar_t> & u) {
-    auto u_abs_squared = u.real().cwiseProduct(u.real()) +
-                        u.imag().cwiseProduct(u.imag());
-    Eigen::VectorX<Scalar_t> ones_buf = Eigen::VectorX<Scalar_t>::Ones(L.rows());
+  auto compute_B = [&m, &L, &kappa](const Eigen::VectorX<Scalar_t> &u) {
+    auto u_abs_squared =
+        u.real().cwiseProduct(u.real()) + u.imag().cwiseProduct(u.imag());
+    Eigen::VectorX<Scalar_t> ones_buf =
+        Eigen::VectorX<Scalar_t>::Ones(L.rows());
     ones_buf = (ones_buf + kappa * u_abs_squared).cwiseInverse();
-    return -m.cwiseProduct(u_abs_squared.cwiseProduct(ones_buf)).cwiseProduct(u);
+    return -m.cwiseProduct(u_abs_squared.cwiseProduct(ones_buf))
+                .cwiseProduct(u);
   };
 
-
-  // as paper says, some approximation for first step 
-  for(uint32_t k = 0;k<pre_steps;++k) {
-    // take #pre_steps of SS2 
+  // as paper says, some approximation for first step
+  for (uint32_t k = 0; k < pre_steps; ++k) {
+    // take #pre_steps of SS2
     // NLSESolver::step<std::complex<double>>(buf, rho_buf, u, L, m, dti_small);
 
     // repeatedly apply 1st order approx as suggested
-    const auto B = compute_B(u);  
-    const auto filtered = NLSECubicGautschiSolver::phi1m_multiply<std::complex<double>>
-        (solver, scaled_L, B, dti_small);
+    const auto B = compute_B(u);
+    const auto filtered =
+        NLSECubicGautschiSolver::phi1m_multiply<std::complex<double>>(
+            solver, scaled_L, B, dti_small);
     Eigen::VectorX<std::complex<double>> exp_v = expm_multiply(L, u, dti_small);
-    u = exp_v - dti_small * filtered; 
+    u = exp_v - dti_small * filtered;
     neumann_bc_no_velocity<std::complex<double>>(u, nx, ny);
   }
 
   for (uint32_t i = 2; i < nt; ++i) {
-    NLSESaturatingGautschiSolver::step(buf, rho_buf, u, u_prev, L, m, dti, kappa);
-    neumann_bc_no_velocity<std::complex<double>>(u, nx, ny);   
+    NLSESaturatingGautschiSolver::step(buf, rho_buf, u, u_prev, L, m, dti,
+                                       kappa);
+    neumann_bc_no_velocity<std::complex<double>>(u, nx, ny);
 
     if (i % freq == 0) {
       uint32_t snapshot_idx = i / freq;
@@ -149,7 +151,7 @@ int main(int argc, char **argv) {
   const std::vector<uint32_t> shape = {num_snapshots, ny, nx};
   save_to_npy(output_file, u_save, shape);
 
-  //std::cout << std::scientific << std::setprecision(4);
-  //std::cout << "walltime: " << compute_time / 1.e6 << " seconds\n";
+  // std::cout << std::scientific << std::setprecision(4);
+  // std::cout << "walltime: " << compute_time / 1.e6 << " seconds\n";
   return 0;
 }

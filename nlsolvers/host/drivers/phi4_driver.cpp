@@ -20,13 +20,16 @@
 int main(int argc, char **argv) {
   if (argc != 12 && argc != 13) {
     std::cerr << "Usage: " << argv[0]
-              << " nx ny Lx Ly input_u0.npy input_v0.npy output_traj.npy output_vel.npy T nt "
+              << " nx ny Lx Ly input_u0.npy input_v0.npy output_traj.npy "
+                 "output_vel.npy T nt "
                  "num_snapshots [input_m.npy]\n";
     std::cerr << "Example: " << argv[0]
-              << " 256 256 10.0 10.0 initial.npy velocity.npy evolution_u.npy evolution_v.npy "
+              << " 256 256 10.0 10.0 initial.npy velocity.npy evolution_u.npy "
+                 "evolution_v.npy "
                  "1.5 500 100\n";
     std::cerr << "Example with m(x,y): " << argv[0]
-              << " 256 256 10.0 10.0 initial.npy velocity.npy evolution_u.npy evolution_v.npy "
+              << " 256 256 10.0 10.0 initial.npy velocity.npy evolution_u.npy "
+                 "evolution_v.npy "
                  "1.5 500 100 coupling.npy\n";
     return 1;
   }
@@ -38,7 +41,7 @@ int main(int argc, char **argv) {
   const std::string input_file = argv[5];
   const std::string input_velocity = argv[6];
   const std::string output_file = argv[7];
-  const std::string output_vel  = argv[8];
+  const std::string output_vel = argv[8];
   const double T = std::stod(argv[9]);
   const uint32_t nt = std::stoul(argv[10]);
   const uint32_t num_snapshots = std::stoul(argv[11]);

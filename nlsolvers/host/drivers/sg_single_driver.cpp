@@ -1,5 +1,5 @@
-#include "eigen_krylov_real.hpp"
 #include "boundaries.hpp"
+#include "eigen_krylov_real.hpp"
 #include "laplacians.hpp"
 #include "sg_single_solver.hpp"
 #include "util.hpp"
@@ -20,13 +20,16 @@
 int main(int argc, char **argv) {
   if (argc != 12 && argc != 13) {
     std::cerr << "Usage: " << argv[0]
-              << " nx ny Lx Ly input_u0.npy input_v0.npy output_traj.npy output_vel.npy T nt "
+              << " nx ny Lx Ly input_u0.npy input_v0.npy output_traj.npy "
+                 "output_vel.npy T nt "
                  "num_snapshots [input_m.npy]\n";
     std::cerr << "Example: " << argv[0]
-              << " 256 256 10.0 10.0 initial.npy velocity.npy evolution_u.npy evolution_v.npy "
+              << " 256 256 10.0 10.0 initial.npy velocity.npy evolution_u.npy "
+                 "evolution_v.npy "
                  "1.5 500 100\n";
     std::cerr << "Example with m(x,y): " << argv[0]
-              << " 256 256 10.0 10.0 initial.npy velocity.npy evolution_u.npy evolution_v.npy "
+              << " 256 256 10.0 10.0 initial.npy velocity.npy evolution_u.npy "
+                 "evolution_v.npy "
                  "1.5 500 100 coupling.npy\n";
     return 1;
   }
@@ -90,7 +93,7 @@ int main(int argc, char **argv) {
       build_laplacian_noflux<double>(nx - 2, ny - 2, dx, dy);
 
   Eigen::VectorXd u_save(num_snapshots * nx * ny);
-  Eigen::VectorXd v_save(num_snapshots * nx * ny); 
+  Eigen::VectorXd v_save(num_snapshots * nx * ny);
 
   Eigen::Map<Eigen::Matrix<double, -1, -1, Eigen::RowMajor>> u_save_mat(
       u_save.data(), num_snapshots, nx * ny);
@@ -103,7 +106,7 @@ int main(int argc, char **argv) {
   Eigen::VectorXd buf(nx * ny);
 
   Eigen::VectorXd v = Eigen::VectorXd::Zero(nx * ny);
-  
+
   for (uint32_t i = 1; i < nt; ++i) {
     SGESolver::step<double>(u, u_past, buf, L, m, dt);
     neumann_bc_no_velocity<double>(u, nx, ny);

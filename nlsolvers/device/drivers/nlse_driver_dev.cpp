@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
   std::vector<uint32_t> input_shape;
   Eigen::VectorX<std::complex<double>> u0 =
       read_from_npy<std::complex<double>>(input_file, input_shape);
-  
+
   if (input_shape.size() != 2 || input_shape[0] != ny || input_shape[1] != nx) {
     std::cerr << "Error: Input array dimensions mismatch\n";
     std::cerr << "Expected: " << ny << "x" << nx << "\n";
