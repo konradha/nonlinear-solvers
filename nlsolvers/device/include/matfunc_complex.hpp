@@ -180,9 +180,11 @@ public:
     if (func == "exp")
     	transform_eigenvals_exp<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_,
                                                      dt, m_);
-    else
+    else if (func == "sinc")
 	transform_eigenvals_sinc<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_,
                                                      dt, m_);	
+    else 
+	throw std::runtime_error("Matrix function application not implemented");
 
     matrix_multiply_QDQ<<<grid_QDQ_, block_2d_>>>(d_eigenvectors_, d_diag_,
                                                   d_work_, m_);

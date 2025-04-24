@@ -32,6 +32,11 @@ public:
     cudaMalloc(&d_u_, n_ * sizeof(thrust::complex<double>));
     cudaMalloc(&d_buf_, n_ * sizeof(thrust::complex<double>));
     cudaMalloc(&d_density_, n_ * sizeof(thrust::complex<double>));
+    cudaMalloc(&d_buf2_, n_ * sizeof(thrust::complex<double>));
+    cudaMalloc(&d_buf3_, n_ * sizeof(thrust::complex<double>));
+    cudaMalloc(&d_buf4_, n_ * sizeof(thrust::complex<double>));
+    cudaMalloc(&d_buf5_, n_ * sizeof(thrust::complex<double>));
+
     cudaMalloc(&d_m_, n_ * sizeof(double));
     cudaMalloc(&d_u_trajectory_,
                n_ * params_.num_snapshots * sizeof(thrust::complex<double>));
@@ -80,6 +85,10 @@ public:
     delete matfunc_;
     cudaFree(d_u_);
     cudaFree(d_buf_);
+    cudaFree(d_buf2_);
+    cudaFree(d_buf3_);
+    cudaFree(d_buf4_);
+    cudaFree(d_buf5_);
     cudaFree(d_density_);
     cudaFree(d_m_);
     cudaFree(d_u_trajectory_);
@@ -102,7 +111,7 @@ public:
                                                  ny_);
       device::nonlin_part<<<grid_dim_, block_dim_>>>(d_buf_, d_u_, d_density_,
                                                      .5 * tau, nx_, ny_);
-      matfunc_->apply(d_u_, d_buf_, tau);
+      matfunc_->apply(d_u_, d_buf_, tau, "exp");
 
       device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
                                                  ny_);
@@ -113,7 +122,7 @@ public:
                                                  ny_, nz_);
       device::nonlin_part_3d<<<grid_dim_, block_dim_>>>(d_buf_, d_u_, d_density_,
                                                      .5 * tau, nx_, ny_, nz_);
-      matfunc_->apply(d_u_, d_buf_, tau);
+      matfunc_->apply(d_u_, d_buf_, tau, "exp");
 
       device::density_3d<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
                                                  ny_, nz_);
@@ -139,49 +148,27 @@ public:
                  cudaMemcpyDeviceToDevice);
       step(tau, 1);
     } else {
-      if (!is_3d) {
-        cudaMemcpy(d_u_, buf); // bookkeeping prev	
-        B<<<grid_dim_, block_dim_>>>(d_buf_, d_m_, d_u_, nx_, ny_); 
+      cudaMemcpy(d_buf_, d_u_, n_ * sizeof(thrust::complex<double>),
+                 cudaMemcpyDeviceToDevice); // bookkeeping prev
+      if (!is_3d_) {
+        B<<<grid_dim_, block_dim_>>>(d_buf2_, d_m_, d_u_, nx_, ny_); 
         thrust::complex<double> real_tau(tau.imag(), 0.0);
-
-        matfunc->apply("sinc", real_tau);
-        matfunc->apply("exp", tau);
-
-
-        matfunc->apply("exp", d_u_prev_, 2. * tau);
-        sewi_kernel<<<grid_dim_, block_dim_>>>();
-        cudaMemcpy(d_u_prev_, buf); // attach "prev" to prev
-      } else {
-        throw std::runtime_error("");
-      }
-
-
-      /*
-       * rho_buf = u;
-        // B(u^n) = -m(x,y)V(|u|^2)u
-        auto compute_B = [&m](const Eigen::VectorX<Scalar_t> & u) {
-          auto u_abs_squared = u.real().cwiseProduct(u.real()) +
-                              u.imag().cwiseProduct(u.imag());
-          return -m.cwiseProduct(u_abs_squared.cwiseProduct(u));
-        };
-        buf = compute_B(u);
-        // e^{-i*tau*Delta} on phi_s(tau*Delta)B(u^n)
-        std::complex<double> real_tau(tau.imag(), 0.0);
-        assert(std::abs(tau.real()) < 1e-12);
-        assert(std::abs(tau.imag()) > 1e-7);
-      
-        Eigen::VectorX<Scalar_t> phi_s_B_un = sincm_multiply(L, buf, real_tau);
-        Eigen::VectorX<Scalar_t> exp_phi_s_B_un = expm_multiply(L, phi_s_B_un, tau);
-      
-        // e^{-2i*tau*Delta} on u^{n-1}
-        Eigen::VectorX<Scalar_t> exp_u_prev = expm_multiply(L, u_prev, 2.*tau);
-      
+	matfunc_->apply(d_buf3_ /* out */, d_buf2_ /* in */, real_tau, "sinc");
+        matfunc_->apply(d_buf2_, d_buf3_, tau, "exp"); // re-use buffer from before 
+        matfunc_->apply(d_buf3_, d_u_prev_, 2. * tau, "exp");
         // u^{n+1} = e^{-2i*tau*Delta}u^{n-1} - 2i*tau*e^{-i*tau*Delta}*phi_s(tau*Delta)*B(u^n)
-        u = exp_u_prev - 2. * tau * exp_phi_s_B_un;
-        u_prev = rho_buf;
-      */
-      
-      // TODO: complete
+        sewi<<<grid_dim_, block_dim_>>>(d_u_, d_buf2_, d_buf3_, tau, nx_, ny_); 
+      } else {
+        B_3d<<<grid_dim_, block_dim_>>>(d_buf2_, d_m_, d_u_, nx_, ny_, nz_); 
+        thrust::complex<double> real_tau(tau.imag(), 0.0);
+	matfunc_->apply(d_buf3_ /* out */, d_buf2_ /* in */, real_tau, "sinc");
+        matfunc_->apply(d_buf2_, d_buf3_, tau, "exp"); // re-use buffer from before 
+        matfunc_->apply(d_buf3_, d_u_prev_, 2. * tau, "exp");
+        // u^{n+1} = e^{-2i*tau*Delta}u^{n-1} - 2i*tau*e^{-i*tau*Delta}*phi_s(tau*Delta)*B(u^n)
+        sewi_3d<<<grid_dim_, block_dim_>>>(d_u_, d_buf2_, d_buf3_, tau, nx_, ny_, nz_);
+      }
+      cudaMemcpy(d_u_prev_, d_buf_, n_ * sizeof(thrust::complex<double>),
+                 cudaMemcpyDeviceToDevice); // attach "prev" to prev
     }
   }
 
@@ -203,6 +190,10 @@ private:
   thrust::complex<double> *d_u_prev_ =
       nullptr; // for first step set to nullptr?
   thrust::complex<double> *d_buf_;
+  thrust::complex<double> *d_buf2_;
+  thrust::complex<double> *d_buf3_;
+  thrust::complex<double> *d_buf4_;
+  thrust::complex<double> *d_buf5_;
   thrust::complex<double> *d_density_;
   thrust::complex<double> *d_u_trajectory_;
   double *d_m_;
