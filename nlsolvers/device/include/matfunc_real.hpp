@@ -232,6 +232,11 @@ public:
     scale_first_col<<<grid_1d, block_1d>>>(d_work_large_, result, beta, n_);
   }
 
+  // unsafe, workaround for now
+  DeviceSpMV<double> * expose_spmv() const {
+    return spmv_;
+  }
+
 private:
   void compute_eigen_decomposition() {
     cudaMemcpy(d_eigenvectors_, krylov_.T, m_ * m_ * sizeof(double),

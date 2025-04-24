@@ -46,14 +46,14 @@ public:
     nx_ = sqrt(n_);
     ny_ = nx_;
     if (nx_ * ny_ != n_) {
-      is_3d = true;
+      is_3d_ = true;
       nx_ = ny_ = nz_ = std::cbrt(n_);
       assert(nx_ * ny_ * nz_ == n_);
     }
 
     // TODO check dims here
     uint32_t threads = 256;
-    if (!is_3d) { 
+    if (!is_3d_) { 
       block_dim_ = dim3(16, 16, 1);
       grid_dim_ = dim3((nx_ + block_dim_.x - 1) / block_dim_.x,
                      (ny_ + block_dim_.y - 1) / block_dim_.y);
@@ -118,8 +118,8 @@ public:
   void step_sewi(const std::complex<double> tau, const uint32_t step_number) {
     // initial step is symmetric SS2, see publication for reference
     if (step_number == 1) {
-      cudaMalloc(&d_u_, n_ * sizeof(thrust::complex<double>)); 
-      cudaMemcpy(d_u_prev_, d_u, n_ * sizeof(thrust::complex<double>),
+      cudaMalloc(&d_u_prev_, n_ * sizeof(thrust::complex<double>)); 
+      cudaMemcpy(d_u_prev_, d_u_, n_ * sizeof(thrust::complex<double>),
                cudaMemcpyDeviceToDevice);
       step(tau, 1); 
     } else {
@@ -143,14 +143,14 @@ private:
 
   MatrixFunctionApplicatorComplex *matfunc_;
   thrust::complex<double> *d_u_;
-  thrust::complex<double> *d_u_prev_ = nullptr;
+  thrust::complex<double> *d_u_prev_ = nullptr; // for first step set to nullptr?
   thrust::complex<double> *d_buf_;
   thrust::complex<double> *d_density_;
   thrust::complex<double> *d_u_trajectory_;
   double *d_m_;
 
   uint32_t nx_, ny_, nz_;
-  bool is_3d = false;
+  bool is_3d_ = false;
   uint32_t current_snapshot_;
   uint32_t n_;
   dim3 grid_dim_;

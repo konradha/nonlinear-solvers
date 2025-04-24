@@ -106,7 +106,7 @@ public:
   }
 
   void apply_bc() {
-      if (!is_3d)
+      if (!is_3d_)
         neumann_bc_no_velocity_blocking<double>(d_u_, nx_, ny_);
       else
        neumann_bc_no_velocity_blocking_3d<double>(d_u_, nx_, ny_, nz_);
@@ -148,4 +148,4 @@ private:
 
 } // namespace device
 
-#endif // KG_SINGLE_DEV_HPP
+#endif // KG_DEV_HPP

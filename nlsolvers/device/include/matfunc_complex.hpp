@@ -27,7 +27,7 @@ __global__ void transform_eigenvals_sinc(thrust::complex<double> *out,
   int i = threadIdx.x + blockIdx.x * blockDim.x;
   if (i < m) {
     const auto val = dt * eigvals[i];
-    out[i] = std::abs(val) < 1e-8? {1., 0.} : thrust::sin(val) / val;
+    out[i] = thrust::abs(val) < 1e-8 ? thrust::complex<double>(1.0, 0.0) : thrust::sin(val) / val;
   }
 }
 
