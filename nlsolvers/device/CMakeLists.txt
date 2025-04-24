@@ -7,8 +7,8 @@ set(DEVICE_HEADERS
     include/sg_single.cuh
     include/sg_single_dev.hpp
  
-    include/kg_dev.cuh
-    include/kg_single_dev.hpp
+    include/kg_dev.hpp
+    include/kg_single.cuh
 
     include/nlse.cuh
     include/nlse_dev.hpp
