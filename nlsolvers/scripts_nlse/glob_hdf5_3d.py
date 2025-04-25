@@ -18,10 +18,11 @@ from downsampling import downsample_interpolation_3d
 
 
 class NLSEDashboardGenerator:
-    def __init__(self, directory, output_dir=None):
+    def __init__(self, directory, output_dir=None, summary_only=False):
         self.directory = Path(directory)
         self.output_dir = Path(output_dir) if output_dir else self.directory / "dashboards"
         self.output_dir.mkdir(exist_ok=True, parents=True)
+        self.summary_only = summary_only
         
         self.h5_files = sorted(glob.glob(str(self.directory / "*.h5")))
         if not self.h5_files:
@@ -32,7 +33,8 @@ class NLSEDashboardGenerator:
     def process_all_files(self):
         for file_path in tqdm(self.h5_files, desc="Generating dashboards"):
             file_id = Path(file_path).stem
-            self.generate_dashboards(file_path, file_id)
+            if not self.summary_only:
+                self.generate_dashboards(file_path, file_id)
         
         self.generate_summary()
     
@@ -259,7 +261,9 @@ class NLSEDashboardGenerator:
                 u_data = f['u'][:]
                 m = f['focusing/m'][:]
                 c = f['anisotropy/c'][:]
-                
+ 
+                self.L = grid_data['Lx']    
+
                 dx = 2 * grid_data['Lx'] / (grid_data['nx'] - 1)
                 dy = 2 * grid_data['Ly'] / (grid_data['ny'] - 1)
                 dz = 2 * grid_data['Lz'] / (grid_data['nz'] - 1)
@@ -269,10 +273,14 @@ class NLSEDashboardGenerator:
                 
                 energy = self._calculate_energy_metrics(u_data, m, c, dx, dy, dz)
                 
-                is_blowup = (max_amplitude[-1] / max_amplitude[0] > 10 or 
-                           max_gradient[-1] / max_gradient[0] > 50 or
-                           np.abs((energy['total_energy'][-1] - energy['total_energy'][0]) / 
-                                 energy['total_energy'][0]) > 0.2)
+                #is_blowup = (max_amplitude[-1] / max_amplitude[0] > 10 or 
+                #           max_gradient[-1] / max_gradient[0] > 50 or
+                #           np.abs((energy['total_energy'][-1] - energy['total_energy'][0]) / 
+                #                 energy['total_energy'][0]) > 0.2)
+
+                # let's try less complicated
+                factor = 45
+                is_blowup = max_amplitude[-1] / max_amplitude[0] > factor
                 
                 blowup_data.append({
                     'file_id': file_id,
@@ -297,7 +305,7 @@ class NLSEDashboardGenerator:
         ax1.bar(file_ids, amp_growth, color=colors)
         ax1.set_title('Maximum Amplitude Growth')
         ax1.set_xlabel('Simulation')
-        ax1.set_ylabel('Growth Ratio (Final/Initial)')
+        ax1.set_ylabel('growth Ratio (Final/Initial)')
         ax1.set_yscale('log')
         ax1.tick_params(axis='x', rotation=90)
         
@@ -315,7 +323,7 @@ class NLSEDashboardGenerator:
         ax3.bar(file_ids, energy_var, color=colors)
         ax3.set_title('Relative Energy Variation')
         ax3.set_xlabel('Simulation')
-        ax3.set_ylabel('|E_final - E_initial|/|E_initial|')
+        ax3.set_ylabel('$|E_T - E_0|/|E_0|$')
         ax3.set_yscale('log')
         ax3.tick_params(axis='x', rotation=90)
         
@@ -326,7 +334,9 @@ class NLSEDashboardGenerator:
                labels=['Blowup Detected', 'Stable Evolution'], 
                autopct='%1.1f%%', 
                colors=['red', 'blue'])
-        ax4.set_title(f'Stability Analysis: {blowup_count}/{len(blowup_data)} simulations show blowup')
+        ax4_title_str = f'{blowup_count}/{len(blowup_data)} simulations show blowup' +\
+                '\n$\\frac{|u_T|}{|u_0|} > f$\n' + f'$f=${factor}'   
+        ax4.set_title(ax4_title_str)
         
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.savefig(self.output_dir / "summary_dashboard.png", dpi=150)
@@ -519,10 +529,12 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Generate NLSE analysis dashboards')
     parser.add_argument('directory', help='Directory containing HDF5 files')
     parser.add_argument('--output', '-o', help='Output directory for dashboards')
+    parser.add_argument('--summary-only', action='store_true', default=False,
+            help='Only perform (conservative) analysis to detect blowup')
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_arguments()
-    generator = NLSEDashboardGenerator(args.directory, args.output)
+    generator = NLSEDashboardGenerator(args.directory, args.output, args.summary_only)
     generator.process_all_files()
     print(f"Dashboards generated in {generator.output_dir}")

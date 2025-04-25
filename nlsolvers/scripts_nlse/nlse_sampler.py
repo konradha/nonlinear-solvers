@@ -1735,13 +1735,13 @@ class NLSE3DSampler:
             
         return u
 
-    def skyrmion_tube(self, amplitude_range=(0.8, 1.5), radius_range=(1.0, 3.0), 
+    def skyrmion_tube(self, system_type='cubic', amplitude_range=(0.8, 1.5), radius_range=(1.0, 3.0), 
                      width_range=(0.5, 1.5), position_variance=0.5, phase_range=(0, 2*np.pi),
                      winding_range=(1, 3), k_z_range=(0.1, 1.0), velocity_scale=0.3,
                      chirp_range=(-0.1, 0.1), tube_count_range=(1, 5),
                      apply_envelope=True, envelope_width=0.7, tube_arrangement='random',
                      interaction_strength=0.5, deformation_factor=0.2):
-        u = np.zeros_like(self.X, dtype=complex)
+        u = np.zeros_like(self.X, dtype=np.complex128)
         n_tubes = np.random.randint(*tube_count_range)
         
         if tube_arrangement == 'random':
