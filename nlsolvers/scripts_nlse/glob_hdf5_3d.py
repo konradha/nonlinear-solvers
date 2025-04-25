@@ -3,25 +3,42 @@ import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
+from matplotlib.collections import LineCollection
+
 from pathlib import Path
 import argparse
 import glob
 import os
-from tqdm import tqdm
+
 import warnings
 from skimage import measure
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 warnings.filterwarnings('ignore')
+
+from matplotlib.colors import hsv_to_rgb
+from matplotlib import cm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+from scipy import ndimage
+from scipy.signal import cwt, ricker
+import matplotlib.animation as animation
+from tqdm import tqdm
+
 
 from downsampling import downsample_interpolation_3d
 
 
 
 class NLSEDashboardGenerator:
-    def __init__(self, directory, output_dir=None, summary_only=False):
+    def __init__(self, directory, output_dir=None, summary_only=False, detailed_panels=False):
         self.directory = Path(directory)
-        self.output_dir = Path(output_dir) if output_dir else self.directory / "dashboards"
+        self.output_dir = Path(output_dir) if output_dir else self.directory / "dashboards" 
         self.output_dir.mkdir(exist_ok=True, parents=True)
+        if detailed_panels:
+            self.detailed_panels = True
+            self.detailed_dir = self.output_dir / "detailed_panels"
+            self.detailed_dir.mkdir(exist_ok=True, parents=True)
+
         self.summary_only = summary_only
         
         self.h5_files = sorted(glob.glob(str(self.directory / "*.h5")))
@@ -35,8 +52,94 @@ class NLSEDashboardGenerator:
             file_id = Path(file_path).stem
             if not self.summary_only:
                 self.generate_dashboards(file_path, file_id)
-        
+            if self.detailed_panels:
+                self.generate_detailed_viz(file_path, file_id)
+ 
         self.generate_summary()
+
+    def generate_detailed_viz(self, file_path, file_id):
+        with h5py.File(file_path, 'r') as f:
+            meta = dict(f['metadata'].attrs)
+            grid_data = dict(f['grid'].attrs)
+            time_data = dict(f['time'].attrs)
+            u_data = f['u'][:]
+            
+            T = time_data['T']
+            nt = u_data.shape[0]
+            time_values = np.linspace(0, T, nt)
+            
+            nx = grid_data['nx']
+            ny = grid_data['ny']
+            nz = grid_data['nz']
+            
+            Lx = grid_data['Lx']
+            Ly = grid_data['Ly']
+            Lz = grid_data['Lz']
+
+            self.L = Lx
+            self.n = nx
+            
+            self.dx = 2 * self.L / (self.n - 1)
+
+            
+            detailed_file_dir = self.detailed_dir / file_id 
+            detailed_file_dir.mkdir(exist_ok=True, parents=True)
+            
+            fname_multi = detailed_file_dir / (
+                    f"multi_scale_" + file_id + ".png" 
+                    )
+            fname_critical = detailed_file_dir / (
+                    f"critical_" + file_id + ".png" 
+                    )
+            fname_temp_phase = detailed_file_dir / (
+                    f"temp_phase_" + file_id + ".png" 
+                    )
+            fname_phase = detailed_file_dir / (
+                    f"complex_phase_" + file_id + ".png" 
+                    )
+            fname_spectral = detailed_file_dir / (
+                    f"spectral_" + file_id + ".png" 
+                    )
+
+            fname_tp_3d = detailed_file_dir / (
+                    f"tp_rendering_" + file_id + ".png" 
+                    )
+            fname_critical_3d = detailed_file_dir / (
+                    f"critical_3d_" + file_id + ".png" 
+                    )
+            fname_iso_3d = detailed_file_dir / (
+                    f"iso_3d_" + file_id + ".png" 
+                    )
+
+            temporal_phase_portrait(u_data, T=T, fname=fname_temp_phase)
+            multi_scale_signature_display(u_data,
+                    timepoints=[0, nt // 2, -1],
+                    timepoint_names=[0, T / 2, T],
+                    fname=str(fname_multi))
+            critical_phenomena_tracker(u_data,
+                    timepoints=[0, nt // 2, -1],
+                    timepoint_names=[0, T / 2, T],
+                    fname=fname_critical) 
+            complex_phase_evolution_display(u_data,
+                    timepoints=[0, nt // 2, -1],
+                    timepoints_names=[0, T / 2, T],
+                    fname=fname_phase)
+            spectral_signature_evolution(u_data,
+                    timepoints=[0, nt // 2, -1],
+                    timepoint_names=[0, T / 2, T],
+                    fname=fname_spectral)
+            phase_colored_isosurfaces(u_data,
+                    timestep=nt // 2, timestep_name=T/2,
+                    iso_value=0.5, fname=fname_tp_3d)
+            critical_points_3d(u_data,
+                    timestep=nt // 2, timestep_name=T/2,
+                    fname=fname_critical_3d)
+            compare_timepoints_isosurfaces(u_data,
+                    timepoints=[0, nt // 2, -1],
+                    timepoints_names=[0, T / 2, T],
+                    iso_value=0.5, fname=fname_iso_3d)
+            
+           
     
     def generate_dashboards(self, file_path, file_id):
         with h5py.File(file_path, 'r') as f:
@@ -525,16 +628,443 @@ class NLSEDashboardGenerator:
             
         return max_gradient
 
+def complex_phase_evolution_display(u, timepoints=[0, -1], timepoints_names=[0, 1], fname=None):
+    nt, nx, ny, nz = u.shape
+
+    if len(timepoints) == 1:
+        timepoints = [timepoints[0]]
+    elif len(timepoints) == 2:
+        step = max(1, (timepoints[1] - timepoints[0]) // 4)
+        timepoints = range(timepoints[0], timepoints[1] + 1, step)
+
+    fig, axes = plt.subplots(1, len(timepoints), figsize=(4*len(timepoints), 4))
+    if len(timepoints) == 1:
+        axes = [axes]
+
+    assert len(timepoints)  == len(timepoints_names)
+    for i, t in enumerate(timepoints):
+        z_mid = nz // 2
+        data = u[t, :, :, z_mid]
+
+        phase = np.angle(data)
+        magnitude = np.abs(data)
+
+        hsv_data = np.zeros((nx, ny, 3))
+        hsv_data[:, :, 0] = (phase + np.pi) / (2 * np.pi)
+        hsv_data[:, :, 1] = 1.0
+        hsv_data[:, :, 2] = 1.0 - np.exp(-magnitude / np.max(magnitude) * 3)
+
+        rgb_data = hsv_to_rgb(hsv_data)
+
+        im = axes[i].imshow(rgb_data, origin='lower')
+        axes[i].set_title(f't = {timepoints_names[i]:.2f}')
+        axes[i].set_xticks([])
+        axes[i].set_yticks([])
+
+    plt.tight_layout()
+    if fname is not None:
+        plt.savefig(fname, dpi=200)
+        plt.close(fig)
+    return fig, axes
+
+def critical_phenomena_tracker(u, timepoints=[0, -1], timepoint_names=[0, -1], fname=None):
+    nt, nx, ny, nz = u.shape
+
+    if len(timepoints) == 1:
+        timepoints = [timepoints[0]]
+    elif len(timepoints) == 2:
+        step = max(1, (timepoints[1] - timepoints[0]) // 4)
+        timepoints = range(timepoints[0], timepoints[1] + 1, step)
+
+    fig, axes = plt.subplots(2, len(timepoints), figsize=(4*len(timepoints), 8))
+    if len(timepoints) == 1:
+        axes = axes.reshape(2, 1)
+
+    for i, t in enumerate(timepoints):
+        z_mid = nz // 2
+        data = u[t, :, :, z_mid]
+
+        magnitude = np.abs(data)
+        max_mag = np.max(magnitude)
+
+        phase = np.angle(data)
+
+        phase_gradient_x, phase_gradient_y = np.gradient(phase)
+        phase_curl = np.abs(np.gradient(phase_gradient_x)[1] - np.gradient(phase_gradient_y)[0])
+
+        zeros_mask = magnitude < max_mag * 0.05
+
+        axes[0, i].imshow(magnitude, origin='lower', cmap='viridis')
+        axes[0, i].contour(zeros_mask, levels=[0.5], colors='red', linewidths=2)
+        axes[0, i].set_title(f'Zeros (t = {timepoint_names[i]:.2f})')
+        axes[0, i].set_xticks([])
+        axes[0, i].set_yticks([])
+
+        im = axes[1, i].imshow(phase_curl, origin='lower', cmap='hot')
+        axes[1, i].set_title(f'Phase Singularities (t = {timepoint_names[i]:.2f})')
+        axes[1, i].set_xticks([])
+        axes[1, i].set_yticks([])
+
+    plt.tight_layout()
+    if fname is not None:
+        plt.savefig(fname, dpi=200)
+        plt.close(fig)
+    return fig, axes
+
+def multi_scale_signature_display(u, timepoints=[0, -1], timepoint_names=[0., 1.],
+        scales=[2, 8, 32], fname=None):
+    nt, nx, ny, nz = u.shape
+
+    assert len(timepoints) == len(timepoint_names)
+
+    if len(timepoints) == 1:
+        timepoints = [timepoints[0]]
+    elif len(timepoints) == 2:
+        step = max(1, (timepoints[1] - timepoints[0]) // 4)
+        timepoints = range(timepoints[0], timepoints[1] + 1, step)
+
+    fig, axes = plt.subplots(len(scales), len(timepoints), figsize=(4*len(timepoints), 3*len(scales)))
+
+    if len(timepoints) == 1 and len(scales) == 1:
+        axes = np.array([[axes]])
+    elif len(timepoints) == 1:
+        axes = axes.reshape(-1, 1)
+    elif len(scales) == 1:
+        axes = axes.reshape(1, -1)
+
+    z_mid = nz // 2
+    max_val = 0
+
+    wavelet_results = {}
+    for i, t in enumerate(timepoints):
+        data = np.abs(u[t, :, :, z_mid])
+
+        for j, scale in enumerate(scales):
+            wavelet = ndimage.gaussian_filter(data, sigma=scale)
+            detail = data - wavelet
+
+            wavelet_results[(i, j)] = detail
+            max_val = max(max_val, np.max(np.abs(detail)))
+
+    for (i, j), detail in wavelet_results.items():
+        im = axes[j, i].imshow(detail, origin='lower', cmap='seismic',
+                             vmin=-max_val, vmax=max_val)
+        axes[j, i].set_title(f't = {timepoint_names[i]:.2f}, scale = {scales[j]}')
+        axes[j, i].set_xticks([])
+        axes[j, i].set_yticks([])
+
+        divider = make_axes_locatable(axes[j, i])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+
+    plt.tight_layout()
+    if fname is not None:
+        plt.savefig(fname, dpi=200)
+        plt.close(fig) 
+    return fig, axes
+
+def temporal_phase_portrait(u, T=1., spatial_points=None, fname=None):
+    nt, nx, ny, nz = u.shape
+
+    if spatial_points is None:
+        spatial_points = [(nx//2, ny//2, nz//2),
+                        (nx//4, ny//2, nz//2),
+                        (3*nx//4, ny//2, nz//2)]
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    for i, (x, y, z) in enumerate(spatial_points):
+        trajectory = u[:, x, y, z]
+
+        points = np.array([trajectory.real, trajectory.imag]).T
+        segments = np.array([points[:-1], points[1:]]).transpose(1, 0, 2)
+
+        norm = plt.Normalize(0, T)
+        linescale = np.linspace(0, T, nt-1)
+        lc = LineCollection(segments, cmap='viridis', norm=norm)
+        lc.set_array(linescale)
+        line = ax.add_collection(lc)
+
+        ax.plot(trajectory.real[0], trajectory.imag[0], 'o',
+             color=cm.viridis(0), markersize=8)
+        ax.plot(trajectory.real[-1], trajectory.imag[-1], 's',
+             color=cm.viridis(1.0), markersize=8)
+
+    ax.set_xlabel('$\Re(u)$')
+    ax.set_ylabel('$\Im(u)$')
+    ax.grid(True)
+    ax.set_aspect('equal')
+
+    fig.colorbar(line, ax=ax, label='Time')
+
+    plt.tight_layout()
+    if fname is not None:
+        plt.savefig(fname, dpi=200)
+        plt.close(fig)
+    return fig, ax
+
+def spectral_signature_evolution(u, timepoints=[0, -1], timepoint_names=[0, 1.], fname=None):
+    nt, nx, ny, nz = u.shape
+    assert len(timepoints) == len(timepoint_names)
+
+    if len(timepoints) == 1:
+        timepoints = [timepoints[0]]
+    elif len(timepoints) == 2:
+        step = max(1, (timepoints[1] - timepoints[0]) // 4)
+        timepoints = range(timepoints[0], timepoints[1] + 1, step)
+
+    fig, axes = plt.subplots(1, len(timepoints), figsize=(4*len(timepoints), 4))
+    if len(timepoints) == 1:
+        axes = [axes]
+
+    z_mid = nz // 2
+    max_val = 0
+
+    for i, t in enumerate(timepoints):
+        data = u[t, :, :, z_mid]
+
+        fft_data = np.fft.fftshift(np.fft.fft2(data))
+        power_spectrum = np.log(np.abs(fft_data) + 1)
+
+        max_val = max(max_val, np.max(power_spectrum))
+
+        im = axes[i].imshow(power_spectrum, origin='lower', cmap='inferno')
+        axes[i].set_title(f't = {timepoint_names[i]:.2f}')
+        axes[i].set_xticks([])
+        axes[i].set_yticks([])
+
+    for i in range(len(timepoints)):
+        im = axes[i].images[0]
+        im.set_clim(0, max_val)
+
+        divider = make_axes_locatable(axes[i])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+
+    plt.tight_layout()
+    if fname is not None:
+        plt.savefig(fname, dpi=200)
+        plt.close(fig)
+    return fig, axes
+
+
+def complex_isosurface_3d(u, timestep=0, iso_value=0.5, fname=None):
+    nt, nx, ny, nz = u.shape
+    
+    magnitude = np.abs(u[timestep])
+    phase = np.angle(u[timestep])
+    
+    norm_magnitude = magnitude / np.max(magnitude)
+    
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    verts, faces, normals, values = measure.marching_cubes(norm_magnitude, iso_value)
+    
+    mesh = ax.plot_trisurf(verts[:, 0], verts[:, 1], verts[:, 2],
+                          triangles=faces, cmap='viridis', alpha=0.8)
+    
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title(f'Isosurface at |u| = {iso_value:.2f} (t = {timestep})')
+    
+    if fname is not None:
+        plt.savefig(fname, dpi=200)
+        plt.close(fig)
+    
+    return fig, ax
+
+def compare_timepoints_isosurfaces(u, timepoints=[0, -1], timepoints_names=[0., 1.],
+        iso_value=0.5, fname=None):
+    nt, nx, ny, nz = u.shape
+    
+    if len(timepoints) == 2 and timepoints[1] == -1:
+        timepoints = [timepoints[0], nt-1]
+    
+    if len(timepoints) == 2:
+        timepoints = np.linspace(timepoints[0], timepoints[1], 4, dtype=int)
+    
+    fig = plt.figure(figsize=(16, 12))
+    
+    for i, timestep in enumerate(timepoints):
+        ax = fig.add_subplot(2, 2, i+1, projection='3d')
+        
+        magnitude = np.abs(u[timestep])
+        norm_magnitude = magnitude / np.max(magnitude)
+        
+        verts, faces, normals, values = measure.marching_cubes(norm_magnitude, iso_value)
+        
+        ax.plot_trisurf(verts[:, 0], verts[:, 1], verts[:, 2],
+                       triangles=faces, cmap='viridis', alpha=0.8)
+        
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title(f't = {timepoints_names[i]:.2f}')
+    
+    plt.tight_layout()
+    
+    if fname is not None:
+        plt.savefig(fname, dpi=200)
+        plt.close(fig)
+    
+    return fig
+
+def phase_colored_isosurfaces(u, timestep=0, timestep_name=0., iso_value=0.5, fname=None):
+    nt, nx, ny, nz = u.shape
+    
+    magnitude = np.abs(u[timestep])
+    phase = np.angle(u[timestep])
+    
+    norm_magnitude = magnitude / np.max(magnitude)
+    
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    verts, faces, normals, values = measure.marching_cubes(norm_magnitude, iso_value)
+    
+    x, y, z = verts.T
+    i, j, k = np.floor(verts).astype(int).T
+    i = np.clip(i, 0, nx-1)
+    j = np.clip(j, 0, ny-1)
+    k = np.clip(k, 0, nz-1)
+    
+    phase_values = np.array([phase[i[f[0]], j[f[0]], k[f[0]]] for f in faces])
+    norm_phase = (phase_values + np.pi) / (2 * np.pi)
+    
+    ax.plot_trisurf(x, y, z, triangles=faces, alpha=0.8)
+    surf = ax.plot_trisurf(x, y, z, triangles=faces, alpha=0.8)
+    
+    colors = cm.hsv(norm_phase)
+    surf.set_facecolor(colors)
+    
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title(f'Phase-colored isosurface (|u| = {iso_value:.2f}, t = {timestep_name:.2f})')
+    
+    if fname is not None:
+        plt.savefig(fname, dpi=200)
+        plt.close(fig)
+    
+    return fig, ax
+
+def critical_points_3d(u, timestep=0, timestep_name=0., threshold=1e-2, fname=None):
+    nt, nx, ny, nz = u.shape
+    
+    magnitude = np.abs(u[timestep])
+    phase = np.angle(u[timestep])
+    
+    max_mag = np.max(magnitude)
+    
+    grad_x, grad_y, grad_z = np.gradient(u[timestep])
+    grad_magnitude = np.sqrt(
+            grad_x ** 2 + grad_y ** 2 + grad_z ** 2)
+    
+    zeros = (magnitude < threshold * max_mag) & (grad_magnitude < threshold * np.max(grad_magnitude))
+    
+    x, y, z = np.where(zeros)
+    
+    if len(x) > 0:
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        norm_magnitude = magnitude / np.max(magnitude)
+        verts, faces, _, _ = measure.marching_cubes(norm_magnitude, threshold)
+        
+        ax.plot_trisurf(verts[:, 0], verts[:, 1], verts[:, 2],
+                       triangles=faces, color='lightgray', alpha=0.3)
+        
+        ax.scatter(x, y, z, c='red', s=50, alpha=1.0)
+        
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title(f'Critical points (t = {timestep_name:.2f})')
+        
+        if fname is not None:
+            plt.savefig(fname, dpi=200)
+            plt.close(fig)
+        
+        return fig, ax
+    else:
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        ax.text(nx/2, ny/2, nz/2, "No critical points found", 
+               ha='center', va='center', fontsize=14)
+        
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title(f'Critical points (t = {timestep})')
+        
+        if fname is not None:
+            plt.savefig(fname, dpi=200)
+            plt.close(fig)
+        
+        return fig, ax
+
+def scatter_3d_magnitude_phase(u, timestep=0, sampling=4, fname=None):
+    nt, nx, ny, nz = u.shape
+    
+    magnitude = np.abs(u[timestep])
+    phase = np.angle(u[timestep])
+    
+    max_mag = np.max(magnitude)
+    
+    x, y, z = np.meshgrid(
+        np.arange(0, nx, sampling),
+        np.arange(0, ny, sampling),
+        np.arange(0, nz, sampling)
+    )
+    
+    x = x.flatten()
+    y = y.flatten()
+    z = z.flatten()
+    
+    magnitudes = np.array([magnitude[i, j, k] for i, j, k in zip(x, y, z)])
+    phases = np.array([phase[i, j, k] for i, j, k in zip(x, y, z)])
+    
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    scatter = ax.scatter(x, y, z, 
+                        c=phases, 
+                        s=magnitudes/max_mag*100,
+                        cmap='hsv', 
+                        alpha=0.6,
+                        vmin=-np.pi, vmax=np.pi)
+    
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title(f'3D Scatter (t = {timestep}, sampling = {sampling})')
+    
+    cbar = plt.colorbar(scatter, ax=ax, label='Phase')
+    cbar.set_ticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi])
+    cbar.set_ticklabels([r'$-\pi$', r'$-\pi/2$', r'$0$', r'$\pi/2$', r'$\pi$'])
+    
+    if fname is not None:
+        plt.savefig(fname, dpi=200)
+        plt.close(fig)
+    
+    return fig, ax
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Generate NLSE analysis dashboards')
     parser.add_argument('directory', help='Directory containing HDF5 files')
     parser.add_argument('--output', '-o', help='Output directory for dashboards')
     parser.add_argument('--summary-only', action='store_true', default=False,
             help='Only perform (conservative) analysis to detect blowup')
+    parser.add_argument('--detailed-panels', action='store_true', default=False,
+            help='Detailed visualizations of different trajectories') 
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = parse_arguments()
-    generator = NLSEDashboardGenerator(args.directory, args.output, args.summary_only)
+    generator = NLSEDashboardGenerator(args.directory, args.output, args.summary_only, args.detailed_panels)
     generator.process_all_files()
     print(f"Dashboards generated in {generator.output_dir}")
