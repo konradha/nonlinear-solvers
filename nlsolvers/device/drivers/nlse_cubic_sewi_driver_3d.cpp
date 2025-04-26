@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
   const auto freq = nt / num_snapshots;
 
   std::vector<uint32_t> input_shape;
-  Eigen::VectorXcd u0 = read_from_npy<double>(input_file, input_shape);
+  Eigen::VectorXcd u0 = read_from_npy<std::complex<double>>(input_file, input_shape);
 
   if (input_shape.size() != 3 || input_shape[0] != nz || input_shape[1] != ny ||
       input_shape[2] != nx) {
