@@ -63,6 +63,9 @@ class NLSEDashboardGenerator:
             grid_data = dict(f['grid'].attrs)
             time_data = dict(f['time'].attrs)
             u_data = f['u'][:]
+
+            c_data = f['anisotropy']['c'][:]
+            m_data = f['focusing']['m'][:]
             
             T = time_data['T']
             nt = u_data.shape[0]
@@ -111,33 +114,62 @@ class NLSEDashboardGenerator:
                     f"iso_3d_" + file_id + ".png" 
                     )
 
-            temporal_phase_portrait(u_data, T=T, fname=fname_temp_phase)
-            multi_scale_signature_display(u_data,
-                    timepoints=[0, nt // 2, -1],
-                    timepoint_names=[0, T / 2, T],
-                    fname=str(fname_multi))
-            critical_phenomena_tracker(u_data,
-                    timepoints=[0, nt // 2, -1],
-                    timepoint_names=[0, T / 2, T],
-                    fname=fname_critical) 
-            complex_phase_evolution_display(u_data,
-                    timepoints=[0, nt // 2, -1],
-                    timepoints_names=[0, T / 2, T],
-                    fname=fname_phase)
-            spectral_signature_evolution(u_data,
-                    timepoints=[0, nt // 2, -1],
-                    timepoint_names=[0, T / 2, T],
-                    fname=fname_spectral)
-            phase_colored_isosurfaces(u_data,
-                    timestep=nt // 2, timestep_name=T/2,
-                    iso_value=0.5, fname=fname_tp_3d)
-            critical_points_3d(u_data,
-                    timestep=nt // 2, timestep_name=T/2,
-                    fname=fname_critical_3d)
-            compare_timepoints_isosurfaces(u_data,
-                    timepoints=[0, nt // 2, -1],
-                    timepoints_names=[0, T / 2, T],
-                    iso_value=0.5, fname=fname_iso_3d)
+            try:
+                temporal_phase_portrait(u_data, T=T, fname=fname_temp_phase)
+                multi_scale_signature_display(u_data,
+                        timepoints=[0, nt // 2, -1],
+                        timepoint_names=[0, T / 2, T],
+                        fname=str(fname_multi))
+                critical_phenomena_tracker(u_data,
+                        timepoints=[0, nt // 2, -1],
+                        timepoint_names=[0, T / 2, T],
+                        fname=fname_critical) 
+                complex_phase_evolution_display(u_data,
+                        timepoints=[0, nt // 2, -1],
+                        timepoints_names=[0, T / 2, T],
+                        fname=fname_phase)
+                spectral_signature_evolution(u_data,
+                        timepoints=[0, nt // 2, -1],
+                        timepoint_names=[0, T / 2, T],
+                        fname=fname_spectral)
+
+                phase_colored_isosurfaces(u_data,
+                        timestep=nt // 2, timestep_name=T/2,
+                        iso_value=0.5, fname=fname_tp_3d)
+
+                critical_points_3d(u_data,
+                        timestep=nt // 2, timestep_name=T/2,
+                        fname=fname_critical_3d)
+
+
+                dr = u_data[0].shape[0]  
+                # we want u_i and m, c to work nicely together
+                ms = m_data.shape[0]
+                m_data = downsample_interpolation_3d(
+                        m_data.reshape(1, ms, ms, ms),
+                        target_shape=(dr, dr, dr),
+                        Lx=self.L,
+                        Ly=self.L,
+                        Lz=self.L
+                    )
+                m_data = m_data.reshape(dr, dr, dr)
+                cs = c_data.shape[0]
+                c_data = downsample_interpolation_3d(
+                        c_data.reshape(1, cs, cs, cs),
+                        target_shape=(dr, dr, dr),
+                        Lx=self.L,
+                        Ly=self.L,
+                        Lz=self.L
+                    )
+                c_data = c_data.reshape(dr, dr, dr)
+
+                #compare_timepoints_isosurfaces(u_data,
+                compare_timepoints_isosurfaces(u_data, c_data, m_data, 
+                        timepoints=[0, nt // 4, nt // 2, 3 * nt // 4],
+                        timepoints_names=[0, T / 4, T / 2, 3 * T / 4],
+                        fname=fname_iso_3d)
+            except Exception as e:
+                print(e)
             
            
     
@@ -875,35 +907,92 @@ def complex_isosurface_3d(u, timestep=0, iso_value=0.5, fname=None):
     
     return fig, ax
 
-def compare_timepoints_isosurfaces(u, timepoints=[0, -1], timepoints_names=[0., 1.],
-        iso_value=0.5, fname=None):
-    nt, nx, ny, nz = u.shape
+def compare_timepoints_isosurfaces(u, c, m, timepoints=[0, -1], timepoints_names=[0., 1.],
+        xrange=(-3.,3.), yrange=(-3.,3.), zrange=(-3.,3.),
+        iso_values=[0.25, 0.5, 0.75], colors=['blue', 'green', 'red'],
+        alpha=0.5, field_slice_pos=0, fname=None):
+    from scipy.interpolate import RegularGridInterpolator
+    from matplotlib.colors import to_rgba
     
+    nt, nx, ny, nz = u.shape
+
     if len(timepoints) == 2 and timepoints[1] == -1:
         timepoints = [timepoints[0], nt-1]
     
     if len(timepoints) == 2:
         timepoints = np.linspace(timepoints[0], timepoints[1], 4, dtype=int)
     
-    fig = plt.figure(figsize=(16, 12))
+    fig = plt.figure(figsize=(16, 24))
+    
+    x_points = np.linspace(xrange[0], xrange[1], nx)
+    y_points = np.linspace(yrange[0], yrange[1], ny)
+    z_points = np.linspace(zrange[0], zrange[1], nz)
+    
+    slice_idx = int((field_slice_pos - zrange[0]) / (zrange[1] - zrange[0]) * (nz - 1))
+    slice_idx = max(0, min(slice_idx, nz-1))
+    
+    X, Y = np.meshgrid(x_points, y_points, indexing='ij')
+    
+    ax1 = fig.add_subplot(3, 2, 1)
+    c_slice = c[:, :, slice_idx]
+    c_img = ax1.pcolormesh(X, Y, c_slice, cmap='viridis', shading='auto')
+    ax1.set_title(f'$c(x,y,z={z_points[slice_idx]:.2f})$')
+    ax1.set_xlabel('X')
+    ax1.set_ylabel('Y')
+    ax1.set_xlim(xrange)
+    ax1.set_ylim(yrange)
+    divider = make_axes_locatable(ax1)
+    cax1 = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(c_img, cax=cax1)
+    
+    ax2 = fig.add_subplot(3, 2, 2)
+    m_slice = m[:, :, slice_idx]
+    m_img = ax2.pcolormesh(X, Y, m_slice, cmap='plasma', shading='auto')
+    ax2.set_title(f'$m(x,y,z={z_points[slice_idx]:.2f})$')
+    ax2.set_xlabel('X')
+    ax2.set_ylabel('Y')
+    ax2.set_xlim(xrange)
+    ax2.set_ylim(yrange)
+    divider = make_axes_locatable(ax2)
+    cax2 = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(m_img, cax=cax2)
     
     for i, timestep in enumerate(timepoints):
-        ax = fig.add_subplot(2, 2, i+1, projection='3d')
+        ax = fig.add_subplot(3, 2, i+3, projection='3d')
         
         magnitude = np.abs(u[timestep])
         norm_magnitude = magnitude / np.max(magnitude)
         
-        verts, faces, normals, values = measure.marching_cubes(norm_magnitude, iso_value)
-        
-        ax.plot_trisurf(verts[:, 0], verts[:, 1], verts[:, 2],
-                       triangles=faces, cmap='viridis', alpha=0.8)
+        for level_idx, iso_value in enumerate(iso_values):
+            verts, faces, normals, values = measure.marching_cubes(norm_magnitude, iso_value)
+            
+            if len(verts) == 0:
+                continue
+                
+            scaled_verts = np.zeros_like(verts)
+            scaled_verts[:, 0] = xrange[0] + verts[:, 0] * (xrange[1] - xrange[0]) / (nx - 1)
+            scaled_verts[:, 1] = yrange[0] + verts[:, 1] * (yrange[1] - yrange[0]) / (ny - 1)
+            scaled_verts[:, 2] = zrange[0] + verts[:, 2] * (zrange[1] - zrange[0]) / (nz - 1)
+            
+            color_rgba = to_rgba(colors[level_idx], alpha)
+            
+            mesh = ax.plot_trisurf(scaled_verts[:, 0], scaled_verts[:, 1], scaled_verts[:, 2],
+                          triangles=faces, color=color_rgba, shade=True)
         
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
-        ax.set_title(f't = {timepoints_names[i]:.2f}')
+        ax.set_title(f'|u| at t = {timepoints_names[i]:.2f}')
+        ax.set_xlim(xrange)
+        ax.set_ylim(yrange)
+        ax.set_zlim(zrange)
     
-    plt.tight_layout()
+    custom_lines = [plt.Line2D([0], [0], color=colors[i], lw=4) for i in range(len(iso_values))]
+    legend_labels = [f'|u| = {val:.2f}' for val in iso_values]
+    
+    fig.legend(custom_lines, legend_labels, loc='lower center', bbox_to_anchor=(0.5, 0.02))
+    
+    plt.tight_layout(rect=[0, 0.05, 1, 0.98])
     
     if fname is not None:
         plt.savefig(fname, dpi=200)
@@ -951,8 +1040,6 @@ def phase_colored_isosurfaces(u, timestep=0, timestep_name=0., iso_value=0.5, fn
     return fig, ax
 
 def critical_points_3d(u, timestep=0, timestep_name=0., threshold=1e-2, fname=None):
-    nt, nx, ny, nz = u.shape
-    
     magnitude = np.abs(u[timestep])
     phase = np.angle(u[timestep])
     
@@ -989,68 +1076,23 @@ def critical_points_3d(u, timestep=0, timestep_name=0., threshold=1e-2, fname=No
         
         return fig, ax
     else:
-        fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111, projection='3d')
-        
-        ax.text(nx/2, ny/2, nz/2, "No critical points found", 
-               ha='center', va='center', fontsize=14)
-        
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        ax.set_title(f'Critical points (t = {timestep})')
-        
-        if fname is not None:
-            plt.savefig(fname, dpi=200)
-            plt.close(fig)
-        
-        return fig, ax
-
-def scatter_3d_magnitude_phase(u, timestep=0, sampling=4, fname=None):
-    nt, nx, ny, nz = u.shape
-    
-    magnitude = np.abs(u[timestep])
-    phase = np.angle(u[timestep])
-    
-    max_mag = np.max(magnitude)
-    
-    x, y, z = np.meshgrid(
-        np.arange(0, nx, sampling),
-        np.arange(0, ny, sampling),
-        np.arange(0, nz, sampling)
-    )
-    
-    x = x.flatten()
-    y = y.flatten()
-    z = z.flatten()
-    
-    magnitudes = np.array([magnitude[i, j, k] for i, j, k in zip(x, y, z)])
-    phases = np.array([phase[i, j, k] for i, j, k in zip(x, y, z)])
-    
-    fig = plt.figure(figsize=(10, 8))
-    ax = fig.add_subplot(111, projection='3d')
-    
-    scatter = ax.scatter(x, y, z, 
-                        c=phases, 
-                        s=magnitudes/max_mag*100,
-                        cmap='hsv', 
-                        alpha=0.6,
-                        vmin=-np.pi, vmax=np.pi)
-    
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.set_title(f'3D Scatter (t = {timestep}, sampling = {sampling})')
-    
-    cbar = plt.colorbar(scatter, ax=ax, label='Phase')
-    cbar.set_ticks([-np.pi, -np.pi/2, 0, np.pi/2, np.pi])
-    cbar.set_ticklabels([r'$-\pi$', r'$-\pi/2$', r'$0$', r'$\pi/2$', r'$\pi$'])
-    
-    if fname is not None:
-        plt.savefig(fname, dpi=200)
-        plt.close(fig)
-    
-    return fig, ax
+        raise Exception("No critical points found")
+        # fig = plt.figure(figsize=(10, 8))
+        # ax = fig.add_subplot(111, projection='3d')
+        # 
+        # ax.text(nx/2, ny/2, nz/2, "No critical points found", 
+        #        ha='center', va='center', fontsize=14)
+        # 
+        # ax.set_xlabel('X')
+        # ax.set_ylabel('Y')
+        # ax.set_zlabel('Z')
+        # ax.set_title(f'Critical points (t = {timestep})')
+        # 
+        # if fname is not None:
+        #     plt.savefig(fname, dpi=200)
+        #     plt.close(fig)
+        # 
+        # return fig, ax
 
 
 def parse_arguments():
