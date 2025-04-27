@@ -15,14 +15,27 @@ module load gcc/12.2.0
 module load ffmpeg
 
 for p in multi_soliton_state skyrmion_tube; do
-	for cp in waveguide anisotropic optimal; do
-		python scripts_nlse/launcher_3d.py \
+	python scripts_nlse/launcher_3d.py \
 			--exe build/bin/nlse_3d_dev\
 		       	--nx 200 --ny 200 --nz 200\
-		       	--dr-x 64 --dr-y 64 --dr-z 64\
+		       	--dr-x 100 --dr-y 100 --dr-z 100\
 		       	--Lx 3. --Ly 3. --Lz 3.\
 		       	--T 1. --nt 500 --snapshots 50\
-		       	--phenomenon ${p}\
-		       	--num-runs 8 --visualize --c-m-pair ${cp}
-		done
+			--visualize \
+		       	--num-runs 4 \
+			--output-dir /cluster/scratch/konradha/${p}_constant \
+			-seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID))
 	done
+	#for cp in optimal; do
+	#	python scripts_nlse/launcher_3d.py \
+	#		--exe build/bin/nlse_3d_dev\
+	#	       	--nx 200 --ny 200 --nz 200\
+	#	       	--dr-x 100 --dr-y 100 --dr-z 100\
+	#	       	--Lx 3. --Ly 3. --Lz 3.\
+	#	       	--T 1. --nt 500 --snapshots 50\
+	#		--visualize \
+	#	       	--phenomenon ${p}\
+	#	       	--num-runs 4 --c-m-pair ${cp}\
+	#		--output-dir /cluster/scratch/konradha/${p}_${cp}
+	#	done
+	#done

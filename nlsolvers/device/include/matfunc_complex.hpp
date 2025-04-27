@@ -34,6 +34,15 @@ __global__ void transform_eigenvals_sinc(thrust::complex<double> *out,
   }
 }
 
+__global__ void set_diagonal(thrust::complex<double>* matrix,
+                                 const thrust::complex<double>* diag,
+                                 uint32_t m) {
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    if (idx < m) {
+        matrix[idx * m + idx] = diag[idx];
+    }
+}
+
 __global__ void matrix_multiply_QDQ(const thrust::complex<double> *Q,
                                    const thrust::complex<double> *D,
                                    thrust::complex<double> *result,
@@ -245,49 +254,54 @@ public:
         transform_eigenvals_sinc<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_, dt, m_);
     else
         throw std::runtime_error("Matrix function application not implemented");
-
-
-    matrix_multiply_QDQ<<<grid_QDQ_, block_2d_>>>(d_eigenvectors_, d_diag_,
-                                                d_work_, m_, grid_QDQ_.x, grid_QDQ_.y);
-
-    matrix_multiply_VK<<<grid_VK_, block_2d_>>>(krylov_.V, d_work_,
-                                                  d_work_large_, n_, m_,
-                                                  grid_VK_.x, grid_VK_.y);
-    scale_first_col<<<grid_1d_, block_1d_>>>(d_work_large_, result, beta, n_);
+    cudaMemset(d_work_, 0, m_ * m_ * sizeof(thrust::complex<double>));
+    dim3 blockDim(256);
+    dim3 gridDim((m_ + blockDim.x - 1) / blockDim.x);
+    set_diagonal<<<gridDim, blockDim>>>(d_work_, d_diag_, m_); 
+   
+    thrust::complex<double> *temp_work;
+    cudaMalloc(&temp_work, m_ * m_ * sizeof(thrust::complex<double>));
+    
+    const cuDoubleComplex alpha = make_cuDoubleComplex(1.0, 0.0);
+    const cuDoubleComplex beta_cublas = make_cuDoubleComplex(0.0, 0.0);
+    
+    // Q * D
+    cublasZgemm(cublas_handle_, CUBLAS_OP_N, CUBLAS_OP_N,
+                m_, m_, m_,
+                &alpha,
+                reinterpret_cast<const cuDoubleComplex*>(d_eigenvectors_), m_,
+                reinterpret_cast<const cuDoubleComplex*>(d_work_), m_,
+                &beta_cublas,
+                reinterpret_cast<cuDoubleComplex*>(temp_work), m_);
+    
+    // (Q * D) * Q^H
+    cublasZgemm(cublas_handle_, CUBLAS_OP_N, CUBLAS_OP_C,
+                m_, m_, m_,
+                &alpha,
+                reinterpret_cast<const cuDoubleComplex*>(temp_work), m_,
+                reinterpret_cast<const cuDoubleComplex*>(d_eigenvectors_), m_,
+                &beta_cublas,
+                reinterpret_cast<cuDoubleComplex*>(d_work_), m_);
+    
+    cudaFree(temp_work);
+    
+    // V * K  
+    cublasZgemm(cublas_handle_, CUBLAS_OP_N, CUBLAS_OP_N,
+                n_, 1, m_,
+                &alpha,
+                reinterpret_cast<const cuDoubleComplex*>(krylov_.V), n_,
+                reinterpret_cast<const cuDoubleComplex*>(d_work_), m_,
+                &beta_cublas,
+                reinterpret_cast<cuDoubleComplex*>(d_work_large_), n_);
+    const cuDoubleComplex scale_factor = make_cuDoubleComplex(beta, 0.0);
+    cublasZscal(cublas_handle_, n_,
+                &scale_factor,
+                reinterpret_cast<cuDoubleComplex*>(d_work_large_), 1);
+    
+    cudaMemcpy(result, d_work_large_, n_ * sizeof(thrust::complex<double>),
+               cudaMemcpyDeviceToDevice);
   }
 
-  /*
-  void apply(thrust::complex<double> *result,
-             const thrust::complex<double> *input, std::complex<double> dt,
-	     const std::string func = "exp") {
-    reset_data();
-    lanczos_iteration_complex(spmv_, &krylov_, input);
-    // cudaDeviceSynchronize();
-    double beta;
-    cudaMemcpy(&beta, krylov_.reconstruct_beta, sizeof(double),
-               cudaMemcpyDeviceToHost);
-
-    compute_eigen_decomposition();
-
-    // thrust::apply
-    if (func == "exp")
-    	transform_eigenvals_exp<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_,
-                                                     dt, m_);
-    else if (func == "sinc")
-	transform_eigenvals_sinc<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_,
-                                                     dt, m_);	
-    else 
-	throw std::runtime_error("Matrix function application not implemented");
-
-    matrix_multiply_QDQ<<<grid_QDQ_, block_2d_>>>(d_eigenvectors_, d_diag_,
-                                                  d_work_, m_);
-    // gemmZ
-    matrix_multiply_VK<<<grid_VK_, block_2d_>>>(krylov_.V, d_work_,
-                                                d_work_large_, n_, m_);
-    // dscalZ
-    scale_first_col<<<grid_1d_, block_1d_>>>(d_work_large_, result, beta, n_);
-  }
-  */
 
   // unsafe, but without full refactoring we take this choice now
   DeviceSpMV<thrust::complex<double>> *expose_spmv() { return spmv_; };
