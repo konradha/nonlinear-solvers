@@ -8,7 +8,11 @@
 #include "spmv.hpp"
 
 #include <cuda_runtime.h>
+#include <iostream>
 #include <vector>
+
+#define DEBUG 0
+
 
 namespace device {
 
@@ -29,17 +33,47 @@ public:
                    const Parameters &params = Parameters())
       : n_(L.rows()), current_snapshot_(0), params_(params) {
 
+#if DEBUG
+    size_t free_mem_start, total_mem;
+    cudaMemGetInfo(&free_mem_start, &total_mem); 
+    std::cout << "GPU Memory: " << total_mem / (1024 * 1024) << " MB total, " 
+              << free_mem_start / (1024 * 1024) << " MB free before allocation" << std::endl;
+
+    size_t complex_double_size = sizeof(thrust::complex<double>);
+    size_t double_size = sizeof(double);
+
+    size_t total_allocation = 0;
+    size_t u_size = n_ * complex_double_size;
+    size_t m_size = n_ * double_size;
+    size_t traj_size = n_ * params_.num_snapshots * complex_double_size;
+
+    total_allocation += u_size * 4; // all buffers
+    total_allocation += m_size;     
+    total_allocation += traj_size;  
+
+    std::cout << "Expected allocation: " << total_allocation / (1024 * 1024) << " MB" << std::endl;
+    std::cout << "  - Field buffers: " << (u_size * 4) / (1024 * 1024) << " MB" << std::endl;
+    std::cout << "  - Trajectory storage: " << traj_size / (1024 * 1024) << " MB" << std::endl;
+    std::cout << "  - Coefficient field: " << m_size / (1024 * 1024) << " MB" << std::endl;
+    std::cout << "  - Matrix operator (approx): " << (L.nonZeros() * complex_double_size) / (1024 * 1024) << " MB" << std::endl;
+    std::cout << "  - Krylov subspace (approx): " << (n_ * params_.krylov_dim * complex_double_size) / (1024 * 1024) << " MB" << std::endl;
+
+    if (total_allocation > free_mem_start * 0.9) {  // 90% ??
+        std::cerr << "WARNING: Expected allocation (" << total_allocation / (1024 * 1024)
+                  << " MB) exceeds 90% of available GPU memory!" << std::endl;
+    }
+#endif
+    
+
     cudaMalloc(&d_u_, n_ * sizeof(thrust::complex<double>));
     cudaMalloc(&d_buf_, n_ * sizeof(thrust::complex<double>));
     cudaMalloc(&d_density_, n_ * sizeof(thrust::complex<double>));
     cudaMalloc(&d_buf2_, n_ * sizeof(thrust::complex<double>));
     cudaMalloc(&d_buf3_, n_ * sizeof(thrust::complex<double>));
-    cudaMalloc(&d_buf4_, n_ * sizeof(thrust::complex<double>));
-    cudaMalloc(&d_buf5_, n_ * sizeof(thrust::complex<double>));
 
     cudaMalloc(&d_m_, n_ * sizeof(double));
-    cudaMalloc(&d_u_trajectory_,
-               n_ * params_.num_snapshots * sizeof(thrust::complex<double>));
+    // cudaMalloc(&d_u_trajectory_,
+    //            n_ * params_.num_snapshots * sizeof(thrust::complex<double>));
 
     cudaMemcpy(d_u_, host_u0, n_ * sizeof(thrust::complex<double>),
                cudaMemcpyHostToDevice);
@@ -48,8 +82,7 @@ public:
     matfunc_ = new MatrixFunctionApplicatorComplex(L, n_, params_.krylov_dim,
                                                    L.nonZeros());
 
-    nx_ = sqrt(n_);
-    ny_ = nx_;
+    nx_ = ny_ = sqrt(n_);
     if (nx_ * ny_ != n_) {
       is_3d_ = true;
       nx_ = ny_ = nz_ = std::cbrt(n_);
@@ -77,8 +110,6 @@ public:
     if (err != cudaSuccess) {
       throw std::runtime_error(cudaGetErrorString(err));
     }
-
-    store_snapshot(0);
   }
 
   ~NLSESolverDevice() {
@@ -87,11 +118,9 @@ public:
     cudaFree(d_buf_);
     cudaFree(d_buf2_);
     cudaFree(d_buf3_);
-    cudaFree(d_buf4_);
-    cudaFree(d_buf5_);
     cudaFree(d_density_);
     cudaFree(d_m_);
-    cudaFree(d_u_trajectory_);
+    // cudaFree(d_u_trajectory_);
     if (d_u_prev_ != nullptr)
       cudaFree(d_u_prev_);
   }
@@ -105,7 +134,7 @@ public:
     }
   }
 
-  void step(const std::complex<double> tau, const uint32_t step_number) {
+  void step(const std::complex<double> tau, const uint32_t step_number, std::complex<double> * host_dst) {
     if (!is_3d_) {
       device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
                                                  ny_);
@@ -131,7 +160,7 @@ public:
     }
 
     if (step_number % params_.snapshot_freq == 0) {
-      store_snapshot(step_number);
+      store_snapshot_online(host_dst);
     }
 
     cudaError_t err = cudaGetLastError();
@@ -140,13 +169,13 @@ public:
     }
   }
 
-  void step_sewi(const std::complex<double> tau, const uint32_t step_number) {
+  void step_sewi(const std::complex<double> tau, const uint32_t step_number, std::complex<double> * host_dst) {
     // initial step is symmetric SS2, see publication for reference
     if (step_number == 1) {
       cudaMalloc(&d_u_prev_, n_ * sizeof(thrust::complex<double>));
       cudaMemcpy(d_u_prev_, d_u_, n_ * sizeof(thrust::complex<double>),
                  cudaMemcpyDeviceToDevice);
-      step(tau, 1);
+      step(tau, 1, host_dst);
     } else {
       cudaMemcpy(d_buf_, d_u_, n_ * sizeof(thrust::complex<double>),
                  cudaMemcpyDeviceToDevice); // bookkeeping prev
@@ -170,20 +199,42 @@ public:
       cudaMemcpy(d_u_prev_, d_buf_, n_ * sizeof(thrust::complex<double>),
                  cudaMemcpyDeviceToDevice); // attach "prev" to prev
     }
+
+    if (step_number > 1 && step_number % params_.snapshot_freq == 0) {
+      store_snapshot_online(host_dst);
+    }
+
+    cudaError_t err = cudaGetLastError();
+    if (err != cudaSuccess) {
+      throw std::runtime_error(cudaGetErrorString(err));
+    }
   }
 
-  void transfer_snapshots(std::complex<double> *dst) {
-    cudaMemcpy(dst, d_u_trajectory_,
-               params_.num_snapshots * n_ * sizeof(thrust::complex<double>),
-               cudaMemcpyDeviceToHost);
-  }
+  // void transfer_snapshots(std::complex<double> *dst) {
+  //   cudaMemcpy(dst, d_u_trajectory_,
+  //              params_.num_snapshots * n_ * sizeof(thrust::complex<double>),
+  //              cudaMemcpyDeviceToHost);
+  // }
+
+  void store_snapshot_online(std::complex<double> *host_dst) {
+    if (current_snapshot_ >= params_.num_snapshots) {
+        return;
+    }
+    cudaMemcpy(
+        host_dst + current_snapshot_ * n_,
+        d_u_,
+        n_ * sizeof(thrust::complex<double>),
+        cudaMemcpyDeviceToHost
+    );
+    current_snapshot_++;
+}
 
 private:
-  void store_snapshot(const uint32_t step_number) {
-    cudaMemcpy(d_u_trajectory_ + current_snapshot_ * n_, d_u_,
-               n_ * sizeof(thrust::complex<double>), cudaMemcpyDeviceToDevice);
-    current_snapshot_++;
-  }
+  // void store_snapshot(const uint32_t step_number) {
+  //   cudaMemcpy(d_u_trajectory_ + current_snapshot_ * n_, d_u_,
+  //              n_ * sizeof(thrust::complex<double>), cudaMemcpyDeviceToDevice);
+  //   current_snapshot_++;
+  // }
 
   MatrixFunctionApplicatorComplex *matfunc_;
   thrust::complex<double> *d_u_;
@@ -192,10 +243,8 @@ private:
   thrust::complex<double> *d_buf_;
   thrust::complex<double> *d_buf2_;
   thrust::complex<double> *d_buf3_;
-  thrust::complex<double> *d_buf4_;
-  thrust::complex<double> *d_buf5_;
   thrust::complex<double> *d_density_;
-  thrust::complex<double> *d_u_trajectory_;
+  // thrust::complex<double> *d_u_trajectory_;
   double *d_m_;
 
   uint32_t nx_, ny_, nz_;

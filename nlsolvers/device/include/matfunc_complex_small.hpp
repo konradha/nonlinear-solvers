@@ -35,56 +35,35 @@ __global__ void transform_eigenvals_sinc(thrust::complex<double> *out,
 }
 
 __global__ void matrix_multiply_QDQ(const thrust::complex<double> *Q,
-                                   const thrust::complex<double> *D,
-                                   thrust::complex<double> *result,
-                                   const uint32_t m,
-                                   const uint32_t max_grid_x,
-                                   const uint32_t max_grid_y) {
-   const uint32_t block_size_x = blockDim.x;
-   const uint32_t block_size_y = blockDim.y;
+                                    const thrust::complex<double> *D,
+                                    thrust::complex<double> *result,
+                                    const uint32_t m) {
+  const int row = blockIdx.y * blockDim.y + threadIdx.y;
+  const int col = blockIdx.x * blockDim.x + threadIdx.x;
 
-   for (uint32_t grid_y = blockIdx.y; grid_y < (m + block_size_y - 1) / block_size_y; grid_y += max_grid_y) {
-       for (uint32_t grid_x = blockIdx.x; grid_x < (m + block_size_x - 1) / block_size_x; grid_x += max_grid_x) {
-           const uint32_t row = grid_y * block_size_y + threadIdx.y;
-           const uint32_t col = grid_x * block_size_x + threadIdx.x;
-
-           if (row < m && col < m) {
-               thrust::complex<double> sum = 0.0;
-#pragma unroll
-               for (uint32_t k = 0; k < m; k++) {
-                   sum += Q[k * m + row] * D[k] * Q[k * m + col];
-               }
-               result[col * m + row] = sum;
-           }
-       }
-   }
+  if (row < m && col < m) {
+    thrust::complex<double> sum = 0.0;
+    for (int k = 0; k < m; k++) {
+      sum += Q[k * m + row] * D[k] * Q[k * m + col];
+    }
+    result[col * m + row] = sum;
+  }
 }
-
 
 __global__ void matrix_multiply_VK(const thrust::complex<double> *V,
                                    const thrust::complex<double> *K,
                                    thrust::complex<double> *result,
-                                   const uint32_t n, const uint32_t m,
-                                   const uint32_t max_grid_x,
-                                   const uint32_t max_grid_y) {
-    const uint32_t block_size_x = blockDim.x;
-    const uint32_t block_size_y = blockDim.y;
-    
-    for (uint32_t grid_y = blockIdx.y; grid_y < (n + block_size_y - 1) / block_size_y; grid_y += max_grid_y) {
-        for (uint32_t grid_x = blockIdx.x; grid_x < (m + block_size_x - 1) / block_size_x; grid_x += max_grid_x) {
-            const uint32_t row = grid_y * block_size_y + threadIdx.y;
-            const uint32_t col = grid_x * block_size_x + threadIdx.x;
-            
-            if (row < n && col < m) {
-                thrust::complex<double> sum = 0.0;
-#pragma unroll
-                for (uint32_t k = 0; k < m; k++) {
-                    sum += V[k * n + row] * K[col * m + k];
-                }
-                result[col * n + row] = sum;
-            }
-        }
+                                   const uint32_t n, const uint32_t m) {
+  const int row = blockIdx.y * blockDim.y + threadIdx.y;
+  const int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+  if (row < n && col < m) {
+    thrust::complex<double> sum = 0.0;
+    for (int k = 0; k < m; k++) {
+      sum += V[k * n + row] * K[col * m + k];
     }
+    result[col * n + row] = sum;
+  }
 }
 
 __global__ void scale_first_col(const thrust::complex<double> *X,
@@ -190,17 +169,13 @@ public:
     solver_work_size_ = lwork;
 
     block_dim_1d_ = dim3(256);
-    uint32_t block_size_2d = (m <= 32) ? 16 : 8;
-    block_2d_ = dim3(block_size_2d, block_size_2d);
-    
-    const uint32_t max_grid_dim = 65535;
-    grid_1d_ = dim3(std::min((n_ + block_1d_.x - 1) / block_1d_.x, max_grid_dim));
-    uint32_t grid_x = std::min((m_ + block_2d_.x - 1) / block_2d_.x, max_grid_dim);
-    uint32_t grid_y = std::min((n_ + block_2d_.y - 1) / block_2d_.y, max_grid_dim);
-    grid_VK_ = dim3(grid_x, grid_y);
-    grid_x = std::min((m_ + block_2d_.x - 1) / block_2d_.x, max_grid_dim);
-    grid_y = std::min((m_ + block_2d_.y - 1) / block_2d_.y, max_grid_dim);
-    grid_QDQ_ = dim3(grid_x, grid_y);
+    block_2d_ = dim3(16, 16);
+    grid_VK_ = dim3((m_ + block_2d_.x - 1) / block_2d_.x,
+                    (n_ + block_2d_.y - 1) / block_2d_.y);
+    grid_QDQ_ = dim3((m_ + block_2d_.x - 1) / block_2d_.x,
+                     (m_ + block_2d_.y - 1) / block_2d_.y);
+    block_1d_ = dim3(256);
+    grid_1d_ = dim3((n_ + block_1d_.x - 1) / block_1d_.x);
   }
 
   ~MatrixFunctionApplicatorComplex() {
@@ -226,37 +201,6 @@ public:
     delete spmv_;
   }
 
-  void apply(thrust::complex<double> *result,
-           const thrust::complex<double> *input, std::complex<double> dt,
-           const std::string func = "exp") {
-    reset_data();
-    lanczos_iteration_complex(spmv_, &krylov_, input);
-    // cudaDeviceSynchronize();
-    double beta;
-    cudaMemcpy(&beta, krylov_.reconstruct_beta, sizeof(double),
-               cudaMemcpyDeviceToHost);
-
-    compute_eigen_decomposition();
-    const uint32_t max_grid_dim = 65535;
-
-    if (func == "exp")
-        transform_eigenvals_exp<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_, dt, m_);
-    else if (func == "sinc")
-        transform_eigenvals_sinc<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_, dt, m_);
-    else
-        throw std::runtime_error("Matrix function application not implemented");
-
-
-    matrix_multiply_QDQ<<<grid_QDQ_, block_2d_>>>(d_eigenvectors_, d_diag_,
-                                                d_work_, m_, grid_QDQ_.x, grid_QDQ_.y);
-
-    matrix_multiply_VK<<<grid_VK_, block_2d_>>>(krylov_.V, d_work_,
-                                                  d_work_large_, n_, m_,
-                                                  grid_VK_.x, grid_VK_.y);
-    scale_first_col<<<grid_1d_, block_1d_>>>(d_work_large_, result, beta, n_);
-  }
-
-  /*
   void apply(thrust::complex<double> *result,
              const thrust::complex<double> *input, std::complex<double> dt,
 	     const std::string func = "exp") {
@@ -287,7 +231,6 @@ public:
     // dscalZ
     scale_first_col<<<grid_1d_, block_1d_>>>(d_work_large_, result, beta, n_);
   }
-  */
 
   // unsafe, but without full refactoring we take this choice now
   DeviceSpMV<thrust::complex<double>> *expose_spmv() { return spmv_; };

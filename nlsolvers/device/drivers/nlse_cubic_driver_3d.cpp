@@ -111,11 +111,12 @@ int main(int argc, char **argv) {
 
   device::NLSESolverDevice::Parameters params(num_snapshots, freq, 15);
   device::NLSESolverDevice solver(L, u0.data(), m.data(), params);
+  solver.store_snapshot_online(u_save.data()); // this should happen inside constructor ... maybe refactor later
   for (uint32_t i = 1; i < nt; ++i) {
-    solver.step(dti, i);
+    solver.step(dti, i, u_save.data());
     solver.apply_bc();
   }
-  solver.transfer_snapshots(u_save.data());
+
   const std::vector<uint32_t> shape = {num_snapshots, nz, ny, nx};
   save_to_npy(output_file, u_save, shape);
   return 0;
