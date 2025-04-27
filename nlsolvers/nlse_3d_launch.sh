@@ -24,7 +24,7 @@ for p in multi_soliton_state skyrmion_tube; do
 			--visualize \
 		       	--num-runs 4 \
 			--output-dir /cluster/scratch/konradha/${p}_constant \
-			-seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID))
+			--seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID))
 	done
 	#for cp in optimal; do
 	#	python scripts_nlse/launcher_3d.py \
