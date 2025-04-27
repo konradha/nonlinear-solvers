@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=integrator_comparison
-#SBATCH --time=00:59:00
+#SBATCH --time=01:59:00
 #SBATCH --mem-per-cpu=32G
 #SBATCH --mail-type=END
 #SBATCH --mail-user=konradha@yahoo.com
