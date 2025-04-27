@@ -40,15 +40,12 @@ def main():
         'anisotropic', 'maybe_blowup'], default=None,
         help="Choose pair between c(x,y,z) and m(x,y,z) (if None will yield constant fields")
 
-
-    temp_args, _ = parser.parse_known_args()
-    selected_config = SYSTEM_CONFIG_NLSE.get(temp_args.system_type, {})
-
     parser.add_argument("--m-value", type=float, default=1.0, help="Coefficient 'm'.")
-    parser.add_argument("--output-dir", type=str, default="compare_nlse_results", help="Dir for outputs.")
+    parser.add_argument("--output-dir", type=str, required=True, help="Dir for outputs.")
     parser.add_argument("--keep-temps", action="store_true", help="Keep temporary .npy files.")
 
     parsed_args = parser.parse_args()
+    selected_config = SYSTEM_CONFIG_NLSE.get(default_system, {})
 
     final_selected_config = SYSTEM_CONFIG_NLSE.get(parsed_args.system_type)
     if final_selected_config:
