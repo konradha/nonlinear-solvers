@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=nlse_3d_dev
-#SBATCH --time=00:30:00
+#SBATCH --time=00:45:00
 #SBATCH --mem-per-cpu=32G
 #SBATCH --gpus=1
 #SBATCH --output=logs/nlse3d_solver_dev_%j.out
@@ -14,28 +14,41 @@ module load python_cuda/3.11.6
 module load gcc/12.2.0 
 module load ffmpeg
 
+# SIZE consideration:
+# n=300 -> (6 * (2 * 8) * 300³) B for SpMV ....
+# (> 2GB) which is not even taking the various work data that
+# need to be allocated into account ...
+
+# non-constant: i u_t + \Delta u + |u|²u = 0
 for p in multi_soliton_state skyrmion_tube; do
-	python scripts_nlse/launcher_3d.py \
-			--exe build/bin/nlse_3d_dev\
-		       	--nx 200 --ny 200 --nz 200\
-		       	--dr-x 100 --dr-y 100 --dr-z 100\
-		       	--Lx 3. --Ly 3. --Lz 3.\
-		       	--T 1. --nt 500 --snapshots 50\
+        python scripts_nlse/launcher_3d.py \
+                --exe build/bin/nlse_3d_dev \
+                --nx 160 --ny 160 --nz 160 \
+                --dr-x 80 --dr-y 80 --dr-z 80 \
+                --Lx 3. --Ly 3. --Lz 3. \
+                --T 1. --nt 800 --snapshots 48 \
+                --visualize \
+                --num-runs 2 \
+		--phenomenon ${p} \
+                --seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID)) \
+                --output-dir /cluster/scratch/konradha/${p}_constant
+done
+
+# non-constant: i u_t + div(c(x,y,z)grad(u)) + m(x,y,z) |u|²u = 0
+for p in multi_soliton_state skyrmion_tube; do
+	for cp in optimal sharp_interfaces waveguide grf_threshold anisotropic; do
+		python scripts_nlse/launcher_3d.py \
+			--exe build/bin/nlse_3d_dev \
+			--nx 160 --ny 160 --nz 160 \
+			--dr-x 80 --dr-y 80 --dr-z 80 \
+			--Lx 3. --Ly 3. --Lz 3. \
+			--T 1. --nt 800 --snapshots 48 \
 			--visualize \
-		       	--num-runs 4 \
-			--output-dir /cluster/scratch/konradha/${p}_constant \
-			--seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID))
+			--num-runs 2 \
+			--phenomenon ${p} \
+			--c-m-pair ${cp} \
+			--seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID)) \
+			--output-dir /cluster/scratch/konradha/${p}_${cp}
 	done
-	#for cp in optimal; do
-	#	python scripts_nlse/launcher_3d.py \
-	#		--exe build/bin/nlse_3d_dev\
-	#	       	--nx 200 --ny 200 --nz 200\
-	#	       	--dr-x 100 --dr-y 100 --dr-z 100\
-	#	       	--Lx 3. --Ly 3. --Lz 3.\
-	#	       	--T 1. --nt 500 --snapshots 50\
-	#		--visualize \
-	#	       	--phenomenon ${p}\
-	#	       	--num-runs 4 --c-m-pair ${cp}\
-	#		--output-dir /cluster/scratch/konradha/${p}_${cp}
-	#	done
-	#done
+done
+

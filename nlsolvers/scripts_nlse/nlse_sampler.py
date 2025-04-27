@@ -1635,6 +1635,10 @@ class NLSE3DSampler:
                         y = cy + separation * 0.5 * np.sin(phi) * np.sin(theta)
                         z = cz + separation * 0.5 * np.cos(phi)
                         positions.append((x, y, z))
+
+        
+
+            
         
         center_x = np.mean([p[0] for p in positions])
         center_y = np.mean([p[1] for p in positions])
@@ -1732,7 +1736,16 @@ class NLSE3DSampler:
         
         if apply_envelope:
             u = self._envelope(u, envelope_width)
-            
+
+        # # very artifical "boundary envelope" trying to reduce BC effects
+        # buffer_x_mask = np.abs(self.X) > .8 * self.L
+        # buffer_y_mask = np.abs(self.Y) > .8 * self.L 
+        # buffer_z_mask = np.abs(self.Z) > .8 * self.L
+        # clamping_mask = np.logical_and(
+        #         np.logical_and(buffer_x_mask, buffer_y_mask),
+        #         buffer_z_mask)
+        # u[clamping_mask] = 0.1 * u[clamping_mask]
+    
         return u
 
     def skyrmion_tube(self, system_type='cubic', amplitude_range=(0.8, 1.5), radius_range=(1.0, 3.0), 
