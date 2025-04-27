@@ -34,10 +34,13 @@ class NLSEDashboardGenerator:
         self.directory = Path(directory)
         self.output_dir = Path(output_dir) if output_dir else self.directory / "dashboards" 
         self.output_dir.mkdir(exist_ok=True, parents=True)
+
         if detailed_panels:
             self.detailed_panels = True
             self.detailed_dir = self.output_dir / "detailed_panels"
             self.detailed_dir.mkdir(exist_ok=True, parents=True)
+        else:
+            self.detailed_panels = False
 
         self.summary_only = summary_only
         
@@ -910,29 +913,29 @@ def complex_isosurface_3d(u, timestep=0, iso_value=0.5, fname=None):
 def compare_timepoints_isosurfaces(u, c, m, timepoints=[0, -1], timepoints_names=[0., 1.],
         xrange=(-3.,3.), yrange=(-3.,3.), zrange=(-3.,3.),
         iso_values=[0.25, 0.5, 0.75], colors=['blue', 'green', 'red'],
-        alpha=0.5, field_slice_pos=0, fname=None):
+        alpha=0.5, field_slice_pos=0, blowup_factor=10, fname=None):
     from scipy.interpolate import RegularGridInterpolator
     from matplotlib.colors import to_rgba
-    
+
     nt, nx, ny, nz = u.shape
 
     if len(timepoints) == 2 and timepoints[1] == -1:
         timepoints = [timepoints[0], nt-1]
-    
+
     if len(timepoints) == 2:
         timepoints = np.linspace(timepoints[0], timepoints[1], 4, dtype=int)
-    
+
     fig = plt.figure(figsize=(16, 24))
-    
+
     x_points = np.linspace(xrange[0], xrange[1], nx)
     y_points = np.linspace(yrange[0], yrange[1], ny)
     z_points = np.linspace(zrange[0], zrange[1], nz)
-    
+
     slice_idx = int((field_slice_pos - zrange[0]) / (zrange[1] - zrange[0]) * (nz - 1))
     slice_idx = max(0, min(slice_idx, nz-1))
-    
+
     X, Y = np.meshgrid(x_points, y_points, indexing='ij')
-    
+
     ax1 = fig.add_subplot(3, 2, 1)
     c_slice = c[:, :, slice_idx]
     c_img = ax1.pcolormesh(X, Y, c_slice, cmap='viridis', shading='auto')
@@ -944,7 +947,7 @@ def compare_timepoints_isosurfaces(u, c, m, timepoints=[0, -1], timepoints_names
     divider = make_axes_locatable(ax1)
     cax1 = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(c_img, cax=cax1)
-    
+
     ax2 = fig.add_subplot(3, 2, 2)
     m_slice = m[:, :, slice_idx]
     m_img = ax2.pcolormesh(X, Y, m_slice, cmap='plasma', shading='auto')
@@ -956,29 +959,48 @@ def compare_timepoints_isosurfaces(u, c, m, timepoints=[0, -1], timepoints_names
     divider = make_axes_locatable(ax2)
     cax2 = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(m_img, cax=cax2)
-    
+
+    max_init_magnitude = np.max(np.abs(u[0]))
+    blowup_level = blowup_factor * max_init_magnitude / np.max(np.abs(u[0]))
+
+    extended_iso_values = iso_values.copy()
+    extended_colors = colors.copy()
+
+    extended_iso_values.append(blowup_level)
+    extended_colors.append('yellow')
+
     for i, timestep in enumerate(timepoints):
         ax = fig.add_subplot(3, 2, i+3, projection='3d')
-        
+
         magnitude = np.abs(u[timestep])
-        norm_magnitude = magnitude / np.max(magnitude)
-        
-        for level_idx, iso_value in enumerate(iso_values):
-            verts, faces, normals, values = measure.marching_cubes(norm_magnitude, iso_value)
-            
-            if len(verts) == 0:
+        max_mag = np.max(magnitude)
+        norm_magnitude = magnitude / max_mag
+
+        for level_idx, iso_value in enumerate(extended_iso_values):
+            if level_idx == len(iso_values):
+                if max_mag < blowup_factor * max_init_magnitude:
+                    continue
+
+            try:
+                verts, faces, normals, values = measure.marching_cubes(norm_magnitude,
+                                                                      min(iso_value, 0.99))
+
+                if len(verts) == 0:
+                    continue
+
+                scaled_verts = np.zeros_like(verts)
+                scaled_verts[:, 0] = xrange[0] + verts[:, 0] * (xrange[1] - xrange[0]) / (nx - 1)
+                scaled_verts[:, 1] = yrange[0] + verts[:, 1] * (yrange[1] - yrange[0]) / (ny - 1)
+                scaled_verts[:, 2] = zrange[0] + verts[:, 2] * (zrange[1] - zrange[0]) / (nz - 1)
+
+                color_rgba = to_rgba(extended_colors[level_idx],
+                                    alpha if level_idx < len(iso_values) else 0.8)
+
+                mesh = ax.plot_trisurf(scaled_verts[:, 0], scaled_verts[:, 1], scaled_verts[:, 2],
+                              triangles=faces, color=color_rgba, shade=True)
+            except:
                 continue
-                
-            scaled_verts = np.zeros_like(verts)
-            scaled_verts[:, 0] = xrange[0] + verts[:, 0] * (xrange[1] - xrange[0]) / (nx - 1)
-            scaled_verts[:, 1] = yrange[0] + verts[:, 1] * (yrange[1] - yrange[0]) / (ny - 1)
-            scaled_verts[:, 2] = zrange[0] + verts[:, 2] * (zrange[1] - zrange[0]) / (nz - 1)
-            
-            color_rgba = to_rgba(colors[level_idx], alpha)
-            
-            mesh = ax.plot_trisurf(scaled_verts[:, 0], scaled_verts[:, 1], scaled_verts[:, 2],
-                          triangles=faces, color=color_rgba, shade=True)
-        
+
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
@@ -986,18 +1008,25 @@ def compare_timepoints_isosurfaces(u, c, m, timepoints=[0, -1], timepoints_names
         ax.set_xlim(xrange)
         ax.set_ylim(yrange)
         ax.set_zlim(zrange)
-    
-    custom_lines = [plt.Line2D([0], [0], color=colors[i], lw=4) for i in range(len(iso_values))]
-    legend_labels = [f'|u| = {val:.2f}' for val in iso_values]
-    
+
+        if max_mag > blowup_factor * max_init_magnitude:
+            ax.text(xrange[0], yrange[1], zrange[1],
+                   f"MAX: {max_mag:.2f} (>$f |u_0|$)",
+                   color='red', fontweight='bold')
+
+    custom_lines = [plt.Line2D([0], [0], color=extended_colors[i], lw=4)
+                   for i in range(len(extended_iso_values))]
+    legend_labels = [f'$|u| = {val:.2f}$' for val in iso_values]
+    legend_labels.append(f'$|u| > {blowup_factor}|u_0|$ (Potential Blowup)')
+
     fig.legend(custom_lines, legend_labels, loc='lower center', bbox_to_anchor=(0.5, 0.02))
-    
+
     plt.tight_layout(rect=[0, 0.05, 1, 0.98])
-    
+
     if fname is not None:
         plt.savefig(fname, dpi=200)
         plt.close(fig)
-    
+
     return fig
 
 def phase_colored_isosurfaces(u, timestep=0, timestep_name=0., iso_value=0.5, fname=None):

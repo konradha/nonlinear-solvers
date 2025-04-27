@@ -1,9 +1,16 @@
 import argparse
 import sys
-from compare_utils_nlse import NlseComparer, SYSTEM_CONFIG_NLSE
+
+from compare_utils_nlse_3d import NlseComparer3d, SYSTEM_CONFIG_NLSE
+from spatial_amplification_3d import (
+    make_grid,
+    create_constant_m
+)
+
+from nonlinearity_profiles_3d import highlight_profiles
 
 def main():
-    parser = argparse.ArgumentParser(description="Compare two different NLSE integrators.")
+    parser = argparse.ArgumentParser(description="Compare two different NLSE integrators (3D case)")
     nlse_choices = list(SYSTEM_CONFIG_NLSE.keys())
     default_system = 'NLSE_cubic' if 'NLSE_cubic' in nlse_choices else nlse_choices[0]
 
@@ -14,26 +21,30 @@ def main():
     parser.add_argument("--exe2", type=str, required=True, help="Path to the second integrator executable.")
     parser.add_argument("--name2", type=str, required=True, help="Name for the second integrator (e.g., Gautschi, Device).")
 
-    parser.add_argument("--nx", type=int, default=128, help="Number of grid points in x.")
-    parser.add_argument("--ny", type=int, default=128, help="Number of grid points in y.")
+    parser.add_argument("--nx", type=int, default=80, help="Number of grid points in x.")
+    parser.add_argument("--ny", type=int, default=80, help="Number of grid points in y.")
+    parser.add_argument("--nz", type=int, default=80, help="Number of grid points in z.")
+   
     parser.add_argument("--Lx", type=float, default=10.0, help="Domain half-width in x.")
     parser.add_argument("--Ly", type=float, default=10.0, help="Domain half-width in y.")
+    parser.add_argument("--Lz", type=float, default=10.0, help="Domain half-width in z.")
+
     parser.add_argument("--T", type=float, default=1.0, help="Total simulation time.")
     parser.add_argument("--nt", type=int, default=1000, help="Number of time steps.")
     parser.add_argument("--num-snapshots", type=int, default=100, help="Number of snapshots.")
-    parser.add_argument("--ic-type", type=str, default="multi_soliton", help="Initial condition type (passed to sampler).")
+    parser.add_argument("--ic-type", type=str, default="multi_soliton_state", help="Initial condition type (passed to sampler).")
+
+    parser.add_argument("--c-m-pair", type=str, choices=['optimal',
+        'resonant_cavity', 'focusing_soliton', 'sharp_interfaces',
+        'multi_scale', 'fractal_nonlinear', 'waveguide', 'grf_threshold',
+        'anisotropic', 'maybe_blowup'], default=None,
+        help="Choose pair between c(x,y,z) and m(x,y,z) (if None will yield constant fields")
+
 
     temp_args, _ = parser.parse_known_args()
     selected_config = SYSTEM_CONFIG_NLSE.get(temp_args.system_type, {})
 
     parser.add_argument("--m-value", type=float, default=1.0, help="Coefficient 'm'.")
-    if 'sigma1' in selected_config.get('params', []):
-        parser.add_argument("--sigma1", type=float, help="Coefficient sigma1 for NLSE-CQ.")
-    if 'sigma2' in selected_config.get('params', []):
-        parser.add_argument("--sigma2", type=float, help="Coefficient sigma2 for NLSE-CQ.")
-    if 'kappa' in selected_config.get('params', []):
-         parser.add_argument("--kappa", type=float, help="Coefficient kappa for NLSE-Sat.")
-
     parser.add_argument("--output-dir", type=str, default="compare_nlse_results", help="Dir for outputs.")
     parser.add_argument("--keep-temps", action="store_true", help="Keep temporary .npy files.")
 
@@ -45,7 +56,7 @@ def main():
             if param_name != 'm_value' and param_name in parsed_args and getattr(parsed_args, param_name, None) is None:
                 parser.error(f"--{param_name} is required for system-type '{parsed_args.system_type}'")
 
-    comparer = NlseComparer(parsed_args)
+    comparer = NlseComparer3d(parsed_args)
     comparer.execute()
 
 if __name__ == "__main__":
