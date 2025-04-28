@@ -14,6 +14,8 @@
 #include <string>
 #include <vector>
 
+#define DEBUG 1
+
 // We'll assume to be taking first-order approximants for the velocity for now
 // for all equations in u_tt
 
@@ -100,6 +102,9 @@ int main(int argc, char **argv) {
     std::cerr << "Error loading c(x, y, z): " << e.what() << "\n";
     throw std::runtime_error("Faulty c (2)");
   }
+#if DEBUG
+  std::cout << "Successfully read data, now constructing Laplacian\n";
+#endif
 
   const Eigen::SparseMatrix<std::complex<double>> L =
       (build_anisotropic_laplacian_noflux_3d<std::complex<double>>(
@@ -115,6 +120,9 @@ int main(int argc, char **argv) {
   Eigen::VectorXcd u = u0;
   Eigen::VectorXcd buf(nx * ny * nz);
   Eigen::VectorXcd rho_buf(nx * ny * nz);
+#if DEBUG
+  std::cout << "Initialized, starting integration\n";
+#endif
   for (uint32_t i = 1; i < nt; ++i) {
     NLSESolver3d::step<std::complex<double>>(buf, rho_buf, u, L, m, dti);
     neumann_bc_no_velocity_3d<std::complex<double>>(u, nx, ny, nz);
@@ -123,6 +131,9 @@ int main(int argc, char **argv) {
       if (snapshot_idx < num_snapshots) {
         u_save_mat.row(snapshot_idx) = u.transpose();
       }
+#if DEBUG
+  std::cout << "Save snapshot" << snapshot_idx << "\n";
+#endif
     }
   }
   const std::vector<uint32_t> shape = {num_snapshots, nz, ny, nx};

@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+#define DEBUG 1
+
 // We'll assume to be taking first-order approximants for the velocity for now
 // for all equations in u_tt
 
@@ -102,6 +104,11 @@ int main(int argc, char **argv) {
     throw std::runtime_error("Faulty c (2)");
   }
 
+#if DEBUG
+  std::cout << "Successfully read data, now constructing Laplacian\n";
+#endif
+
+
   const Eigen::SparseMatrix<std::complex<double>> L =
       (build_anisotropic_laplacian_noflux_3d<std::complex<double>>(
            nx - 2, ny - 2, nz - 2, dx, dy, dz, c))
@@ -122,6 +129,9 @@ int main(int argc, char **argv) {
   if (freq == 1)
     u_save_mat.row(1) = u.transpose();
 
+#if DEBUG
+  std::cout << "Initialized, starting integration\n";
+#endif
   Eigen::VectorXcd u_prev = u0;
   for (uint32_t i = 2; i < nt; ++i) {
     NLSECubicGautschiSolver::step(buf, rho_buf, u, u_prev, L, m, dti);
@@ -132,6 +142,9 @@ int main(int argc, char **argv) {
       if (snapshot_idx < num_snapshots) {
         u_save_mat.row(snapshot_idx) = u.transpose();
       }
+#if DEBUG
+  std::cout << "Save snapshot" << snapshot_idx << "\n";
+#endif
     }
   }
 
