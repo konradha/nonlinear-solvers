@@ -15,6 +15,8 @@
 #include "spmv.hpp"
 #include <thrust/complex.h>
 
+#include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
 #include <cublas_v2.h>
 #include <thrust/device_vector.h>
 #include <thrust/inner_product.h>

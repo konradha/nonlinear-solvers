@@ -15,7 +15,6 @@
 #include <string>
 #include <vector>
 
-#define DEBUG 0
 
 // We'll assume to be taking first-order approximants for the velocity for now
 // for all equations in u_tt

@@ -7,6 +7,8 @@
 #include <cuComplex.h>
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
+#include <cuda_runtime.h>
 #include <cusolverDn.h>
 #include <thrust/complex.h>
 
@@ -240,7 +242,6 @@ public:
            const std::string func = "exp") {
     reset_data();
     lanczos_iteration_complex(spmv_, &krylov_, input);
-    // cudaDeviceSynchronize();
     double beta;
     cudaMemcpy(&beta, krylov_.reconstruct_beta, sizeof(double),
                cudaMemcpyDeviceToHost);
@@ -254,6 +255,7 @@ public:
         transform_eigenvals_sinc<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_, dt, m_);
     else
         throw std::runtime_error("Matrix function application not implemented");
+    
     cudaMemset(d_work_, 0, m_ * m_ * sizeof(thrust::complex<double>));
     dim3 blockDim(256);
     dim3 gridDim((m_ + blockDim.x - 1) / blockDim.x);
@@ -265,7 +267,7 @@ public:
     const cuDoubleComplex alpha = make_cuDoubleComplex(1.0, 0.0);
     const cuDoubleComplex beta_cublas = make_cuDoubleComplex(0.0, 0.0);
     
-    // Q * D
+    // Q f(D)
     cublasZgemm(cublas_handle_, CUBLAS_OP_N, CUBLAS_OP_N,
                 m_, m_, m_,
                 &alpha,
@@ -274,7 +276,7 @@ public:
                 &beta_cublas,
                 reinterpret_cast<cuDoubleComplex*>(temp_work), m_);
     
-    // (Q * D) * Q^H
+    // (Q f(D)) Q^H
     cublasZgemm(cublas_handle_, CUBLAS_OP_N, CUBLAS_OP_C,
                 m_, m_, m_,
                 &alpha,
@@ -283,23 +285,48 @@ public:
                 &beta_cublas,
                 reinterpret_cast<cuDoubleComplex*>(d_work_), m_);
     
-    cudaFree(temp_work);
+    thrust::complex<double> *e1;
+    cudaMalloc(&e1, m_ * sizeof(thrust::complex<double>));
+    cudaMemset(e1, 0, m_ * sizeof(thrust::complex<double>));
+    thrust::complex<double> one_val(1.0, 0.0);
+    cudaMemcpy(e1, &one_val, sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
     
-    // V * K  
-    cublasZgemm(cublas_handle_, CUBLAS_OP_N, CUBLAS_OP_N,
-                n_, 1, m_,
+    thrust::complex<double> *temp_vec;
+    cudaMalloc(&temp_vec, m_ * sizeof(thrust::complex<double>));
+    
+
+    // f(T) e_1 = (Q f(D)) Q^H e_1
+    cublasZgemv(cublas_handle_, CUBLAS_OP_N, 
+                m_, m_,
+                &alpha,
+                reinterpret_cast<const cuDoubleComplex*>(d_work_), m_,
+                reinterpret_cast<const cuDoubleComplex*>(e1), 1,
+                &beta_cublas,
+                reinterpret_cast<cuDoubleComplex*>(temp_vec), 1);
+    
+    // V f(T) e_1
+    cublasZgemv(cublas_handle_, CUBLAS_OP_N,
+                n_, m_,
                 &alpha,
                 reinterpret_cast<const cuDoubleComplex*>(krylov_.V), n_,
-                reinterpret_cast<const cuDoubleComplex*>(d_work_), m_,
+                reinterpret_cast<const cuDoubleComplex*>(temp_vec), 1,
                 &beta_cublas,
-                reinterpret_cast<cuDoubleComplex*>(d_work_large_), n_);
+                reinterpret_cast<cuDoubleComplex*>(d_work_large_), 1);
+    
     const cuDoubleComplex scale_factor = make_cuDoubleComplex(beta, 0.0);
+    
+    // beta * V f(T) e_1
     cublasZscal(cublas_handle_, n_,
                 &scale_factor,
                 reinterpret_cast<cuDoubleComplex*>(d_work_large_), 1);
     
     cudaMemcpy(result, d_work_large_, n_ * sizeof(thrust::complex<double>),
                cudaMemcpyDeviceToDevice);
+               
+    cudaFree(e1);
+    cudaFree(temp_vec);
+    cudaFree(temp_work);
+
   }
 
 

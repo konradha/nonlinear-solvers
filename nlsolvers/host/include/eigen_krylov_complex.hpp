@@ -4,7 +4,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 
-#define DEBUG 1
+#define DEBUG 0
 
 #if DEBUG
 #include <iostream>
