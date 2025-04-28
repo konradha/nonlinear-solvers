@@ -21,7 +21,7 @@ python scripts_nlse/compare_integrators_nlse_3d.py \
        	--exe1 build/bin/nlse_cubic_host_3d \
 	--exe2 build/bin/nlse_cubic_host_gautschi_3d\
        	--name1 SS2-host --name2 sEWI-host\
-       	--nx 32 --ny 32 --nz 32\
+       	--nx 250 --ny 250 --nz 250\
        	--Lx 3. --Ly 3. --Lz 3.\
        	--T 1. --nt 100 --num-snapshots 100 \
 	--output-dir ${SCRATCH}/compare_ss2_sewi_host_nlse_${SLURM_JOB_ID}

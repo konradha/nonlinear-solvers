@@ -32,6 +32,7 @@ from visualization import (
 from nlse_sampler import NLSE3DSampler as NLSESampler
 from valid_spaces import get_parameter_spaces_3d
 
+sys.stdout.reconfigure(line_buffering=True)
 
  
 class Launcher:
