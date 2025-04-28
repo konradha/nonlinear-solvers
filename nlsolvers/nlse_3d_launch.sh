@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=nlse_3d_dev
-#SBATCH --time=00:45:00
+#SBATCH --time=01:45:00
 #SBATCH --mem-per-cpu=32G
 #SBATCH --gpus=1
 #SBATCH --output=logs/nlse3d_solver_dev_%j.out
@@ -34,7 +34,7 @@ for p in multi_soliton_state skyrmion_tube; do
                 --num-runs 4 \
 		--phenomenon ${p} \
                 --seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID)) \
-                --output-dir /cluster/scratch/konradha/${p}_constant
+                --output-dir /cluster/scratch/konradha/nlse_${p}_constant
 done
 
 for p in multi_soliton_state skyrmion_tube; do
@@ -48,7 +48,7 @@ for p in multi_soliton_state skyrmion_tube; do
                 --num-runs 2 \
 		--phenomenon ${p} \
                 --seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID)) \
-                --output-dir /cluster/scratch/konradha/${p}_constant_with_visuals
+                --output-dir /cluster/scratch/konradha/nlse_${p}_constant_with_visuals
 done
 
 
@@ -65,7 +65,7 @@ for p in multi_soliton_state skyrmion_tube; do
 			--phenomenon ${p} \
 			--c-m-pair ${cp} \
 			--seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID)) \
-			--output-dir /cluster/scratch/konradha/${p}_${cp}
+			--output-dir /cluster/scratch/konradha/nlse_${p}_${cp}
 	done
 done
 
@@ -82,6 +82,6 @@ for p in multi_soliton_state skyrmion_tube; do
 			--phenomenon ${p} \
 			--c-m-pair ${cp} \
 			--seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID)) \
-			--output-dir /cluster/scratch/konradha/${p}_${cp}_with_visuals
+			--output-dir /cluster/scratch/konradha/nlse_${p}_${cp}_with_visuals
 	done
 done
