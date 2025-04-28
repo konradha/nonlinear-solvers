@@ -73,6 +73,7 @@ else()
   message(FATAL_ERROR "libnpy not found at ${LIBNPY_DIR}. Specify with -DLIBNPY_DIR=path/to/libnpy")
 endif()
 
+
 include_directories(
   ${CMAKE_SOURCE_DIR}/common/include
   ${CMAKE_SOURCE_DIR}/host/include

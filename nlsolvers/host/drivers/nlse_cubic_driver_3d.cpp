@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
         u_save_mat.row(snapshot_idx) = u.transpose();
       }
 #if DEBUG
-  std::cout << "Save snapshot" << snapshot_idx << "\n";
+  std::cout << "Save snapshot: " << snapshot_idx << "\n";
 #endif
     }
   }
