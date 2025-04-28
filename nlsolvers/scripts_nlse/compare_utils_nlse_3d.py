@@ -333,6 +333,49 @@ class NlseComparer3d:
                        'time_points': np.linspace(0, self.args.T, self.args.num_snapshots)}
         return diff_metrics
 
+    def _plot_state(self, traj, name):
+        from mpl_toolkits.mplot3d import Axes3D
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        num_snapshots = traj.shape[0]
+        indices = [num_snapshots // 4, num_snapshots // 2, 3 * num_snapshots // 4, num_snapshots - 1]
+        times = [self.args.T / 4, self.args.T / 2, 3 * self.args.T / 4, self.args.T]
+        
+        fig = plt.figure(figsize=(20, 15))
+        
+        for i, idx in enumerate(indices):
+            if idx >= num_snapshots: continue
+            
+            diff_data = np.abs(traj[idx])
+            threshold = np.percentile(diff_data, 90)
+            
+            ax = fig.add_subplot(2, 2, i+1, projection='3d')
+            
+            x = np.linspace(-self.args.Lx, self.args.Lx, diff_data.shape[0])
+            y = np.linspace(-self.args.Ly, self.args.Ly, diff_data.shape[1])
+            z = np.linspace(-self.args.Lz, self.args.Lz, diff_data.shape[2])
+            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+            
+            mask = diff_data > threshold
+            ax.scatter(X[mask], Y[mask], Z[mask], c=diff_data[mask], 
+                    s=5, alpha=0.7, cmap='viridis')
+            
+            ax.set_title(f"t = {times[i]:.2f}")
+            ax.set_xlabel("x")
+            ax.set_ylabel("y")
+            ax.set_zlabel("z")
+            ax.set_xlim(-self.args.Lx, self.args.Lx)
+            ax.set_ylim(-self.args.Ly, self.args.Ly)
+            ax.set_zlim(-self.args.Lz, self.args.Lz)
+        
+        fig.suptitle(f"state |{name}| at different times", fontsize=16)
+        plot_filename = self.plots_dir / f"state_3d_{name}_{self.args.system_type}_{self.run_id}.png"
+        fig.tight_layout(rect=[0, 0.03, 1, 0.93])
+        fig.savefig(plot_filename, dpi=300)
+        plt.close(fig)
+        print(f"3D state plot saved to {plot_filename}")
+
     def _plot_state_differences(self, traj1, traj2, name1, name2):
         from mpl_toolkits.mplot3d import Axes3D
         import matplotlib.pyplot as plt
@@ -472,6 +515,8 @@ class NlseComparer3d:
         self._plot_comparison(metrics1, self.args.name1, metrics2, self.args.name2, diff_metrics)
         self._plot_state_differences(traj1_data, traj2_data, self.args.name1, self.args.name2)
         self._plot_energy_closer(metrics1['time_points'], traj1_data, traj2_data, self.args.name1, self.args.name2, m_np)
+        self._plot_state(traj1_data, self.args.name1)
+        self._plot_state(traj2_data, self.args.name2)
 
         if not getattr(self.args, 'keep_temps', False):
             try:
