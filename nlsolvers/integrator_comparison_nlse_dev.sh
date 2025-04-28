@@ -24,7 +24,7 @@ python scripts_nlse/compare_integrators_nlse_3d.py \
        	--exe1 build/bin/nlse_3d_dev \
 	--exe2 build/bin/nlse_cubic_host_3d \
        	--name1 SS2-dev --name2 SS2-host\
-       	--nx 32 --ny 32 --nz 32\
+       	--nx 64 --ny 64 --nz 64\
        	--Lx .1 --Ly .1 --Lz .1\
-       	--T 1. --nt 1000 --num-snapshots 100 \
+       	--T .1 --nt 10 --num-snapshots 10 \
 	--output-dir ${SCRATCH}/compare_ss2_host_dev_nlse_${SLURM_JOB_ID}

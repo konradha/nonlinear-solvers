@@ -35,6 +35,8 @@ from valid_spaces import get_parameter_spaces_3d
 from classify_trajectory import batch_process_solutions
 from global_analysis import analyze_all_runs
 
+sys.stdout.reconfigure(line_buffering=True)
+
  
 class Launcher:
     def __init__(self, args):
