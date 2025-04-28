@@ -363,8 +363,12 @@ class Launcher:
                 # animate using high-res data
                 # TODO implement viz in 3d
                 
-                traj_data = self.downsample_trajectory(traj_data)
-                vel_data = self.downsample_trajectory(vel_data)
+                traj_data = self.downsample_trajectory(traj_data.reshape(
+                                self.args.snapshots, self.args.nx, self.args.ny, self.args.nz)
+                            )
+                vel_data  = self.downsample_trajectory(vel_data.reshape(
+                                self.args.snapshots, self.args.nx, self.args.ny, self.args.nz)
+                            )
                 sols[f"{self.run_id}_{i}"] = (traj_data, vel_data)
                 # save downsampled (u, v) trajectory only to perform analysis
                 self.save_to_hdf5(
