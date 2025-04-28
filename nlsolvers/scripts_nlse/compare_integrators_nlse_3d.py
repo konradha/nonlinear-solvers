@@ -8,6 +8,7 @@ from spatial_amplification_3d import (
 )
 
 from nonlinearity_profiles_3d import highlight_profiles
+sys.stdout.reconfigure(line_buffering=True) 
 
 def main():
     parser = argparse.ArgumentParser(description="Compare two different NLSE integrators (3D case)")

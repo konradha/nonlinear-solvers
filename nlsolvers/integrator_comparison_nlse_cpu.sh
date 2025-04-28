@@ -8,8 +8,7 @@
 
 #SBATCH --output=logs/integrator_comparison_%j.out
 #SBATCH --error=logs/integrator_comparison_%j.err
-#SBATCH --ntasks=4
-#SBATCH --partition=gpu
+#SBATCH --ntasks=1
 
 module load stack/2024-06 cuda/12.1.1 python/3.11.6 eigen
 module load python_cuda/3.11.6
@@ -21,7 +20,7 @@ python scripts_nlse/compare_integrators_nlse_3d.py \
        	--exe1 build/bin/nlse_cubic_host_3d \
 	--exe2 build/bin/nlse_cubic_host_gautschi_3d\
        	--name1 SS2-host --name2 sEWI-host\
-       	--nx 150 --ny 150 --nz 150\
+       	--nx 100 --ny 100 --nz 100\
        	--Lx 3. --Ly 3. --Lz 3.\
-       	--T .5 --nt 500 \
+       	--T 1. --nt 100 --num-snapshots 100 \
 	--output-dir ${SCRATCH}/compare_ss2_sewi_host_nlse_${SLURM_JOB_ID}
