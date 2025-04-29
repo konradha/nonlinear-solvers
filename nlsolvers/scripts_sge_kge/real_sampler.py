@@ -1811,9 +1811,8 @@ class RealWaveSampler3d:
                                       velocity_type=velocity_type,
                                       **params)
         
-        # watch out for zeros!
+        # watch out for zeros! -- TODO get scaling right
         u0 = u0 / np.max(np.abs(u0) + 1e-10)
-        v0 = v0 / np.max(np.abs(v0) + 1e-10)
         return (u0, v0)
 
 
