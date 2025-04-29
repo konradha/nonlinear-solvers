@@ -1,0 +1,86 @@
+- nicely refactor args to KGE 2d solvers, host and device (4x)
+  -> make single driver for both 2d and 3d
+- nicely refactor args to NLSE 2d solvers, host and device (4x)
+  -> make single driver for both 2d and 3d
+
+(for host/device each 2 drivers): 
+  -> dimension as arg
+  -> specs as args: L, n
+  -> method 1: SV and SS2
+  -> host / device
+
+thus:
+  - KGE_host_driver.cpp, KGE_dev_driver.cpp
+  - NLSE_host_driver.cpp, NLSE_dev_driver.cpp
+
+- adapt launchers correspondingly: Need 2d and 3d checks
+
+- sanity-check solvers:
+	- Krylov subspace host / device
+
+	- step functions KGE
+	- step functions NLSE
+	  (both sufficient if test for 3d)
+  -> should be thorough test cases showing that we're close up to an eps
+
+
+- figure out nice factoring for u0, v0, (c,m) for KGE 2d
+- figure out nice factoring for u0, v0, (c,m) for KGE 3d
+
+- figure out nice factoring for u0, v0, (c,m) for NLSE 2d
+- figure out nice factoring for u0, v0, (c,m) for NLSE 3d [STRETCH]
+  -> might be difficult / infeasible depending on if solver actually works as expected
+
+- collect 2TB for 3d cases // 5hrs
+- collect 2TB for 2d cases // 10hrs -> need more phenomena to sample (have, just more runs)!
+
+(should be doable tomorrow!)
+
+
+- overview:
+1. intro
+
+2. integrability (quickly walk through it, dimensionality, boundary conditions)
+2.1 blow-ups (NLSE mostly)
+
+3. numerical methods for integrable systems (explain methods, python prototyping)
+3.0 stencils versus large operators, CFL, integrability
+3.1 standard: symplectic
+3.2 implicit
+3.3 energy-conserving 
+3.4 difficulty of incorporating BCs
+
+4. exponential / trigonometric integrators -- filtering frequencies in stiff linear operators
+4.1 SS2 usually: spectral
+4.2 SS2 Krylov subspace
+4.3 Gautschi-type for KGE
+4.4 sEWI for NLSE
+
+[x] Krylov subspace methods
+
+5. Stormer-Verlet versus Gautschi-type (KGE)
+full story: from idea to implementation (view on setup in Eigen, CUDA)
+- standard circular soliton
+- cooliding solitons
+
+6. initial conditions
+
+7. (c, m) pairs
+- constant c, m
+- anisotropy
+- waveguides
+
+8. analysis
+
+9. parameter space exploration
+
+10. application to ML
+
+11. finetuning [STRETCH]
+
+12. quanitizing POSEIDON [EXTREME STRETCH]
+
+13. summary
+14. outlook
+
+
