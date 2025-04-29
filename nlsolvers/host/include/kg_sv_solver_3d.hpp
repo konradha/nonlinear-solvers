@@ -13,7 +13,7 @@ template <typename Scalar_t>
 void step(Eigen::VectorX<Scalar_t> &u, Eigen::VectorX<Scalar_t> &u_past,
           Eigen::VectorX<Scalar_t> &buf, const Eigen::SparseMatrix<Scalar_t> &L,
           const Eigen::VectorX<Scalar_t> &m, const Scalar_t tau) {
-  Eigen::VectorX<Scalar_t> buf2 = u.unaryExpr([&](Scalar_t x) { return x; });
+  Eigen::VectorX<Scalar_t> buf2 = u.unaryExpr([&](Scalar_t x) { return x* x * x; });
   buf = L * u - m.cwiseProduct(buf2);
   buf2 = u;
   u = 2 * u - u_past + tau * tau * buf;

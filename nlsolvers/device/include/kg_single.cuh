@@ -16,7 +16,7 @@ __global__ void neg_kernel(double *out, const double *in, const double *m,
                            const uint32_t n) {
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n) {
-    out[idx] = -m[idx] * in[idx];
+    out[idx] = -m[idx] * in[idx] * in[idx] * in[idx];
   }
 }
 
@@ -62,10 +62,13 @@ void step_sv(double *d_v, double *d_u, double *d_u_past, double *d_buf,
              MatrixFunctionApplicatorReal *matfunc, const double *d_m,
              const double tau, const uint32_t n, const dim3 grid,
              const dim3 block) {
+  // u_n-1 bookkeeping
+  cudaMemcpy(d_buf3, d_u, n * sizeof(double), cudaMemcpyDeviceToDevice);
   // 2 u_n - u_{n-1} + dt² (Lu_n - m f(u))
   matfunc->expose_spmv()->multiply(d_u, d_buf);
   neg_kernel<<<grid, block>>>(d_buf2, d_u, d_m, n);
   sv_kernel<<<grid, block>>>(d_u, d_u_past, d_buf, d_buf2, tau, n);
+  cudaMemcpy(d_u_past, d_buf3, n * sizeof(double), cudaMemcpyDeviceToDevice);
   velocity_kernel<<<grid, block>>>(d_v, d_u, d_u_past, tau, n);
 }
 
