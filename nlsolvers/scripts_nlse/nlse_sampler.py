@@ -1558,7 +1558,7 @@ class NLSE3DSampler:
                           chirp_range=(-0.1, 0.1), aspect_ratio_x_range=(1.0, 1.5), 
                           aspect_ratio_y_range=(1.0, 1.5), phase_value=0.0):
         u = np.zeros_like(self.X, dtype=complex)
-        n_solitons = np.random.randint(3, 12) 
+        n_solitons = np.random.randint(2, 6) 
         
         if arrangement == 'linear':
             base_positions = [(i - (n_solitons-1)/2) * separation for i in range(n_solitons)]
@@ -1876,13 +1876,12 @@ class NLSE3DSampler:
                                       phenomenon_type=phenomenon_type,
                                       n_samples=1,
                                       **params)
-        dV = self.dx * self.dy * self.dz
-
-        mass = np.sum(np.abs(u0)**2) * dV
-        target_mass = .2
-        if mass > 1e-15:
-            scale = np.sqrt(target_mass / mass)
-            u0_normalized = u0 * scale
+        # dV = self.dx * self.dy * self.dz
+        # mass = np.sum(np.abs(u0)**2) * dV
+        # target_mass = .2
+        # if mass > 1e-15:
+        #     scale = np.sqrt(target_mass / mass)
+        #     u0_normalized = u0 * scale
             
-        # u0 = u0 / np.max(np.abs(u0))
+        u0 = u0 / np.max(np.abs(u0))
         return u0

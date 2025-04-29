@@ -131,6 +131,10 @@ class Launcher:
         else:
             raise ValueError(f"Unknown m_type: {self.args.m_type}")
         #import pdb; pdb.set_trace()
+
+        # focusing   => m < 0 everywhere in i u_t + \Delta u + m(x) |u|²u = 0
+        # defocusing => m > 0 everywhere
+
         return -m.astype(np.float64)  # safety first
 
     def generate_anisotropy(self, run_idx):

@@ -20,7 +20,7 @@ module load ffmpeg
 # need to be allocated into account ...
 
 n=121
-nt=100
+nt=1000
 dr=100
 
 # non-constant: i u_t + \Delta u + |u|²u = 0

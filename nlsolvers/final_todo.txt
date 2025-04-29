@@ -25,7 +25,7 @@ thus:
 
 
 - figure out nice factoring for u0, v0, (c,m) for KGE 2d
-- figure out nice factoring for u0, v0, (c,m) for KGE 3d
+- figure out nice factoring for u0, v0, (c,m) for KGE 3d -- waveguides need to come back
 
 - figure out nice factoring for u0, v0, (c,m) for NLSE 2d
 - figure out nice factoring for u0, v0, (c,m) for NLSE 3d [STRETCH]
@@ -37,50 +37,67 @@ thus:
 (should be doable tomorrow!)
 
 
-- overview:
-1. intro
 
-2. integrability (quickly walk through it, dimensionality, boundary conditions)
-2.1 blow-ups (NLSE mostly)
+0. abstract
+1. intro: nonlinear waves, ML for PDEs, 
+
+2. integrability & phyics (quickly walk through it, dimensionality, boundary conditions)
+2.1 basics, dimensions
+2.2 Lie groups, combinators
+2.3 blow-ups (NLSE mostly)
 
 3. numerical methods for integrable systems (explain methods, python prototyping)
 3.0 stencils versus large operators, CFL, integrability
-3.1 standard: symplectic
-3.2 implicit
-3.3 energy-conserving 
+3.1 standard: symplectic -- nice
+3.2 implicit: slow
+3.3 energy-conserving: unclear
 3.4 difficulty of incorporating BCs
 
-4. exponential / trigonometric integrators -- filtering frequencies in stiff linear operators
-4.1 SS2 usually: spectral
-4.2 SS2 Krylov subspace
-4.3 Gautschi-type for KGE
-4.4 sEWI for NLSE
+4. Krylov subspace methods
+4.1 explanation
+4.2 low m is sufficient (compare with scipy also wrt speed) -- can in principle all be Python
 
-[x] Krylov subspace methods
+5. exponential / trigonometric integrators -- filtering frequencies in stiff linear operators
+5.1 SS2 usually: spectral: "infinite" domain
+5.2 SS2 Krylov subspace: lots of matmuls for f(tA)u
+5.3 Gautschi-type for KGE
+5.4 sEWI for NLSE
+5.5 \tau can be large in here (theoretically, unsure for high dimensions as this is ODE research)
 
-5. Stormer-Verlet versus Gautschi-type (KGE)
+6. Stormer-Verlet versus Gautschi-type (KGE)
 full story: from idea to implementation (view on setup in Eigen, CUDA)
 - standard circular soliton
-- cooliding solitons
+- colliding solitons
+- unphysical when hitting boundary
 
-6. initial conditions
+7. initial conditions
+- see script from today -- extend for 2d case
 
-7. (c, m) pairs
+8. (c, m) pairs
 - constant c, m
 - anisotropy
 - waveguides
 
-8. analysis
+9. analysis
+- some data
+- checking proxies
+- variety: tSNE
+- data generation time
 
-9. parameter space exploration
+11. application to ML
+- overall introduction into operator learning
+- current sota architectures
 
-10. application to ML
+12. finetuning [STRETCH]
+- POSEIDON quip
+- finetuning 2d
+- finetuning 3d?
 
-11. finetuning [STRETCH]
+13. quanitizing POSEIDON [EXTREME STRETCH]
+- existing model quantization
+- finetuned (2d) quantization
 
-12. quanitizing POSEIDON [EXTREME STRETCH]
-
-13. summary
-14. outlook
+14. summary
+15. outlook
 
 
