@@ -1810,8 +1810,10 @@ class RealWaveSampler3d:
                                       phenomenon_type=phenomenon_type,
                                       velocity_type=velocity_type,
                                       **params)
-        u0 = u0 / np.max(np.abs(u0))
-        v0 = v0 / np.max(np.abs(v0))
+        
+        # watch out for zeros!
+        u0 = u0 / np.max(np.abs(u0) + 1e-10)
+        v0 = v0 / np.max(np.abs(v0) + 1e-10)
         return (u0, v0)
 
 

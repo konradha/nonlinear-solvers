@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
 
   Eigen::VectorXd u = u0;
   Eigen::VectorXd v = v0;
-  Eigen::VectorXd buf(nx * ny);
+  Eigen::VectorXd buf(nx * ny * nz);
 
   for (uint32_t i = 1; i < nt; ++i) {
     KGESolver3d::step<double>(u, u_past, buf, L, m, dt);
