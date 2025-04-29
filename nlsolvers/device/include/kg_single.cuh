@@ -36,7 +36,7 @@ __global__ void sv_kernel(double *u, double *u_past, double *l,
                           const double tau, const uint32_t n) {
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n) {
-    u[idx] = 2 * u[idx] - u_past[idx] + tau * tau * (l[idx] - nl[idx]);
+    u[idx] = 2 * u[idx] - u_past[idx] + tau * tau * (l[idx] + nl[idx]);
   }
 }
 
