@@ -70,6 +70,7 @@ public:
     block_dim_ = dim3(threads_per_block);
 
     store_snapshot(0);
+    cublasCreate(&cublas_handle_);
   }
 
   ~KGESolverDevice() {
@@ -84,6 +85,7 @@ public:
     cudaFree(d_m_);
     cudaFree(d_u_trajectory_);
     cudaFree(d_v_trajectory_);
+    cublasDestroy(cublas_handle_);
   }
 
   void step() {
@@ -144,6 +146,8 @@ private:
   dim3 block_dim_;
   Parameters params_;
   double dt_;
+  cublasHandle_t cublas_handle_;
+  
 };
 
 } // namespace device

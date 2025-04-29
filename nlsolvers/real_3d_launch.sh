@@ -23,7 +23,7 @@ n=160
 nt=6000 # using SV we're really _fast_
 dr=100
 exe=build/bin/kg_sv_3d_dev
-L=6.
+L=3.
 
 # constant: u_tt = \Delta u - u
 for p in kink_field; do

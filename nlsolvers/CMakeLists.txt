@@ -33,7 +33,7 @@ if(ENABLE_GPU)
 
   
   if(OPTIMIZE_SPEED)
-    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O2 --use_fast_math --expt-relaxed-constexpr")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O2 --use_fast_math --expt-relaxed-constexpr --extended-lambda")
   endif()
   include_directories(
     ${CMAKE_SOURCE_DIR}/device/include
