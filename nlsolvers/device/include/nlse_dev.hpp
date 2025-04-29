@@ -16,6 +16,53 @@
 
 namespace device {
 
+// Let's remove more hand-rolled kernels to not incure more penalties!
+void compute_density(thrust::complex<double>* d_density, const thrust::complex<double>* d_u, const double* d_m, const size_t n) {
+  thrust::device_ptr<thrust::complex<double>> density_ptr(d_density);
+  thrust::device_ptr<const thrust::complex<double>> u_ptr(d_u);
+  thrust::device_ptr<const double> m_ptr(d_m);
+
+  thrust::transform(u_ptr, u_ptr + n, m_ptr, density_ptr,
+                   [] __device__ (const thrust::complex<double>& u, const double m) {
+                       return m * (u.real() * u.real() + u.imag() * u.imag());
+                   });
+}
+
+void apply_nonlinear_part(thrust::complex<double>* d_out, const thrust::complex<double>* d_in,
+                           const thrust::complex<double>* d_rho, const std::complex<double>& tau, const size_t n) {
+  thrust::device_ptr<thrust::complex<double>> out_ptr(d_out);
+  thrust::device_ptr<const thrust::complex<double>> in_ptr(d_in);
+  thrust::device_ptr<const thrust::complex<double>> rho_ptr(d_rho);
+  thrust::complex<double> thrust_tau(tau.real(), tau.imag());
+  thrust::transform(in_ptr, in_ptr + n, rho_ptr, out_ptr,
+                   [thrust_tau] __device__ (const thrust::complex<double>& in_val, const thrust::complex<double>& rho_val) {
+                       return in_val * exp(thrust_tau * rho_val);
+                   });
+}
+
+void compute_B(thrust::complex<double>* d_out, const double* d_m, const thrust::complex<double>* d_u, const size_t n) {
+  thrust::device_ptr<thrust::complex<double>> out_ptr(d_out);
+  thrust::device_ptr<const thrust::complex<double>> u_ptr(d_u);
+  thrust::device_ptr<const double> m_ptr(d_m);
+
+  thrust::transform(u_ptr, u_ptr + n, m_ptr, out_ptr,
+                   [] __device__ (const thrust::complex<double>& u, const double m) {
+                       return -m * (u.real() * u.real() + u.imag() * u.imag()) * u;
+                   });
+}
+
+void apply_sewi(thrust::complex<double>* d_out, const thrust::complex<double>* d_exp_prev,
+                const thrust::complex<double>* d_exp_psi_B, const std::complex<double>& tau, const size_t n) {
+  thrust::device_ptr<thrust::complex<double>> out_ptr(d_out);
+  thrust::device_ptr<const thrust::complex<double>> exp_prev_ptr(d_exp_prev);
+  thrust::device_ptr<const thrust::complex<double>> exp_psi_B_ptr(d_exp_psi_B);
+  thrust::complex<double> thrust_tau(tau.real(), tau.imag());
+  thrust::transform(exp_prev_ptr, exp_prev_ptr + n, exp_psi_B_ptr, out_ptr,
+                   [thrust_tau] __device__ (const thrust::complex<double>& exp_prev, const thrust::complex<double>& exp_psi_B) {
+                       return exp_prev - 2.0 * thrust_tau * exp_psi_B;
+                   });
+}
+
 class NLSESolverDevice {
 public:
   struct Parameters {
@@ -127,77 +174,55 @@ public:
 
   void apply_bc() {
     if (!is_3d_) {
-      neumann_bc_no_velocity_blocking<thrust::complex<double>>(d_u_, nx_, ny_);
-    } else {
-      neumann_bc_no_velocity_blocking_3d<thrust::complex<double>>(d_u_, nx_,
-                                                                  ny_, nz_);
+        neumann_bc_no_velocity_blocking<thrust::complex<double>>(d_u_, nx_, ny_);
+      } else {
+        neumann_bc_no_velocity_blocking_3d<thrust::complex<double>>(d_u_, nx_,
+                                                                    ny_, nz_);
+      }
     }
-  }
-
-  void step(const std::complex<double> tau, const uint32_t step_number, std::complex<double> * host_dst) {
-    if (!is_3d_) {
-      device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
-                                                 ny_);
-      device::nonlin_part<<<grid_dim_, block_dim_>>>(d_buf_, d_u_, d_density_,
-                                                     .5 * tau, nx_, ny_);
-      matfunc_->apply(d_u_, d_buf_, tau, "exp");
-
-      device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
-                                                 ny_);
-      device::nonlin_part<<<grid_dim_, block_dim_>>>(d_u_, d_u_, d_density_,
-                                                     .5 * tau, nx_, ny_);
-    } else {
-      device::density_3d<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
-                                                 ny_, nz_);
-      device::nonlin_part_3d<<<grid_dim_, block_dim_>>>(d_buf_, d_u_, d_density_,
-                                                     .5 * tau, nx_, ny_, nz_);
-      matfunc_->apply(d_u_, d_buf_, tau, "exp");
-
-      device::density_3d<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
-                                                 ny_, nz_);
-      device::nonlin_part_3d<<<grid_dim_, block_dim_>>>(d_u_, d_u_, d_density_,
-                                                     .5 * tau, nx_, ny_, nz_);
-    }
-
+  
+  void step(const std::complex<double> tau, const uint32_t step_number, std::complex<double>* host_dst) {
+    compute_density(d_density_, d_u_, d_m_, n_);
+    apply_nonlinear_part(d_buf_, d_u_, d_density_, 0.5 * tau, n_);
+    matfunc_->apply(d_u_, d_buf_, tau, "exp");
+  
+    compute_density(d_density_, d_u_, d_m_, n_);
+    apply_nonlinear_part(d_u_, d_u_, d_density_, 0.5 * tau, n_);
+  
     if (step_number % params_.snapshot_freq == 0) {
       store_snapshot_online(host_dst);
     }
-
+  
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
       throw std::runtime_error(cudaGetErrorString(err));
     }
   }
-
-  void step_sewi(const std::complex<double> tau, const uint32_t step_number, std::complex<double> * host_dst) {
-    // initial step is symmetric SS2, see publication for reference
+  
+  void step_sewi(const std::complex<double> tau, const uint32_t step_number, std::complex<double>* host_dst) {
     if (step_number == 1) {
       cudaMalloc(&d_u_prev_, n_ * sizeof(thrust::complex<double>));
-      cudaMemcpy(d_u_prev_, d_u_, n_ * sizeof(thrust::complex<double>),
-                 cudaMemcpyDeviceToDevice);
+      cudaMemcpy(d_u_prev_, d_u_, n_ * sizeof(thrust::complex<double>), cudaMemcpyDeviceToDevice);
       step(tau, 1, host_dst);
-    } else {
-      cudaMemcpy(d_buf_, d_u_, n_ * sizeof(thrust::complex<double>),
-                 cudaMemcpyDeviceToDevice); // bookkeeping prev
-      if (!is_3d_) {
-        B<<<grid_dim_, block_dim_>>>(d_buf2_, d_m_, d_u_, nx_, ny_); 
-        thrust::complex<double> real_tau(tau.imag(), 0.0);
-	matfunc_->apply(d_buf3_ /* out */, d_buf2_ /* in */, real_tau, "sinc");
-        matfunc_->apply(d_buf2_, d_buf3_, tau, "exp"); // re-use buffer from before 
-        matfunc_->apply(d_buf3_, d_u_prev_, 2. * tau, "exp");
-        // u^{n+1} = e^{-2i*tau*Delta}u^{n-1} - 2i*tau*e^{-i*tau*Delta}*phi_s(tau*Delta)*B(u^n)
-        sewi<<<grid_dim_, block_dim_>>>(d_u_, d_buf2_, d_buf3_, tau, nx_, ny_); 
-      } else {
-        B_3d<<<grid_dim_, block_dim_>>>(d_buf2_, d_m_, d_u_, nx_, ny_, nz_); 
-        thrust::complex<double> real_tau(tau.imag(), 0.0);
-	matfunc_->apply(d_buf3_ /* out */, d_buf2_ /* in */, real_tau, "sinc");
-        matfunc_->apply(d_buf2_, d_buf3_, tau, "exp"); // re-use buffer from before 
-        matfunc_->apply(d_buf3_, d_u_prev_, 2. * tau, "exp");
-        // u^{n+1} = e^{-2i*tau*Delta}u^{n-1} - 2i*tau*e^{-i*tau*Delta}*phi_s(tau*Delta)*B(u^n)
-        sewi_3d<<<grid_dim_, block_dim_>>>(d_u_, d_buf2_, d_buf3_, tau, nx_, ny_, nz_);
-      }
-      cudaMemcpy(d_u_prev_, d_buf_, n_ * sizeof(thrust::complex<double>),
-                 cudaMemcpyDeviceToDevice); // attach "prev" to prev
+    } else { 
+      thrust::device_ptr<thrust::complex<double>> u_ptr(d_u_);
+      thrust::device_ptr<thrust::complex<double>> buf_ptr(d_buf_);
+      thrust::copy(u_ptr, u_ptr + n_, buf_ptr);
+
+      compute_B(d_buf2_, d_m_, d_u_, n_);
+
+      std::complex<double> std_real_tau(tau.imag(), 0.0);
+      thrust::complex<double> real_tau(std_real_tau.real(), std_real_tau.imag());
+      matfunc_->apply(d_buf3_, d_buf2_, std_real_tau, "sinc");
+      matfunc_->apply(d_buf2_, d_buf3_, tau, "exp");
+      
+      std::complex<double> two_tau = 2.0 * tau;
+      matfunc_->apply(d_buf3_, d_u_prev_, two_tau, "exp");
+
+      apply_sewi(d_u_, d_buf2_, d_buf3_, tau, n_);
+
+      thrust::device_ptr<thrust::complex<double>> u_prev_ptr(d_u_prev_);
+      thrust::copy(buf_ptr, buf_ptr + n_, u_prev_ptr);
     }
 
     if (step_number > 1 && step_number % params_.snapshot_freq == 0) {
@@ -208,7 +233,84 @@ public:
     if (err != cudaSuccess) {
       throw std::runtime_error(cudaGetErrorString(err));
     }
-  }
+}
+
+  
+  // void step(const std::complex<double> tau, const uint32_t step_number, std::complex<double> * host_dst) {
+  //   if (!is_3d_) {
+  //     device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
+  //                                                ny_);
+  //     device::nonlin_part<<<grid_dim_, block_dim_>>>(d_buf_, d_u_, d_density_,
+  //                                                    .5 * tau, nx_, ny_);
+  //     matfunc_->apply(d_u_, d_buf_, tau, "exp");
+
+  //     device::density<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
+  //                                                ny_);
+  //     device::nonlin_part<<<grid_dim_, block_dim_>>>(d_u_, d_u_, d_density_,
+  //                                                    .5 * tau, nx_, ny_);
+  //   } else {
+  //     device::density_3d<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
+  //                                                ny_, nz_);
+  //     device::nonlin_part_3d<<<grid_dim_, block_dim_>>>(d_buf_, d_u_, d_density_,
+  //                                                    .5 * tau, nx_, ny_, nz_);
+  //     matfunc_->apply(d_u_, d_buf_, tau, "exp");
+
+  //     device::density_3d<<<grid_dim_, block_dim_>>>(d_density_, d_u_, d_m_, nx_,
+  //                                                ny_, nz_);
+  //     device::nonlin_part_3d<<<grid_dim_, block_dim_>>>(d_u_, d_u_, d_density_,
+  //                                                    .5 * tau, nx_, ny_, nz_);
+  //   }
+
+  //   if (step_number % params_.snapshot_freq == 0) {
+  //     store_snapshot_online(host_dst);
+  //   }
+
+  //   cudaError_t err = cudaGetLastError();
+  //   if (err != cudaSuccess) {
+  //     throw std::runtime_error(cudaGetErrorString(err));
+  //   }
+  // }
+
+  // void step_sewi(const std::complex<double> tau, const uint32_t step_number, std::complex<double> * host_dst) {
+  //   // initial step is symmetric SS2, see publication for reference
+  //   if (step_number == 1) {
+  //     cudaMalloc(&d_u_prev_, n_ * sizeof(thrust::complex<double>));
+  //     cudaMemcpy(d_u_prev_, d_u_, n_ * sizeof(thrust::complex<double>),
+  //                cudaMemcpyDeviceToDevice);
+  //     step(tau, 1, host_dst);
+  //   } else {
+  //     cudaMemcpy(d_buf_, d_u_, n_ * sizeof(thrust::complex<double>),
+  //                cudaMemcpyDeviceToDevice); // bookkeeping prev
+  //     if (!is_3d_) {
+  //       B<<<grid_dim_, block_dim_>>>(d_buf2_, d_m_, d_u_, nx_, ny_); 
+  //       thrust::complex<double> real_tau(tau.imag(), 0.0);
+  //       matfunc_->apply(d_buf3_ /* out */, d_buf2_ /* in */, real_tau, "sinc");
+  //       matfunc_->apply(d_buf2_, d_buf3_, tau, "exp"); // re-use buffer from before 
+  //       matfunc_->apply(d_buf3_, d_u_prev_, 2. * tau, "exp");
+  //       // u^{n+1} = e^{-2i*tau*Delta}u^{n-1} - 2i*tau*e^{-i*tau*Delta}*phi_s(tau*Delta)*B(u^n)
+  //       sewi<<<grid_dim_, block_dim_>>>(d_u_, d_buf2_, d_buf3_, tau, nx_, ny_); 
+  //     } else {
+  //       B_3d<<<grid_dim_, block_dim_>>>(d_buf2_, d_m_, d_u_, nx_, ny_, nz_); 
+  //       thrust::complex<double> real_tau(tau.imag(), 0.0);
+  //       matfunc_->apply(d_buf3_ /* out */, d_buf2_ /* in */, real_tau, "sinc");
+  //       matfunc_->apply(d_buf2_, d_buf3_, tau, "exp"); // re-use buffer from before 
+  //       matfunc_->apply(d_buf3_, d_u_prev_, 2. * tau, "exp");
+  //       // u^{n+1} = e^{-2i*tau*Delta}u^{n-1} - 2i*tau*e^{-i*tau*Delta}*phi_s(tau*Delta)*B(u^n)
+  //       sewi_3d<<<grid_dim_, block_dim_>>>(d_u_, d_buf2_, d_buf3_, tau, nx_, ny_, nz_);
+  //     }
+  //     cudaMemcpy(d_u_prev_, d_buf_, n_ * sizeof(thrust::complex<double>),
+  //                cudaMemcpyDeviceToDevice); // attach "prev" to prev
+  //   }
+
+  //   if (step_number > 1 && step_number % params_.snapshot_freq == 0) {
+  //     store_snapshot_online(host_dst);
+  //   }
+
+  //   cudaError_t err = cudaGetLastError();
+  //   if (err != cudaSuccess) {
+  //     throw std::runtime_error(cudaGetErrorString(err));
+  //   }
+  // }
 
   // void transfer_snapshots(std::complex<double> *dst) {
   //   cudaMemcpy(dst, d_u_trajectory_,

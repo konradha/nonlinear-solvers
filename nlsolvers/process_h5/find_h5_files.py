@@ -8,9 +8,10 @@ def find_h5_files(base_dir, output_file):
     h5_files = []
     
     include_prefixes = [
-        "kge_kink_field_", 
+        # "kge_kink_field_", 
         # "nlse_multi_soliton_state_", 
         # "nlse_skyrmion_tube_"
+        "nlse_multi_soliton_state_constant_refactored"
     ]
     
     for prefix in include_prefixes:

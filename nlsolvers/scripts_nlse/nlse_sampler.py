@@ -1876,5 +1876,13 @@ class NLSE3DSampler:
                                       phenomenon_type=phenomenon_type,
                                       n_samples=1,
                                       **params)
-        u0 = u0 / np.max(np.abs(u0))
+        dV = self.dx * self.dy * self.dz
+
+        mass = np.sum(np.abs(u0)**2) * dV
+        target_mass = .2
+        if mass > 1e-15:
+            scale = np.sqrt(target_mass / mass)
+            u0_normalized = u0 * scale
+            
+        # u0 = u0 / np.max(np.abs(u0))
         return u0
