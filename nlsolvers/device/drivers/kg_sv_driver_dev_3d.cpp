@@ -125,7 +125,7 @@ int main(int argc, char **argv) {
 
   Eigen::VectorXd u = u0;
   Eigen::VectorXd v = v0;
-  Eigen::VectorXd buf(nx * ny);
+  
 
   int *d_row_ptr, *d_col_ind;
   double *d_values;
