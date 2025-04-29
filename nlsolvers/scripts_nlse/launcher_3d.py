@@ -131,7 +131,7 @@ class Launcher:
         else:
             raise ValueError(f"Unknown m_type: {self.args.m_type}")
         #import pdb; pdb.set_trace()
-        return m.astype(np.float64)  # safety first
+        return -m.astype(np.float64)  # safety first
 
     def generate_anisotropy(self, run_idx):
         if self.args.c_type == "constant":
