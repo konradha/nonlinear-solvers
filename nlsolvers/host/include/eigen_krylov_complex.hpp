@@ -12,7 +12,7 @@
 
 template <typename Float>
 std::tuple<Eigen::MatrixX<Float>, Eigen::MatrixX<Float>, Float>
-lanczos_L(const Eigen::SparseMatrix<Float> &L, const Eigen::VectorX<Float> &u,
+lanczos_L_complex(const Eigen::SparseMatrix<Float> &L, const Eigen::VectorX<Float> &u,
           const uint32_t m) {
   const uint32_t n = L.rows();
   Eigen::MatrixX<Float> V = Eigen::MatrixX<Float>::Zero(n, m);
@@ -33,8 +33,16 @@ lanczos_L(const Eigen::SparseMatrix<Float> &L, const Eigen::VectorX<Float> &u,
       Float coeff = V.col(i).adjoint() * w;
       w.noalias() -= coeff * V.col(i);
     }
+
+
     T(j + 1, j) = w.norm();
     T(j, j + 1) = T(j + 1, j);
+    // if (std::abs(T(j + 1, j)) < 1e-8) {
+    //   V.conservativeResize(Eigen::NoChange, j + 1);
+    //   T.conservativeResize(j + 1, j + 1);
+    //   break;
+    // }
+    
     V.col(j + 1) = w / T(j + 1, j);
   }
   // std::cout << "Eigen beta: " << beta << "\n";
@@ -47,7 +55,7 @@ template <typename Float>
 Eigen::VectorX<Float> expm_multiply(const Eigen::SparseMatrix<Float> &L,
                                     const Eigen::VectorX<Float> &u, Float t,
                                     const uint32_t m = 10) {
-  const auto [V, T, beta] = lanczos_L(L, u, m);
+  const auto [V, T, beta] = lanczos_L_complex(L, u, m);
   // std::cout << "Host beta\n" << beta << "\n";
   // std::cout << "Host T\n" << T << "\n";
   // std::cout << "Host V\n" << V << "\n";
@@ -78,7 +86,7 @@ template <typename Float>
 Eigen::VectorX<Float> sincm_multiply(const Eigen::SparseMatrix<Float> &L,
                                      const Eigen::VectorX<Float> &u, Float t,
                                      const uint32_t m = 10) {
-  const auto [V, T, beta] = lanczos_L(L, u, m);
+  const auto [V, T, beta] = lanczos_L_complex(L, u, m);
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixX<Float>> es(T);
   Eigen::MatrixX<Float> sinc_T =
       (es.eigenvectors() *

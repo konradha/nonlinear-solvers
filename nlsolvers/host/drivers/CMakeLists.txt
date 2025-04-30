@@ -122,3 +122,8 @@ if(BUILD_KG)
         install(TARGETS kg_sv_driver_3d RUNTIME DESTINATION bin)
     endif()
 endif()
+
+
+add_executable(scipy_test_host test_scipy_matfunc.cpp)
+target_link_libraries(scipy_test_host PRIVATE host_solvers)
+install(TARGETS scipy_test_host RUNTIME DESTINATION bin)
