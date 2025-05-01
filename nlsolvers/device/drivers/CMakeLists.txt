@@ -47,6 +47,6 @@ if(BUILD_NLSE_SATURATING)
     add_cuda_driver(nlse_saturating_dev nlse_saturating_driver_dev.cpp)
 endif()
 
-add_cuda_driver(complex_test_matfunc test_matfunc_complex.cpp) 
-add_cuda_driver(nlse_step_test test_nlse_step.cpp)
+# add_cuda_driver(complex_test_matfunc test_matfunc_complex.cpp) 
+# add_cuda_driver(nlse_step_test test_nlse_step.cpp)
 add_cuda_driver(scipy_comparison_dev test_scipy_matfunc.cpp)

@@ -28,7 +28,7 @@ struct GridInfo {
   uint32_t nx = 0, ny = 0, nz = 0;
   double Lx = 0, Ly = 0, Lz = 0;
   double dx = 0, dy = 0, dz = 0;
-  long total_size = 0;
+  uint32_t total_size = 0;
   bool is_3d = true;
   uint32_t shape[3];
 };

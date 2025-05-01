@@ -12,6 +12,8 @@
 #include <cusolverDn.h>
 #include <thrust/complex.h>
 
+#include <Eigen/Sparse>
+
 #define DEBUG 0
 
 __global__ void transform_eigenvals_exp(thrust::complex<double> *out,
@@ -120,9 +122,11 @@ public:
   };
 
   MatrixFunctionApplicatorComplex(
-      const Eigen::SparseMatrix<std::complex<double>> &A, uint32_t n,
+      const Eigen::SparseMatrix<std::complex<double> > &A, uint32_t n,
       uint32_t m, uint32_t nnz, const Parameters &params = Parameters())
       : n_(n), m_(m), params_(params) {
+
+
 #if DEBUG
     size_t complex_double_size = sizeof(thrust::complex<double>);
     size_t double_size = sizeof(double);
@@ -187,6 +191,7 @@ public:
     cudaMalloc(&d_work_, m * m * sizeof(thrust::complex<double>));
     cudaMalloc(&d_work_large_, n * m * sizeof(thrust::complex<double>));
     cudaMalloc(&d_info_, sizeof(int));
+    cudaMalloc(&temp_work_, m_ * m_ * sizeof(thrust::complex<double>));
 
     cusolverDnCreate(&solver_handle_);
     cublasCreate(&cublas_handle_);
@@ -212,9 +217,15 @@ public:
     grid_x = std::min((m_ + block_2d_.x - 1) / block_2d_.x, max_grid_dim);
     grid_y = std::min((m_ + block_2d_.y - 1) / block_2d_.y, max_grid_dim);
     grid_QDQ_ = dim3(grid_x, grid_y);
+
+    cudaMalloc(&e1_, m_ * sizeof(thrust::complex<double>));
+    cudaMemset(e1_, 0, m_ * sizeof(thrust::complex<double>));
+    thrust::complex<double> one_val(1.0, 0.0);
+    cudaMemcpy(e1_, &one_val, sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
   }
 
   ~MatrixFunctionApplicatorComplex() {
+    cudaFree(e1_);
     cudaFree(d_row_ptr_);
     cudaFree(d_col_ind_);
     cudaFree(d_values_);
@@ -231,6 +242,7 @@ public:
     cudaFree(d_work_);
     cudaFree(d_work_large_);
     cudaFree(d_solver_work_);
+    cudaFree(temp_work_);
     cudaFree(d_info_);
     cusolverDnDestroy(solver_handle_);
     cublasDestroy(cublas_handle_);
@@ -249,10 +261,42 @@ public:
     compute_eigen_decomposition();
     const uint32_t max_grid_dim = 65535;
 
+    thrust::device_ptr<thrust::complex<double>> d_diag_ptr(d_diag_);
+    thrust::device_ptr<double> d_eigvals_ptr(d_eigenvalues_);
+    thrust::complex<double> thrust_dt(dt.real(), dt.imag());
     if (func == "exp")
-        transform_eigenvals_exp<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_, dt, m_);
+	// thrust::device_ptr<thrust::complex<double>> density_ptr(d_density);
+  	// thrust::device_ptr<const thrust::complex<double>> u_ptr(d_u);
+  	// thrust::device_ptr<const double> m_ptr(d_m);
+
+  	// thrust::transform(u_ptr, u_ptr + n, m_ptr, density_ptr,
+  	//                  [] __device__ (const thrust::complex<double>& u, const double m) {
+  	//                      return m * (u.real() * u.real() + u.imag() * u.imag());
+  	//                  });
+	//
+	//  out[i] = thrust::exp(dt * eigvals[i]);
+
+	thrust::transform(thrust::make_counting_iterator<uint32_t>(0),
+                 thrust::make_counting_iterator<uint32_t>(m_),
+                 d_diag_ptr,
+                 [=] __device__ (const uint32_t idx) {
+		   double eigval = d_eigvals_ptr[idx]; 
+                   return exp(thrust_dt * eigval);
+                 });
+
+        // transform_eigenvals_exp<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_, dt, m_);
     else if (func == "sinc")
-        transform_eigenvals_sinc<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_, dt, m_);
+        // transform_eigenvals_sinc<<<grid_1d_, block_1d_>>>(d_diag_, d_eigenvalues_, dt, m_);
+	
+	thrust::transform(thrust::make_counting_iterator<uint32_t>(0),
+                 	thrust::make_counting_iterator<uint32_t>(m_),
+                        d_diag_ptr,
+			[=] __device__ (const uint32_t idx) {
+			  double eigval = d_eigvals_ptr[idx];
+			  const auto val = thrust_dt * eigval;
+			  return abs(val) < 1e-8? thrust::complex<double>(1., 0.) : sin(val) / val; 
+			});
+                 
     else
         throw std::runtime_error("Matrix function application not implemented");
     
@@ -261,8 +305,8 @@ public:
     dim3 gridDim((m_ + blockDim.x - 1) / blockDim.x);
     set_diagonal<<<gridDim, blockDim>>>(d_work_, d_diag_, m_); 
    
-    thrust::complex<double> *temp_work;
-    cudaMalloc(&temp_work, m_ * m_ * sizeof(thrust::complex<double>));
+    // thrust::complex<double> *temp_work;
+    // cudaMalloc(&temp_work, m_ * m_ * sizeof(thrust::complex<double>));
     
     const cuDoubleComplex alpha = make_cuDoubleComplex(1.0, 0.0);
     const cuDoubleComplex beta_cublas = make_cuDoubleComplex(0.0, 0.0);
@@ -274,22 +318,22 @@ public:
                 reinterpret_cast<const cuDoubleComplex*>(d_eigenvectors_), m_,
                 reinterpret_cast<const cuDoubleComplex*>(d_work_), m_,
                 &beta_cublas,
-                reinterpret_cast<cuDoubleComplex*>(temp_work), m_);
+                reinterpret_cast<cuDoubleComplex*>(temp_work_), m_);
     
     // (Q f(D)) Q^H
     cublasZgemm(cublas_handle_, CUBLAS_OP_N, CUBLAS_OP_C,
                 m_, m_, m_,
                 &alpha,
-                reinterpret_cast<const cuDoubleComplex*>(temp_work), m_,
+                reinterpret_cast<const cuDoubleComplex*>(temp_work_), m_,
                 reinterpret_cast<const cuDoubleComplex*>(d_eigenvectors_), m_,
                 &beta_cublas,
                 reinterpret_cast<cuDoubleComplex*>(d_work_), m_);
     
-    thrust::complex<double> *e1;
-    cudaMalloc(&e1, m_ * sizeof(thrust::complex<double>));
-    cudaMemset(e1, 0, m_ * sizeof(thrust::complex<double>));
+    thrust::complex<double> *e1_;
+    cudaMalloc(&e1_, m_ * sizeof(thrust::complex<double>));
+    cudaMemset(e1_, 0, m_ * sizeof(thrust::complex<double>));
     thrust::complex<double> one_val(1.0, 0.0);
-    cudaMemcpy(e1, &one_val, sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
+    cudaMemcpy(e1_, &one_val, sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
     
     thrust::complex<double> *temp_vec;
     cudaMalloc(&temp_vec, m_ * sizeof(thrust::complex<double>));
@@ -300,7 +344,7 @@ public:
                 m_, m_,
                 &alpha,
                 reinterpret_cast<const cuDoubleComplex*>(d_work_), m_,
-                reinterpret_cast<const cuDoubleComplex*>(e1), 1,
+                reinterpret_cast<const cuDoubleComplex*>(e1_), 1,
                 &beta_cublas,
                 reinterpret_cast<cuDoubleComplex*>(temp_vec), 1);
     
@@ -323,10 +367,8 @@ public:
     cudaMemcpy(result, d_work_large_, n_ * sizeof(thrust::complex<double>),
                cudaMemcpyDeviceToDevice);
                
-    cudaFree(e1);
+    
     cudaFree(temp_vec);
-    cudaFree(temp_work);
-
   }
 
 
@@ -370,6 +412,8 @@ private:
   thrust::complex<double> *d_work_;
   thrust::complex<double> *d_work_large_;
   thrust::complex<double> *d_solver_work_;
+  thrust::complex<double> *temp_work_;
+  thrust::complex<double> *e1_;
   int *d_info_;
   int solver_work_size_;
   uint32_t n_;

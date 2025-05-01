@@ -2,7 +2,6 @@
 #include "matfunc_complex.hpp"
 #include "spmv.hpp"
 
-
 #include "laplacians.hpp"
 #include "util.hpp"
 
@@ -79,7 +78,7 @@ int main(int argc, char **argv) {
         create_centered_gaussian_3d<double>(grid, gaussian_width);
     Eigen::VectorXcd u0_complex = u0_real.cast<std::complex<double>>();
 
-    std::vector<int> krylov_dims = {10, 20, 30, 40, 50};
+    std::vector<uint32_t> krylov_dims = {10, 20, 30, 40, 50};
     std::complex<double> complex_dt(0.0, t);
     thrust::complex<double> thrust_dt{complex_dt.real(), complex_dt.imag()};
 
@@ -97,7 +96,10 @@ int main(int argc, char **argv) {
    
 
     uint32_t n = grid.total_size;
-    auto u_thrust = static_cast<thrust::complex<double> * >(u0_complex.data());
+
+    std::complex<double>* std_ptr = u0_complex.data();
+    auto u_thrust = reinterpret_cast<thrust::complex<double>*>(std_ptr);
+
     thrust::complex<double> * d_u, * d_result;
     cudaMalloc(&d_u, n * sizeof(thrust::complex<double>));
     cudaMalloc(&d_result, n * sizeof(thrust::complex<double>));
@@ -105,7 +107,7 @@ int main(int argc, char **argv) {
 
     Eigen::VectorX<std::complex<double>> result_dev(n);
 
-    for (int m : krylov_dims) {
+    for (const auto & m : krylov_dims) {
       // Eigen::VectorXd y_host_real =
       //     expm_multiply(L_op_real, u0_real, t, m);
       // Eigen::VectorXcd y_host_complex =
@@ -119,9 +121,15 @@ int main(int argc, char **argv) {
       // Then finally: Write test comparing 5-10 steps of KGE / NLSE 
       // Gautschi versus traditional integrator (should be quick once Krylov solver verified)
 
-      MatrixFunctionApplicatorComplex matfunc_applicator_complex(L_op_complex, grid.total_size, m, L_op_complex.nonZeros());
+      MatrixFunctionApplicatorComplex * matfunc_applicator_complex; 
+      matfunc_applicator_complex = new MatrixFunctionApplicatorComplex(
+		      L_op_complex,
+		      grid.total_size,
+		      m,
+		      L_op_complex.nonZeros());
+      std::cout << "Instantiated cuda matfunc applicator for m=" << m << "\n";
  
-      matfunc_applicator_complex.apply(d_result, d_u, thrust_dt, "exp");
+      matfunc_applicator_complex->apply(d_result, d_u, thrust_dt, "exp");
       cudaDeviceSynchronize();
 
       cudaMemcpy(result_dev.data(), d_result, n  * sizeof(thrust::complex<double>), cudaMemcpyDeviceToHost);
@@ -130,14 +138,14 @@ int main(int argc, char **argv) {
       thrust::device_ptr<thrust::complex<double>> d_ptr = thrust::device_pointer_cast(d_result); // wrap raw ptr
       thrust::transform(
           thrust::counting_iterator<size_t>(0),
-          thrust::counting_iterator<size_t>(N),
+          thrust::counting_iterator<size_t>(n),
           d_ptr,
-          [] __device__ () -> thrust::complex<double> {
+          [] __device__ (uint32_t idx /* needed for cub API */) -> thrust::complex<double> {
               return thrust::complex<double>(0.0, -1.0); // set to some weird val on purpose
           }
       );
 
- 
+      delete matfunc_applicator_complex;  
       save_to_npy(+ "_y_device_complex_m" + std::to_string(m) +
                           ".npy",  result_dev, {(uint32_t)grid.total_size});
     }

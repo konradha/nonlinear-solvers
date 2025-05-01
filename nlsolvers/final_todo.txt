@@ -7,6 +7,7 @@
   -> dimension as arg
   -> specs as args: L, n
   -> method 1: SV and SS2
+  -> method 2: Gautschi and sEWI
   -> host / device
 
 thus:

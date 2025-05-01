@@ -77,8 +77,9 @@ public:
 
   NLSESolverDevice(const Eigen::SparseMatrix<std::complex<double>> &L,
                    const std::complex<double> *host_u0, const double *host_m,
+		   /* const bool & is_3d, */
                    const Parameters &params = Parameters())
-      : n_(L.rows()), current_snapshot_(0), params_(params) {
+      : /* is_3d_(is_3d), */ n_(L.rows()), current_snapshot_(0), params_(params) {
 
 #if DEBUG
     size_t free_mem_start, total_mem;
