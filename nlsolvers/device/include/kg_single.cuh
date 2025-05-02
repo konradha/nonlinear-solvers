@@ -58,17 +58,35 @@ void step(double *d_v, double *d_u, double *d_u_past, double *d_buf,
           double *d_buf2, double *d_buf3, MatrixFunctionApplicatorReal *matfunc,
           const double *d_m, const double tau, const uint32_t n,
           const dim3 grid, const dim3 block) {
-  cudaMemcpy(d_buf, d_u, n * sizeof(double), cudaMemcpyDeviceToDevice);
+  // cudaMemcpy(d_buf, d_u, n * sizeof(double), cudaMemcpyDeviceToDevice);
+  // matfunc->apply(d_buf2, d_u, tau,
+  //                MatrixFunctionApplicatorReal::FunctionType::ID_SQRT);
+  // neg_kernel<<<grid, block>>>(d_buf2, d_buf2, d_m, n);
+  // matfunc->apply(d_buf3, d_buf2, tau,
+  //                MatrixFunctionApplicatorReal::FunctionType::SINC2_SQRT);
+  // matfunc->apply(d_buf2, d_u, tau,
+  //                MatrixFunctionApplicatorReal::FunctionType::COS_SQRT);
+  gautschi_kernel<<<grid, block>>>(d_u, d_u, d_u_past, d_buf2, d_buf3, tau, n);
+  cudaMemcpy(d_u_past, d_buf, n * sizeof(double), cudaMemcpyDeviceToDevice);
+  velocity_kernel<<<grid, block>>>(d_v, d_u, d_u_past, tau, n);
+
+  thrust::device_ptr<double> d_u_ptr(d_u);
+  thrust::device_ptr<double> d_buf_ptr(d_buf);
+  thrust::copy(d_u_ptr, d_u_ptr + n, d_buf_ptr);
   matfunc->apply(d_buf2, d_u, tau,
                  MatrixFunctionApplicatorReal::FunctionType::ID_SQRT);
-  neg_kernel<<<grid, block>>>(d_buf2, d_buf2, d_m, n);
+  thrust::device_ptr<const double> d_m_ptr(d_m);
+  thrust::device_ptr<double> d_buf2_ptr(d_buf2);
+  thrust::transform(d_u_ptr, d_u_ptr + n, d_m_ptr, d_buf2_ptr,
+                     [] __device__ (double u_val, double m_val) {
+                         return -m_val * u_val * u_val * u_val;
+                     });
   matfunc->apply(d_buf3, d_buf2, tau,
                  MatrixFunctionApplicatorReal::FunctionType::SINC2_SQRT);
   matfunc->apply(d_buf2, d_u, tau,
                  MatrixFunctionApplicatorReal::FunctionType::COS_SQRT);
-  gautschi_kernel<<<grid, block>>>(d_u, d_u, d_u_past, d_buf2, d_buf3, tau, n);
-  cudaMemcpy(d_u_past, d_buf, n * sizeof(double), cudaMemcpyDeviceToDevice);
-  velocity_kernel<<<grid, block>>>(d_v, d_u, d_u_past, tau, n);
+  // INCOMPLETE: TODO
+
 }
 
 void step_sv(double *d_v, double *d_u, double *d_u_past, double *d_buf,
