@@ -122,7 +122,7 @@ class GlobalAnalyzer:
             elif self.system_type == "hyperbolic_sine_gordon":
                 potential = np.sum(np.cosh(u) - 1, axis=(1, 2)) * dx * dy
             elif self.system_type == "klein_gordon":
-                potential = np.sum(.5 * u ** 2, axis=(1, 2)) * dx * dy
+                potential = np.sum(.5 * u ** 4, axis=(1, 2)) * dx * dy
             elif self.system_type == "phi4":
                 potential = np.sum((u**2 - 1)**2 / 4, axis=(1, 2)) * dx * dy
             else:
@@ -312,7 +312,7 @@ class GlobalAnalyzer:
 
         ax.set_title("Norm Conservation ($L^2$ ratio)")
         ax.set_xlabel("T / [1]")
-        ax.set_ylabel("$||u||^2 / ||u_0 ||^2$")
+        ax.set_ylabel("$||u||^4 / ||u_0 ||^2$")
         ax.grid(True)
         ax.legend(loc='best')
 

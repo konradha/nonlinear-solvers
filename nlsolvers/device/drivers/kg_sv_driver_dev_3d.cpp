@@ -140,10 +140,11 @@ int main(int argc, char **argv) {
              cudaMemcpyHostToDevice);
   cudaMemcpy(d_values, L.valuePtr(), L.nonZeros() * sizeof(double),
              cudaMemcpyHostToDevice);
+  bool is_3d = true;
   device::KGESolverDevice::Parameters params(num_snapshots, freq, 10);
   device::KGESolverDevice solver(d_row_ptr, d_col_ind, d_values, m.data(),
                                  nx * ny * nz, L.nonZeros(), u0.data(),
-                                 v0.data(), dt, params);
+                                 v0.data(), dt, is_3d, params);
 
   for (uint32_t i = 1; i < nt; ++i) {
     solver.step_sv();

@@ -77,9 +77,9 @@ public:
 
   NLSESolverDevice(const Eigen::SparseMatrix<std::complex<double>> &L,
                    const std::complex<double> *host_u0, const double *host_m,
-		   /* const bool & is_3d, */
+		   const bool & is_3d,
                    const Parameters &params = Parameters())
-      : /* is_3d_(is_3d), */ n_(L.rows()), current_snapshot_(0), params_(params) {
+      : is_3d_(is_3d), n_(L.rows()), current_snapshot_(0), params_(params) {
 
 #if DEBUG
     size_t free_mem_start, total_mem;
@@ -130,11 +130,13 @@ public:
     matfunc_ = new MatrixFunctionApplicatorComplex(L, n_, params_.krylov_dim,
                                                    L.nonZeros());
 
-    nx_ = ny_ = sqrt(n_);
-    if (nx_ * ny_ != n_) {
+    if (is_3d_) {
       is_3d_ = true;
       nx_ = ny_ = nz_ = std::cbrt(n_);
       assert(nx_ * ny_ * nz_ == n_);
+    } else {
+      nx_ = ny_ = std::sqrt(n_);
+      assert(nx_ * ny_  == n_);
     }
 
     // TODO check dims here

@@ -28,12 +28,14 @@ public:
   KGESolverDevice(const int *d_row_ptr, const int *d_col_ind,
                   const double *d_values, const double *h_m, uint32_t n,
                   uint32_t nnz, const double *host_u0, const double *host_v0,
-                  double dt, const Parameters &params = Parameters())
-      : n_(n), current_snapshot_(0), params_(params), dt_(dt) {
+                  double dt, const bool is_3d, const Parameters &params = Parameters())
+      : is_3d_(is_3d), n_(n), current_snapshot_(0), params_(params), dt_(dt) {
 
-    nx_ = ny_ = std::sqrt(n);
-    if (nx_ * ny_ != n) {
-      is_3d_ = true;
+    if (!is_3d) {
+      nx_ = ny_ = std::sqrt(n);
+      assert(nx_ * ny_ == n);
+    } else { 
+      is_3d_ = true; // to make it explicit
       nx_ = ny_ = nz_ = std::cbrt(n);
       assert(nx_ * ny_ * nz_ == n);
     }

@@ -16,27 +16,27 @@
 
 #define DEBUG 0
 
-__global__ void transform_eigenvals_exp(thrust::complex<double> *out,
-                                        const double *eigvals,
-                                        thrust::complex<double> dt,
-                                        const uint32_t m) {
-  int i = threadIdx.x + blockIdx.x * blockDim.x;
-  if (i < m) {
-    out[i] = thrust::exp(dt * eigvals[i]);
-  }
-}
-
-__global__ void transform_eigenvals_sinc(thrust::complex<double> *out,
-                                         const double *eigvals,
-                                         thrust::complex<double> dt,
-                                         const uint32_t m) {
-  int i = threadIdx.x + blockIdx.x * blockDim.x;
-  if (i < m) {
-    const auto val = dt * eigvals[i];
-    out[i] = thrust::abs(val) < 1e-8 ? thrust::complex<double>(1.0, 0.0)
-                                     : thrust::sin(val) / val;
-  }
-}
+// __global__ void transform_eigenvals_exp(thrust::complex<double> *out,
+//                                         const double *eigvals,
+//                                         thrust::complex<double> dt,
+//                                         const uint32_t m) {
+//   int i = threadIdx.x + blockIdx.x * blockDim.x;
+//   if (i < m) {
+//     out[i] = thrust::exp(dt * eigvals[i]);
+//   }
+// }
+// 
+// __global__ void transform_eigenvals_sinc(thrust::complex<double> *out,
+//                                          const double *eigvals,
+//                                          thrust::complex<double> dt,
+//                                          const uint32_t m) {
+//   int i = threadIdx.x + blockIdx.x * blockDim.x;
+//   if (i < m) {
+//     const auto val = dt * eigvals[i];
+//     out[i] = thrust::abs(val) < 1e-8 ? thrust::complex<double>(1.0, 0.0)
+//                                      : thrust::sin(val) / val;
+//   }
+// }
 
 __global__ void set_diagonal(thrust::complex<double>* matrix,
                                  const thrust::complex<double>* diag,
@@ -47,67 +47,67 @@ __global__ void set_diagonal(thrust::complex<double>* matrix,
     }
 }
 
-__global__ void matrix_multiply_QDQ(const thrust::complex<double> *Q,
-                                   const thrust::complex<double> *D,
-                                   thrust::complex<double> *result,
-                                   const uint32_t m,
-                                   const uint32_t max_grid_x,
-                                   const uint32_t max_grid_y) {
-   const uint32_t block_size_x = blockDim.x;
-   const uint32_t block_size_y = blockDim.y;
-
-   for (uint32_t grid_y = blockIdx.y; grid_y < (m + block_size_y - 1) / block_size_y; grid_y += max_grid_y) {
-       for (uint32_t grid_x = blockIdx.x; grid_x < (m + block_size_x - 1) / block_size_x; grid_x += max_grid_x) {
-           const uint32_t row = grid_y * block_size_y + threadIdx.y;
-           const uint32_t col = grid_x * block_size_x + threadIdx.x;
-
-           if (row < m && col < m) {
-               thrust::complex<double> sum = 0.0;
-#pragma unroll
-               for (uint32_t k = 0; k < m; k++) {
-                   sum += Q[k * m + row] * D[k] * Q[k * m + col];
-               }
-               result[col * m + row] = sum;
-           }
-       }
-   }
-}
-
-
-__global__ void matrix_multiply_VK(const thrust::complex<double> *V,
-                                   const thrust::complex<double> *K,
-                                   thrust::complex<double> *result,
-                                   const uint32_t n, const uint32_t m,
-                                   const uint32_t max_grid_x,
-                                   const uint32_t max_grid_y) {
-    const uint32_t block_size_x = blockDim.x;
-    const uint32_t block_size_y = blockDim.y;
-    
-    for (uint32_t grid_y = blockIdx.y; grid_y < (n + block_size_y - 1) / block_size_y; grid_y += max_grid_y) {
-        for (uint32_t grid_x = blockIdx.x; grid_x < (m + block_size_x - 1) / block_size_x; grid_x += max_grid_x) {
-            const uint32_t row = grid_y * block_size_y + threadIdx.y;
-            const uint32_t col = grid_x * block_size_x + threadIdx.x;
-            
-            if (row < n && col < m) {
-                thrust::complex<double> sum = 0.0;
-#pragma unroll
-                for (uint32_t k = 0; k < m; k++) {
-                    sum += V[k * n + row] * K[col * m + k];
-                }
-                result[col * n + row] = sum;
-            }
-        }
-    }
-}
-
-__global__ void scale_first_col(const thrust::complex<double> *X,
-                                thrust::complex<double> *result,
-                                const double beta, const uint32_t n) {
-  const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < n) {
-    result[idx] = beta * X[idx];
-  }
-}
+// __global__ void matrix_multiply_QDQ(const thrust::complex<double> *Q,
+//                                    const thrust::complex<double> *D,
+//                                    thrust::complex<double> *result,
+//                                    const uint32_t m,
+//                                    const uint32_t max_grid_x,
+//                                    const uint32_t max_grid_y) {
+//    const uint32_t block_size_x = blockDim.x;
+//    const uint32_t block_size_y = blockDim.y;
+// 
+//    for (uint32_t grid_y = blockIdx.y; grid_y < (m + block_size_y - 1) / block_size_y; grid_y += max_grid_y) {
+//        for (uint32_t grid_x = blockIdx.x; grid_x < (m + block_size_x - 1) / block_size_x; grid_x += max_grid_x) {
+//            const uint32_t row = grid_y * block_size_y + threadIdx.y;
+//            const uint32_t col = grid_x * block_size_x + threadIdx.x;
+// 
+//            if (row < m && col < m) {
+//                thrust::complex<double> sum = 0.0;
+// #pragma unroll
+//                for (uint32_t k = 0; k < m; k++) {
+//                    sum += Q[k * m + row] * D[k] * Q[k * m + col];
+//                }
+//                result[col * m + row] = sum;
+//            }
+//        }
+//    }
+// }
+// 
+// 
+// __global__ void matrix_multiply_VK(const thrust::complex<double> *V,
+//                                    const thrust::complex<double> *K,
+//                                    thrust::complex<double> *result,
+//                                    const uint32_t n, const uint32_t m,
+//                                    const uint32_t max_grid_x,
+//                                    const uint32_t max_grid_y) {
+//     const uint32_t block_size_x = blockDim.x;
+//     const uint32_t block_size_y = blockDim.y;
+//     
+//     for (uint32_t grid_y = blockIdx.y; grid_y < (n + block_size_y - 1) / block_size_y; grid_y += max_grid_y) {
+//         for (uint32_t grid_x = blockIdx.x; grid_x < (m + block_size_x - 1) / block_size_x; grid_x += max_grid_x) {
+//             const uint32_t row = grid_y * block_size_y + threadIdx.y;
+//             const uint32_t col = grid_x * block_size_x + threadIdx.x;
+//             
+//             if (row < n && col < m) {
+//                 thrust::complex<double> sum = 0.0;
+// #pragma unroll
+//                 for (uint32_t k = 0; k < m; k++) {
+//                     sum += V[k * n + row] * K[col * m + k];
+//                 }
+//                 result[col * n + row] = sum;
+//             }
+//         }
+//     }
+// }
+// 
+// __global__ void scale_first_col(const thrust::complex<double> *X,
+//                                 thrust::complex<double> *result,
+//                                 const double beta, const uint32_t n) {
+//   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+//   if (idx < n) {
+//     result[idx] = beta * X[idx];
+//   }
+// }
 
 class MatrixFunctionApplicatorComplex {
 public:
@@ -205,23 +205,24 @@ public:
     cudaMalloc(&d_solver_work_, lwork * sizeof(cuDoubleComplex));
     solver_work_size_ = lwork;
 
-    block_dim_1d_ = dim3(256);
-    uint32_t block_size_2d = (m <= 32) ? 16 : 8;
-    block_2d_ = dim3(block_size_2d, block_size_2d);
-    
-    const uint32_t max_grid_dim = 65535;
-    grid_1d_ = dim3(std::min((n_ + block_1d_.x - 1) / block_1d_.x, max_grid_dim));
-    uint32_t grid_x = std::min((m_ + block_2d_.x - 1) / block_2d_.x, max_grid_dim);
-    uint32_t grid_y = std::min((n_ + block_2d_.y - 1) / block_2d_.y, max_grid_dim);
-    grid_VK_ = dim3(grid_x, grid_y);
-    grid_x = std::min((m_ + block_2d_.x - 1) / block_2d_.x, max_grid_dim);
-    grid_y = std::min((m_ + block_2d_.y - 1) / block_2d_.y, max_grid_dim);
-    grid_QDQ_ = dim3(grid_x, grid_y);
+    // block_dim_1d_ = dim3(256);
+    // uint32_t block_size_2d = (m <= 32) ? 16 : 8;
+    // block_2d_ = dim3(block_size_2d, block_size_2d);
+    // 
+    // const uint32_t max_grid_dim = 65535;
+    // grid_1d_ = dim3(std::min((n_ + block_1d_.x - 1) / block_1d_.x, max_grid_dim));
+    // uint32_t grid_x = std::min((m_ + block_2d_.x - 1) / block_2d_.x, max_grid_dim);
+    // uint32_t grid_y = std::min((n_ + block_2d_.y - 1) / block_2d_.y, max_grid_dim);
+    // grid_VK_ = dim3(grid_x, grid_y);
+    // grid_x = std::min((m_ + block_2d_.x - 1) / block_2d_.x, max_grid_dim);
+    // grid_y = std::min((m_ + block_2d_.y - 1) / block_2d_.y, max_grid_dim);
+    // grid_QDQ_ = dim3(grid_x, grid_y);
 
     cudaMalloc(&e1_, m_ * sizeof(thrust::complex<double>));
     cudaMemset(e1_, 0, m_ * sizeof(thrust::complex<double>));
     thrust::complex<double> one_val(1.0, 0.0);
     cudaMemcpy(e1_, &one_val, sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
+    cudaMalloc(&temp_vec_, m_ * sizeof(thrust::complex<double>));
   }
 
   ~MatrixFunctionApplicatorComplex() {
@@ -243,6 +244,7 @@ public:
     cudaFree(d_work_large_);
     cudaFree(d_solver_work_);
     cudaFree(temp_work_);
+    cudaFree(temp_vec_);
     cudaFree(d_info_);
     cusolverDnDestroy(solver_handle_);
     cublasDestroy(cublas_handle_);
@@ -329,16 +331,17 @@ public:
                 &beta_cublas,
                 reinterpret_cast<cuDoubleComplex*>(d_work_), m_);
     
-    thrust::complex<double> *e1_;
-    cudaMalloc(&e1_, m_ * sizeof(thrust::complex<double>));
-    cudaMemset(e1_, 0, m_ * sizeof(thrust::complex<double>));
-    thrust::complex<double> one_val(1.0, 0.0);
-    cudaMemcpy(e1_, &one_val, sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
+    // thrust::complex<double> *e1_;
+    // cudaMalloc(&e1_, m_ * sizeof(thrust::complex<double>));
+    // cudaMemset(e1_, 0, m_ * sizeof(thrust::complex<double>));
+    // thrust::complex<double> one_val(1.0, 0.0);
+    // cudaMemcpy(e1_, &one_val, sizeof(thrust::complex<double>), cudaMemcpyHostToDevice);
     
-    thrust::complex<double> *temp_vec;
-    cudaMalloc(&temp_vec, m_ * sizeof(thrust::complex<double>));
+    // thrust::complex<double> *temp_vec;
+    // cudaMalloc(&temp_vec, m_ * sizeof(thrust::complex<double>));
     
 
+    cudaMemset(temp_vec_, 0, m_ * sizeof(thrust::complex<double>));
     // f(T) e_1 = (Q f(D)) Q^H e_1
     cublasZgemv(cublas_handle_, CUBLAS_OP_N, 
                 m_, m_,
@@ -346,14 +349,14 @@ public:
                 reinterpret_cast<const cuDoubleComplex*>(d_work_), m_,
                 reinterpret_cast<const cuDoubleComplex*>(e1_), 1,
                 &beta_cublas,
-                reinterpret_cast<cuDoubleComplex*>(temp_vec), 1);
+                reinterpret_cast<cuDoubleComplex*>(temp_vec_), 1);
     
     // V f(T) e_1
     cublasZgemv(cublas_handle_, CUBLAS_OP_N,
                 n_, m_,
                 &alpha,
                 reinterpret_cast<const cuDoubleComplex*>(krylov_.V), n_,
-                reinterpret_cast<const cuDoubleComplex*>(temp_vec), 1,
+                reinterpret_cast<const cuDoubleComplex*>(temp_vec_), 1,
                 &beta_cublas,
                 reinterpret_cast<cuDoubleComplex*>(d_work_large_), 1);
     
@@ -368,7 +371,7 @@ public:
                cudaMemcpyDeviceToDevice);
                
     
-    cudaFree(temp_vec);
+    // cudaFree(temp_vec);
   }
 
 
@@ -413,6 +416,7 @@ private:
   thrust::complex<double> *d_work_large_;
   thrust::complex<double> *d_solver_work_;
   thrust::complex<double> *temp_work_;
+  thrust::complex<double> *temp_vec_;
   thrust::complex<double> *e1_;
   int *d_info_;
   int solver_work_size_;
@@ -420,14 +424,14 @@ private:
   uint32_t m_;
   Parameters params_;
 
-  dim3 block_dim_1d_;
-  dim3 block_2d_;
+  // dim3 block_dim_1d_;
+  // dim3 block_2d_;
 
-  dim3 grid_VK_;
-  dim3 grid_QDQ_;
+  // dim3 grid_VK_;
+  // dim3 grid_QDQ_;
 
-  dim3 block_1d_;
-  dim3 grid_1d_;
+  // dim3 block_1d_;
+  // dim3 grid_1d_;
 
 
   uint64_t total_allocated_;

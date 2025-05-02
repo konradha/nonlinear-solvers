@@ -145,46 +145,46 @@ def get_parameter_spaces():
 def get_parameter_spaces_3d():
     parameter_spaces = {}
 
-    # parameter_spaces["multi_soliton_state"] = {
-    #     "system_type": ["cubic"],
-    #     "amplitude_range": [(0.5, 1.0), (0.8, 1.2), (1.0, 1.5), (1.5, 2.0)],
-    #     "width_range": [(0.5, 1.0), (0.8, 1.2), (1.0, 1.5), (1.5, 2.0)],
-    #     "position_variance": [0.5, 1.0, 1.5, 2.0],
-    #     "velocity_scale": [0.0, 0.2, 0.5, 1.0, 1.5],
-    #     "phase_pattern": ["random",
-    #         "alternating", "synchronized", "vortex", "3d_vortex",
-    #         "radial", "spiral", "z_dependent", "partial_coherence"],
-    #     "arrangement": ["linear", "planar_grid", "circular",
-    #         "spherical", "random", "lattice", "hierarchical"],
-    #     "separation": [3.0, 5.0, 7.0, 10.0],
-    #     "apply_envelope": [False],
-    #     "envelope_width": [0.5, 0.7, 0.9],
-    #     "Lambda_range": [(0.02, 0.08), (0.04, 0.14), (0.1, 0.2)],
-    #     "coherence": [0.2, 0.5, 0.8, 1.0],
-    #     "interaction_strength": [0.3, 0.5, 0.7, 1.0],
-    #     "cluster_levels": [1, 2, 3, 4],
-    #     "order_range": [(1, 2), (1, 3), (2, 3)],
-    #     "chirp_range": [(-0.2, -0.1), (-0.1, 0.1), (0.0, 0.1), (0.1, 0.2)],
-    #     "aspect_ratio_x_range": [(1.0, 1.0), (1.0, 1.5), (1.5, 2.0)],
-    #     "aspect_ratio_y_range": [(1.0, 1.0), (1.0, 1.5), (1.5, 2.0)],
-    #     "phase_value": [0.0, np.pi / 4, np.pi / 2, np.pi, 3 * np.pi / 2]
-    # }
-
     parameter_spaces["multi_soliton_state"] = {
         "system_type": ["cubic"],
-        "amplitude_range": [(0.5, 0.8)],
-        "width_range": [(1.5, 2.5)],    
-        "arrangement": ["planar_grid", "linear", "random"],
-        "position_variance": [0.5], 
-        "separation": [7.0, 10.0],
-        "velocity_scale": [0.0],
-        "phase_pattern": ["synchronized", "random"],
-        "phase_value": [0.0],
-        "order_range": [(1, 2)],
-        "chirp_range": [(0.0, 0.0)],
-        "aspect_ratio_x_range": [(1.0, 1.0)],
-        "aspect_ratio_y_range": [(1.0, 1.0)]
+        "amplitude_range": [(0.5, 1.0), (0.8, 1.2), (1.0, 1.5), (1.5, 2.0)],
+        "width_range": [(0.5, 1.0), (0.8, 1.2), (1.0, 1.5), (1.5, 2.0)],
+        "position_variance": [0.5, 1.0, 1.5, 2.0],
+        "velocity_scale": [0.0, 0.2, 0.5, 1.0, 1.5],
+        "phase_pattern": ["random",
+            "alternating", "synchronized", "vortex", "3d_vortex",
+            "radial", "spiral", "z_dependent", "partial_coherence"],
+        "arrangement": ["linear", "planar_grid", "circular",
+            "spherical", "random", "lattice", "hierarchical"],
+        "separation": [3.0, 5.0, 7.0, 10.0],
+        "apply_envelope": [False],
+        "envelope_width": [0.5, 0.7, 0.9],
+        "Lambda_range": [(0.02, 0.08), (0.04, 0.14), (0.1, 0.2)],
+        "coherence": [0.2, 0.5, 0.8, 1.0],
+        "interaction_strength": [0.3, 0.5, 0.7, 1.0],
+        "cluster_levels": [1, 2, 3, 4],
+        "order_range": [(1, 2), (1, 3), (2, 3)],
+        "chirp_range": [(-0.2, -0.1), (-0.1, 0.1), (0.0, 0.1), (0.1, 0.2)],
+        "aspect_ratio_x_range": [(1.0, 1.0), (1.0, 1.5), (1.5, 2.0)],
+        "aspect_ratio_y_range": [(1.0, 1.0), (1.0, 1.5), (1.5, 2.0)],
+        "phase_value": [0.0, np.pi / 4, np.pi / 2, np.pi, 3 * np.pi / 2]
     }
+
+    # parameter_spaces["multi_soliton_state"] = {
+    #     "system_type": ["cubic"],
+    #     "amplitude_range": [(0.5, 0.8)],
+    #     "width_range": [(1.5, 2.5)],    
+    #     "arrangement": ["planar_grid", "linear", "random"],
+    #     "position_variance": [0.5], 
+    #     "separation": [7.0, 10.0],
+    #     "velocity_scale": [0.0],
+    #     "phase_pattern": ["synchronized", "random"],
+    #     "phase_value": [0.0],
+    #     "order_range": [(1, 2)],
+    #     "chirp_range": [(0.0, 0.0)],
+    #     "aspect_ratio_x_range": [(1.0, 1.0)],
+    #     "aspect_ratio_y_range": [(1.0, 1.0)]
+    # }
 
 
 

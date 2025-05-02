@@ -50,6 +50,9 @@ class NLSELauncher:
         self.focusing_dir = self.output_dir / "focusing"
         self.focusing_dir.mkdir(exist_ok=True)
 
+        self.anisotropy_dir = self.output_dir / "anisotropy"
+        self.anisotropy_dir.mkdir(exist_ok=True)
+
         self.analysis_dir = self.output_dir / "analysis"
         self.analysis_dir.mkdir(exist_ok=True)
 
@@ -165,12 +168,19 @@ class NLSELauncher:
 
         return m.astype(np.float64) # safety first
 
-    def run_simulation(self, run_idx, u0, m):
+    def generate_anisotropy(self, run_idx):
+        c = np.ones((self.args.nx, self.args.ny), dtype=np.float64)
+        return c
+
+    def run_simulation(self, run_idx, u0, m, c):
         ic_file = self.ic_dir / f"ic_{self.run_id}_{run_idx:04d}.npy"
         np.save(ic_file, u0)
 
         m_file = self.focusing_dir / f"m_{self.run_id}_{run_idx:04d}.npy"
         np.save(m_file, m)
+
+        c_file = self.anisotropy_dir / f"c_{self.run_id}_{run_idx:04d}.npy"
+        np.save(c_file, m)
 
         traj_file = self.traj_dir / f"traj_{self.run_id}_{run_idx:04d}.npy"
 
@@ -189,7 +199,8 @@ class NLSELauncher:
             str(self.args.T),
             str(self.args.nt),
             str(self.args.snapshots),
-            str(m_file)
+            str(m_file),
+            str(c_file)
         ]
 
         start_time = time.time()
@@ -225,7 +236,7 @@ class NLSELauncher:
             raise ValueError(
                 f"Unknown downsampling strategy: {self.args.dr_strategy}")
 
-    def save_to_hdf5(self, run_idx, u0, m, traj_data,
+    def save_to_hdf5(self, run_idx, u0, m, c, traj_data,
                      phenomenon_params, elapsed_time):
         h5_file = self.h5_dir / f"run_{self.run_id}_{run_idx:04d}.h5"
         with h5py.File(h5_file, 'w') as f:
@@ -265,7 +276,7 @@ class NLSELauncher:
                 m_grp.attrs['std'] = self.args.m_std
                 m_grp.attrs['scale'] = self.args.m_scale
             m_grp.create_dataset('m', data=m)
-
+            f.create_dataset('c', data=c)
             f.create_dataset('u', data=traj_data)
             f.create_dataset('X', data=self.X)
             f.create_dataset('Y', data=self.Y)
@@ -330,10 +341,11 @@ class NLSELauncher:
                 u0, phenomenon_params = self.generate_initial_condition(i)
                 print(f"Run {i+1}/{self.args.num_runs}", phenomenon_params)
                 m = self.generate_spatial_amplification(i)
-                traj_data, walltime = self.run_simulation(i, u0, m)
+                c = self.generate_anisotropy(i)
+                traj_data, walltime = self.run_simulation(i, u0, m, c)
                 traj_data = self.downsample_trajectory(traj_data)
                 self.save_to_hdf5(
-                    i, u0, m, traj_data, phenomenon_params, walltime)
+                    i, u0, m, c, traj_data, phenomenon_params, walltime)
 
                 if self.args.visualize:
                     self.create_visualization(
@@ -385,6 +397,7 @@ def parse_args():
                         help="Relative box length for periodic boxes (fraction of L)")
     parser.add_argument("--m_wall_dist", type=float, default=0.1,
                         help="Wall distance for periodic boxes (fraction of L)")
+    parser.add_argument("--anisotropy", type=str, default="one", choices=["one"])
 
     parser.add_argument("--nx", type=int, default=128, help="Grid points in x")
     parser.add_argument("--ny", type=int, default=128, help="Grid points in y")

@@ -19,22 +19,24 @@ module load ffmpeg
 # (> 2GB) which is not even taking the various work data that
 # need to be allocated into account ...
 
-n=121
+n=85
 nt=1000
-dr=100
+dr=64
+exe=build/bin/nlse_3d_dev
 
 # non-constant: i u_t + \Delta u + |u|²u = 0
 for p in multi_soliton_state skyrmion_tube; do
         python scripts_nlse/launcher_3d.py \
-                --exe build/bin/nlse_sewi_3d_dev \
+                --exe ${exe} \
                 --nx $n --ny $n --nz $n \
                 --dr-x ${dr} --dr-y ${dr} --dr-z ${dr} \
                 --Lx 3. --Ly 3. --Lz 3. \
-                --T .1 --nt ${nt} --snapshots 100 \
+                --T 1. --nt ${nt} --snapshots 100 \
                 --num-runs 8 \
 		--phenomenon ${p} \
+		--visualize --delete-intermediates \
                 --seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID)) \
-                --output-dir /cluster/scratch/konradha/nlse_${p}_constant_refactored
+                --output-dir /cluster/scratch/konradha/nlse_3d_test
 done
 
 # for p in multi_soliton_state skyrmion_tube; do

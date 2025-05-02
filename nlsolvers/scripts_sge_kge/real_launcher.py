@@ -29,6 +29,7 @@ from valid_spaces import get_parameter_spaces
 from classify_trajectory import batch_process_solutions
 from global_analysis import analyze_all_runs
 
+sys.stdout.reconfigure(line_buffering=True)
 
 class Launcher:
     def __init__(self, args):
@@ -56,6 +57,10 @@ class Launcher:
 
         self.analysis_dir = self.output_dir / "analysis"
         self.analysis_dir.mkdir(exist_ok=True)
+
+        self.anisotropy_dir = self.output_dir / "anisotropy"
+        self.anisotropy_dir.mkdir(exist_ok=True)
+
 
         self.h5_dir = self.output_dir / "hdf5"
         self.h5_dir.mkdir(exist_ok=True)
@@ -165,7 +170,12 @@ class Launcher:
 
         return m.astype(np.float64)  # safety first
 
-    def run_simulation(self, run_idx, u0, v0, m):
+    def generate_anisotropy(self, run_idx):
+        c = np.ones((self.args.nx, self.args.ny,), dtype=np.float64)
+        return c
+
+
+    def run_simulation(self, run_idx, u0, v0, m, c):
         u0_file = self.ic_dir / f"u0_{self.run_id}_{run_idx:04d}.npy"
         np.save(u0_file, u0)
 
@@ -174,6 +184,9 @@ class Launcher:
 
         m_file = self.focusing_dir / f"m_{self.run_id}_{run_idx:04d}.npy"
         np.save(m_file, m)
+
+        c_file = self.anisotropy_dir / f"c_{self.run_id}_{run_idx:04d}.npy" 
+        np.save(c_file, c)
 
         traj_file = self.traj_dir / f"traj_{self.run_id}_{run_idx:04d}.npy"
         vel_file = self.traj_dir / f"vel_{self.run_id}_{run_idx:04d}.npy"
@@ -195,7 +208,8 @@ class Launcher:
             str(self.args.T),
             str(self.args.nt),
             str(self.args.snapshots),
-            str(m_file)
+            str(m_file),
+            str(c_file)
         ]
 
         start_time = time.time()
@@ -235,7 +249,7 @@ class Launcher:
             raise ValueError(
                 f"Unknown downsampling strategy: {self.args.dr_strategy}")
 
-    def save_to_hdf5(self, run_idx, u0, v0, m, traj_data, vel_data,
+    def save_to_hdf5(self, run_idx, u0, v0, m, c, traj_data, vel_data,
                      phenomenon_params, elapsed_time):
         h5_file = self.h5_dir / f"run_{self.run_id}_{run_idx:04d}.h5"
         with h5py.File(h5_file, 'w') as f:
@@ -276,6 +290,7 @@ class Launcher:
                 m_grp.attrs['std'] = self.args.m_std
                 m_grp.attrs['scale'] = self.args.m_scale
             m_grp.create_dataset('m', data=m)
+            m_grp.create_dataset('c', data=c)
             f.create_dataset('u', data=traj_data)
             f.create_dataset('v', data=vel_data)
             f.create_dataset('X', data=self.X)
@@ -361,8 +376,10 @@ class Launcher:
                 pre_start = time.time()
                 (u0, v0), phenomenon_params = self.generate_initial_condition(i)
                 m = self.generate_spatial_amplification(i)
+                c = self.generate_anisotropy(i)
                 pre_end = time.time()
-                (traj_data, vel_data), walltime = self.run_simulation(i, u0, v0, m)
+
+                (traj_data, vel_data), walltime = self.run_simulation(i, u0, v0, m, c)
                 post_start = time.time()
 
                 # animate using high-res data
@@ -374,7 +391,7 @@ class Launcher:
                 sols[f"{self.run_id}_{i}"] = (traj_data, vel_data)
                 # save downsampled (u, v) trajectory only to perform analysis
                 self.save_to_hdf5(
-                    i, u0, v0, m, traj_data, vel_data,
+                    i, u0, v0, m, c, traj_data, vel_data,
                     phenomenon_params, walltime)
                 if self.args.delete_intermediates:
                     self.cleanup(i)
@@ -432,6 +449,8 @@ def parse_args():
     parser.add_argument("--velocity-type", type=str, default="zero",
                         choices=["zero", "fitting", "random"])
 
+    parser.add_argument("--anisotropy-type", type=str, default="one", choices=["one"])
+
     parser.add_argument("--m_type", type=str, default="constant",
                         choices=["constant", "periodic_boxes", "periodic_gaussians",
                                  "grf", "wavelet_grf"],
@@ -459,12 +478,12 @@ def parse_args():
     parser.add_argument(
         "--Lx",
         type=float,
-        default=10.0,
+        default=3.0,
         help="Domain half-width in x")
     parser.add_argument(
         "--Ly",
         type=float,
-        default=10.0,
+        default=3.0,
         help="Domain half-width in y")
     parser.add_argument("--T", type=float, default=1.5, help="Simulation time")
     parser.add_argument(
@@ -508,6 +527,7 @@ def parse_args():
 
     parser.add_argument("--parameter-sweep", action="store_true",
                         help="Perform a parameter sweep across phenomenon parameters")
+
 
     args = parser.parse_args()
 
