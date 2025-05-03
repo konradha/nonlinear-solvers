@@ -45,10 +45,10 @@ public:
 
     // part to make this work "nicely"
     const double kBT = 2.; // let's see if this works
-    const double alpha = .75;  // coupling strength
+    const double alpha = .01;  // coupling strength
     const double dx = 2 * L_ / (nx_ - 1);  
     //  α sqrt(k_B T dx)
-    scaling_factor_ = alpha * sqrt(2. * kBT * dx) / dt / dx; // fluctuation-dissipation?
+    scaling_factor_ = alpha * sqrt(kBT * dx) / dt; // fluctuation-dissipation?
 
 
 

@@ -332,10 +332,11 @@ class Launcher:
             u0_file = self.ic_dir / f"u0_{self.run_id}_{run_idx:04d}.npy"
             v0_file = self.ic_dir / f"v0_{self.run_id}_{run_idx:04d}.npy"
             m_file = self.focusing_dir / f"m_{self.run_id}_{run_idx:04d}.npy"
+            c_file = self.focusing_dir / f"c_{self.run_id}_{run_idx:04d}.npy"
             traj_file = self.traj_dir / f"traj_{self.run_id}_{run_idx:04d}.npy"
             vel_file = self.traj_dir / f"vel_{self.run_id}_{run_idx:04d}.npy"
 
-            for file in [u0_file, v0_file, m_file, traj_file, vel_file]:
+            for file in [u0_file, v0_file, m_file, c_file, traj_file, vel_file]:
                 if file.exists():
                     os.unlink(file)
 

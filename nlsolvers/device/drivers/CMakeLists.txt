@@ -69,5 +69,8 @@ endif()
 add_cuda_driver(sp4_sv_2d_dev sp4_sv_driver_dev_2d.cpp)
 add_cuda_driver(sp4_sv_3d_dev sp4_sv_driver_dev_3d.cpp)
 
+add_cuda_driver(sge_sv_2d_dev sg_sv_driver_dev_2d.cpp)
+add_cuda_driver(sge_sv_3d_dev sg_sv_driver_dev_3d.cpp)
+
 
 
