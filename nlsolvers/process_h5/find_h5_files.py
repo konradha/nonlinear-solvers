@@ -2,22 +2,15 @@ import os
 import sys
 import glob
 from pathlib import Path
+from sys import argv
 
-def find_h5_files(base_dir, output_file):
+def find_h5_files(base_dir = None, output_file = "h5_file_list.txt"):
     base_path = Path(base_dir)
     h5_files = []
-    
-    include_prefixes = [
-        # "kge_kink_field_", 
-        # "nlse_multi_soliton_state_", 
-        # "nlse_skyrmion_tube_"
-        "nlse_multi_soliton_state_constant_refactored"
-    ]
-    
-    for prefix in include_prefixes:
-        pattern = base_path / f"{prefix}*/hdf5/*.h5"
-        found = glob.glob(str(pattern))
-        h5_files.extend(found)
+      
+    pattern = base_path / f"hdf5/*.h5"
+    found = glob.glob(str(pattern))
+    h5_files.extend(found)
         
     h5_files = sorted(list(set(h5_files)))
     
@@ -41,8 +34,8 @@ if __name__ == "__main__":
          print(f"Error: SCRATCH directory '{scratch_dir}' not found or not a directory.", file=sys.stderr)
          sys.exit(1)
 
-    list_file = "h5_file_list.txt" 
-    num_files = find_h5_files(scratch_dir, list_file)
+    prefixes = str(argv[1]) 
+    num_files = find_h5_files(prefixes)
     
     if num_files == 0:
         sys.exit(1) 

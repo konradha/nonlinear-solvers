@@ -66,4 +66,8 @@ if(BUILD_NLSE_CUBIC)
   add_cuda_driver(nlse_sewi_2d_dev nlse_cubic_sewi_driver_2d.cpp)
 endif()
 
+add_cuda_driver(sp4_sv_2d_dev sp4_sv_driver_dev_2d.cpp)
+add_cuda_driver(sp4_sv_3d_dev sp4_sv_driver_dev_3d.cpp)
+
+
 

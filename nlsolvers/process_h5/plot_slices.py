@@ -78,14 +78,21 @@ def format_params(attrs):
 
 
 def calculate_energy_terms(u_snap, v_snap, c, m, dx, dy, dz, problem_type):
-    dV = dx * dy * dz
-    grad_u_x, grad_u_y, grad_u_z = np.gradient(u_snap, dx, dy, dz, axis=(0, 1, 2))
-    grad_term_integrand = (np.abs(grad_u_x)**2 + np.abs(grad_u_y)**2 + np.abs(grad_u_z)**2)
+    if len(u_snap.shape) == 2:
+        dV = dx * dy
+        grad_u_x, grad_u_y = np.gradient(u_snap, dx, dy, axis=(0, 1))
+        grad_term_integrand = (np.abs(grad_u_x)**2 + np.abs(grad_u_y)**2)
+    elif len(u_snap.shape) == 3:
+        dV = dx * dy * dz
+        grad_u_x, grad_u_y, grad_u_z = np.gradient(u_snap, dx, dy, dz, axis=(0, 1, 2))
+        grad_term_integrand = (np.abs(grad_u_x)**2 + np.abs(grad_u_y)**2 + np.abs(grad_u_z)**2)
+    else:
+        raise NotImplemented
 
     if problem_type == 'klein_gordon':
         kinetic_term = 0.5 * np.sum(v_snap**2) * dV
         gradient_term = 0.5 * np.sum(grad_term_integrand) * dV
-        potential_term = 0.5 * np.sum(u_snap**2) * dV
+        potential_term = 0.5 * np.sum(u_snap**4) * dV
         total_energy = kinetic_term + gradient_term + potential_term
         return total_energy, kinetic_term, gradient_term, potential_term
 
@@ -147,6 +154,8 @@ def plot_analysis_figure(times, energies, kinetic_energies, gradient_energies, p
         ax2.plot(times, gradient_energies, label=r'$E_{\mathrm{grad}}(t)$', color='green', linestyle='--')
         ax2.plot(times, potential_energies, label=r'$E_{\mathrm{pot}}(t)$', color='purple', linestyle=':')
         ax2.plot(times, energies, label=r'$E_{\mathrm{tot}}(t)$', color='black', linestyle='-', linewidth=1.5)
+    else:
+        raise NotImplemented
     ax2.set_ylabel('Energy Components')
     ax2.legend(fontsize=9)
     ax2.grid(True, linestyle=':')
@@ -175,7 +184,6 @@ def plot_analysis_figure(times, energies, kinetic_energies, gradient_energies, p
     plt.close(fig)
     print(f"Analysis plot saved to {output_filename}")
 
-
 def plot_trajectory_slices(h5_filepath, output_dir):
     filepath = Path(h5_filepath)
     output_path = Path(output_dir)
@@ -195,37 +203,53 @@ def plot_trajectory_slices(h5_filepath, output_dir):
 
             problem_type = metadata.get('problem_type', 'unknown')
             is_kge = (problem_type == 'klein_gordon')
+            is_nlse_cubic = (problem_type == 'cubic') 
 
             u = f['u'][()]
             u0 = f['initial_condition/u0'][()]
+            is_2d = len(u.shape) == 3  
+            is_3d = len(u.shape) == 4  
+
+            if not is_2d and not is_3d: raise Exception("Dims?")
+
             if is_kge and 'v' in f:
                 v = f['v'][()]
                 v0 = f['initial_condition/v0'][()]
-            else:
+            elif is_nlse_cubic:
                 v = None
                 v0 = None
+            else:
+                raise NotImplemented
 
-            c = f['anisotropy/c'][()]
-            m = f['focusing/m'][()]
+            # what happens when you don't carefully define data schemata ...
+            c = f['anisotropy/c'][()] if 'anisotropy/c' in f else (f['focusing/c'][()] if 'focusing/c' in f else f['c'][()])
+            m = f['focusing/m'][()] if 'focusing/m' in f else f['m'][()]
+            # c = f['anisotropy/c'][()] if 'anisotropy/c' in f else f['c'][()]
+            # m = f['focusing/m'][()] if 'focusing/m' in f else f['m'][()]
+            # c = f['anisotropy/c'][()]
+            # m = f['focusing/m'][()]
 
             nx = metadata['nx']
             ny = metadata['ny']
-            nz = metadata['nz']
+            nz = metadata.get('nz', 1)
             Lx = metadata['Lx']
             Ly = metadata['Ly']
-            Lz = metadata['Lz']
+            Lz = metadata.get('Lz', 0)
 
-            dx = 2 * Lx / (nx -1) if nx > 1 else 2*Lx
-            dy = 2 * Ly / (ny -1) if ny > 1 else 2*Ly
-            dz = 2 * Lz / (nz -1) if nz > 1 else 2*Lz
-
+            dx = 2 * Lx / (nx - 1) if nx > 1 else 2 * Lx
+            dy = 2 * Ly / (ny - 1) if ny > 1 else 2 * Ly
+            dz = 2 * Lz / (nz - 1) if nz > 1 else 2 * Lz
 
             T = metadata['T']
             num_snapshots = metadata['num_snapshots']
 
-            slice_idx_z = nz // 2
-            c_slice = c[:, :, slice_idx_z]
-            m_slice = m[:, :, slice_idx_z]
+            if is_3d:
+                slice_idx_z = nz // 2
+                c_slice = c[:, :, slice_idx_z]
+                m_slice = m[:, :, slice_idx_z]
+            else:
+                c_slice = c
+                m_slice = m
 
             times_to_plot = [0, T/4, T/2, 3*T/4, T]
             snapshot_indices = np.linspace(0, num_snapshots - 1, num_snapshots, dtype=int)
@@ -238,11 +262,18 @@ def plot_trajectory_slices(h5_filepath, output_dir):
                 plot_indices.append(snapshot_indices[idx])
                 actual_times.append(time_points[idx])
 
-            u_slices = u[plot_indices, :, :, slice_idx_z]
-            if v is not None:
-                v_slices = v[plot_indices, :, :, slice_idx_z]
+            if is_3d:
+                u_slices = u[plot_indices, :, :, slice_idx_z]
+                if v is not None:
+                    v_slices = v[plot_indices, :, :, slice_idx_z]
+                else:
+                    v_slices = None
             else:
-                v_slices = None
+                u_slices = u[plot_indices]
+                if v is not None:
+                    v_slices = v[plot_indices]
+                else:
+                    v_slices = None
 
             is_complex = np.iscomplexobj(u)
 
@@ -287,22 +318,29 @@ def plot_trajectory_slices(h5_filepath, output_dir):
             ax_text = fig.add_subplot(gs[:, -1])
             ax_text.axis('off')
 
+            z_label = r'$z_0$' if is_3d else ''
+
             ax_c = fig.add_subplot(gs[0, 0])
-            im_c = ax_c.imshow(c_slice.T, extent=[-Lx, Lx, -Ly, Ly], origin='lower', cmap='viridis', vmin=c_min, vmax=c_max, interpolation='nearest')
-            ax_c.set_title(r'$c(x, y, z_0)$')
+            im_c = ax_c.imshow(c_slice.T, extent=[-Lx, Lx, -Ly, Ly], origin='lower', cmap='viridis',
+                               vmin=c_min, vmax=c_max, interpolation='nearest')
+            title_c = r'$c(x, y, ' + z_label + r')$' if is_3d else r'$c(x, y)$'
+            ax_c.set_title(title_c)
             ax_c.set_xlabel(r'$x$'); ax_c.set_ylabel(r'$y$'); ax_c.set_aspect('equal')
             fig.colorbar(im_c, ax=ax_c, shrink=0.8)
 
             ax_m = fig.add_subplot(gs[0, 1])
-            im_m = ax_m.imshow(m_slice.T, extent=[-Lx, Lx, -Ly, Ly], origin='lower', cmap=m_cmap, vmin=m_vmin, vmax=m_vmax, interpolation='nearest')
-            ax_m.set_title(r'$m(x, y, z_0)$')
+            im_m = ax_m.imshow(m_slice.T, extent=[-Lx, Lx, -Ly, Ly], origin='lower', cmap=m_cmap,
+                              vmin=m_vmin, vmax=m_vmax, interpolation='nearest')
+            title_m = r'$m(x, y, ' + z_label + r')$' if is_3d else r'$m(x, y)$'
+            ax_m.set_title(title_m)
             ax_m.set_xlabel(r'$x$'); ax_m.set_ylabel(r'$y$'); ax_m.set_aspect('equal')
             fig.colorbar(im_m, ax=ax_m, shrink=0.8)
 
             plot_idx = 0
             for r in range(1, num_rows):
                 for c_u in range(2):
-                    if plot_idx >= len(plot_indices): break
+                    if plot_idx >= len(plot_indices):
+                        break
 
                     t_val = actual_times[plot_idx]
                     u_slice = u_slices[plot_idx]
@@ -310,41 +348,48 @@ def plot_trajectory_slices(h5_filepath, output_dir):
                     if is_complex:
                         col_start_u = c_u * 2
                         ax_u_mag = fig.add_subplot(gs[r, col_start_u])
-                        im_u_mag = ax_u_mag.imshow(np.abs(u_slice).T, extent=[-Lx, Lx, -Ly, Ly], origin='lower', cmap=cmap_u_mag, vmin=u_mag_min, vmax=u_mag_max, interpolation='nearest')
+                        im_u_mag = ax_u_mag.imshow(np.abs(u_slice).T, extent=[-Lx, Lx, -Ly, Ly],
+                                                  origin='lower', cmap=cmap_u_mag,
+                                                  vmin=u_mag_min, vmax=u_mag_max, interpolation='nearest')
                         ax_u_mag.set_title(fr'$|u(t={t_val:.2f})|$')
                         ax_u_mag.set_xlabel(r'$x$'); ax_u_mag.set_ylabel(r'$y$'); ax_u_mag.set_aspect('equal')
                         fig.colorbar(im_u_mag, ax=ax_u_mag, shrink=0.8)
 
                         ax_u_phase = fig.add_subplot(gs[r, col_start_u + 1])
-                        im_u_phase = ax_u_phase.imshow(np.angle(u_slice).T, extent=[-Lx, Lx, -Ly, Ly], origin='lower', cmap=cmap_u_phase, vmin=u_phase_min, vmax=u_phase_max, interpolation='nearest')
+                        im_u_phase = ax_u_phase.imshow(np.angle(u_slice).T, extent=[-Lx, Lx, -Ly, Ly],
+                                                      origin='lower', cmap=cmap_u_phase,
+                                                      vmin=u_phase_min, vmax=u_phase_max, interpolation='nearest')
                         ax_u_phase.set_title(fr'$\arg(u(t={t_val:.2f}))$')
                         ax_u_phase.set_xlabel(r'$x$'); ax_u_phase.set_ylabel(r'$y$'); ax_u_phase.set_aspect('equal')
                         fig.colorbar(im_u_phase, ax=ax_u_phase, ticks=[-np.pi, 0, np.pi], format='%.2f', shrink=0.8)
-
                     else:
-                         col_start_u = c_u * 1
-                         if r == num_rows - 1 and is_kge and c_u == 1:
-                             if v_slices is not None:
+                        col_start_u = c_u * 1
+                        if r == num_rows - 1 and is_kge and c_u == 1:
+                            if v_slices is not None:
                                 v_slice = v_slices[plot_idx]
                                 ax_v = fig.add_subplot(gs[r, col_start_u])
-                                im_v = ax_v.imshow(v_slice.T, extent=[-Lx, Lx, -Ly, Ly], origin='lower', cmap=cmap_v, vmin=v_min, vmax=v_max, interpolation='nearest')
+                                im_v = ax_v.imshow(v_slice.T, extent=[-Lx, Lx, -Ly, Ly],
+                                                  origin='lower', cmap=cmap_v,
+                                                  vmin=v_min, vmax=v_max, interpolation='nearest')
                                 ax_v.set_title(fr'$u_t(t={t_val:.2f})$')
                                 ax_v.set_xlabel(r'$x$'); ax_v.set_ylabel(r'$y$'); ax_v.set_aspect('equal')
                                 fig.colorbar(im_v, ax=ax_v, shrink=0.8)
-                             else:
-                                 ax_empty = fig.add_subplot(gs[r, col_start_u])
-                                 ax_empty.axis('off')
-                                 ax_empty.set_title(r'$u_t$ N/A')
-
-                         else:
-                             ax_u = fig.add_subplot(gs[r, col_start_u])
-                             im_u = ax_u.imshow(u_slice.T, extent=[-Lx, Lx, -Ly, Ly], origin='lower', cmap=cmap_u, vmin=u_min, vmax=u_max, interpolation='nearest')
-                             ax_u.set_title(fr'$u(t={t_val:.2f})$')
-                             ax_u.set_xlabel(r'$x$'); ax_u.set_ylabel(r'$y$'); ax_u.set_aspect('equal')
-                             fig.colorbar(im_u, ax=ax_u, shrink=0.8)
+                            else:
+                                ax_empty = fig.add_subplot(gs[r, col_start_u])
+                                ax_empty.axis('off')
+                                ax_empty.set_title(r'$u_t$ N/A')
+                        else:
+                            ax_u = fig.add_subplot(gs[r, col_start_u])
+                            im_u = ax_u.imshow(u_slice.T, extent=[-Lx, Lx, -Ly, Ly],
+                                              origin='lower', cmap=cmap_u,
+                                              vmin=u_min, vmax=u_max, interpolation='nearest')
+                            ax_u.set_title(fr'$u(t={t_val:.2f})$')
+                            ax_u.set_xlabel(r'$x$'); ax_u.set_ylabel(r'$y$'); ax_u.set_aspect('equal')
+                            fig.colorbar(im_u, ax=ax_u, shrink=0.8)
 
                     plot_idx += 1
-                if plot_idx >= len(plot_indices): break
+                if plot_idx >= len(plot_indices):
+                    break
 
             param_text = format_params(metadata)
             ax_text.text(0.02, 0.98, param_text, transform=ax_text.transAxes,
@@ -354,7 +399,8 @@ def plot_trajectory_slices(h5_filepath, output_dir):
             plt.tight_layout(rect=[0, 0, 0.88, 0.97])
             plot_stem = filepath.stem
             plot_title_latex = plot_stem
-            plt.suptitle(f"Run Slices: {plot_title_latex}", fontsize=14, y=0.995)
+            dimensionality = "2D" if is_2d else "3D"
+            plt.suptitle(f"Run Slices ({dimensionality}): {plot_title_latex}", fontsize=14, y=0.995)
             plt.savefig(plot_filename_slices, dpi=150, bbox_inches='tight')
             plt.close(fig)
             print(f"Slices plot saved to {plot_filename_slices}")
@@ -367,15 +413,17 @@ def plot_trajectory_slices(h5_filepath, output_dir):
             for i in range(num_snapshots):
                 u_snap = u[i]
                 v_snap = v[i] if v is not None else None
-                energies[i], kinetic_energies[i], gradient_energies[i], potential_energies[i] = calculate_energy_terms(u_snap, v_snap, c, m, dx, dy, dz, problem_type)
+                energies[i], kinetic_energies[i], gradient_energies[i], potential_energies[i] = calculate_energy_terms(
+                    u_snap, v_snap, c, m, dx, dy, dz, problem_type)
 
-            plot_analysis_figure(time_points, energies, kinetic_energies, gradient_energies, potential_energies, u, u0, plot_filename_analysis, problem_type)
-
+            plot_analysis_figure(time_points, energies, kinetic_energies, gradient_energies,
+                                potential_energies, u, u0, plot_filename_analysis, problem_type)
 
     except Exception as e:
         print(f"Error processing file {filepath}: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot slices and analysis from simulation HDF5 file.")
@@ -387,7 +435,6 @@ if __name__ == "__main__":
          sys.exit(1)
 
     args = parser.parse_args()
-
     if not os.path.isfile(args.h5_file):
         print(f"Error: Input file not found: {args.h5_file}", file=sys.stderr)
         sys.exit(1)

@@ -19,10 +19,10 @@ module load ffmpeg
 # (> 2GB) which is not even taking the various work data that
 # need to be allocated into account ...
 
-n=160
+n=200
 nt=6000 # using SV we're really _fast_
 dr=100
-exe=build/bin/kg_sv_3d_dev
+exe=build/bin/sp4_sv_3d_dev
 L=3.
 
 # constant: u_tt = \Delta u - u
@@ -33,10 +33,11 @@ for p in kink_field; do
                 --dr-x ${dr} --dr-y ${dr} --dr-z ${dr} \
                 --Lx $L --Ly $L --Lz $L \
                 --T 8. --nt ${nt} --snapshots 40 \
-                --num-runs 8 \
+                --num-runs 2 \
+		--visualize
 		--phenomenon ${p} \
                 --seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID)) \
-                --output-dir /cluster/scratch/konradha/kge_${p}_constant
+                --output-dir /cluster/scratch/konradha/sp4-test
 done
 
 # for p in kink_field; do
