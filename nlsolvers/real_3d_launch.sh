@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH --job-name=kge_3d_dev
-#SBATCH --time=00:45:00
+#SBATCH --job-name=sp4_3d_dev
+#SBATCH --time=00:25:00
 #SBATCH --mem-per-cpu=32G
 #SBATCH --gpus=1
 #SBATCH --output=logs/kge3d_solver_dev_%j.out
@@ -34,10 +34,10 @@ for p in kink_field; do
                 --Lx $L --Ly $L --Lz $L \
                 --T 8. --nt ${nt} --snapshots 40 \
                 --num-runs 2 \
-		--visualize
+		--visualize \
 		--phenomenon ${p} \
                 --seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID)) \
-                --output-dir /cluster/scratch/konradha/sp4-test
+		--output-dir /cluster/scratch/konradha/sp4-test
 done
 
 # for p in kink_field; do
@@ -68,7 +68,7 @@ for p in kink_field; do
 			--phenomenon ${p} \
 			--c-m-pair ${cp} \
 			--seed $((SLURM_JOB_ID + SLURM_ARRAY_TASK_ID)) \
-			--output-dir /cluster/scratch/konradha/kge_${p}_${cp}
+			--output-dir /cluster/scratch/konradha/sp4_${p}_${cp}
 	done
 done
 

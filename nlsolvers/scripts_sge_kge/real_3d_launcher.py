@@ -483,7 +483,7 @@ def parse_args():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="results-3d",
+        required=True,
         help="Output directory")
     parser.add_argument(
         "--exe",
