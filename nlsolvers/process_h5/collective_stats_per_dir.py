@@ -80,7 +80,7 @@ def calculate_energy_terms(u_snap, v_snap, c, m, dx, dy, dz=None, problem_type='
     elif problem_type == 'phi4':
         kinetic_term = 0.5 * np.sum(v_snap**2) * dV
         gradient_term = 0.5 * np.sum(grad_term_integrand) * dV
-        potential_term = np.sum((u**2 - u**4) * dV
+        potential_term = np.sum((u**2 - u**4)) * dV
         total_energy = kinetic_term + gradient_term + potential_term
         return total_energy, kinetic_term, gradient_term, potential_term
     
