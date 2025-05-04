@@ -4,8 +4,8 @@
 #SBATCH --nodes=1
 #SBATCH --mem-per-cpu=32G
 #SBATCH --time=00:10:00
-#SBATCH --output=logs/energy_stats.log
-#SBATCH --error=logs/energy_stats.err
+#SBATCH --output=logs/%j/energy_stats.log
+#SBATCH --error=logs/%j/energy_stats.err
 
 module load stack/2024-06 cuda/12.1.1 python/3.11.6 eigen
 module load gcc/12.2.0  openmpi/4.1.6
