@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=abstract_stats_kge_2d
+#SBATCH --job-name=abstract_stats_kge_3d
 #SBATCH --array=0-7
 #SBATCH --ntasks=16
 #SBATCH --mem-per-cpu=32G
@@ -12,14 +12,14 @@ module load gcc/12.2.0 openmpi/4.1.6
 module load py-mpi4py/3.1.4
 module load cmake/3.27.7
 
-c_types=(constant periodic_structure piecewise_constant sign_changing_mass layered waveguide quasiperiodic turbulent)
+c_types=(constant)
 c=${c_types[$SLURM_ARRAY_TASK_ID]}
 
-mkdir -p kge_2d_analysis/abstracted/$c
+mkdir -p kge_3d_analysis/abstracted/$c
 
-find_dirs=$(find $SCRATCH/kge_2d/c_$c -path "*/*/hdf5" -type d)
+find_dirs=$(find $SCRATCH/kge_3d/c_$c -path "*/*/hdf5" -type d)
 if [ -n "$find_dirs" ]; then
-    mpirun -n $SLURM_NTASKS python ensemble_processing.py "$SCRATCH/kge_2d/c_$c" kge_2d_analysis/abstracted/$c --pattern="**/hdf5/*.h5"
+    mpirun -n $SLURM_NTASKS python ensemble_processing.py "$SCRATCH/kge_3d/c_$c" kge_3d_analysis/abstracted/$c --pattern="**/hdf5/*.h5"
 else
     echo "No HDF5 directories found for c_type=$c"
 fi
