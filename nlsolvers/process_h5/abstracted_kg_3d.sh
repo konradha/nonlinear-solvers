@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=abstract_stats_kge_3d
-#SBATCH --array=0-7
+#SBATCH --array=0-6
 #SBATCH --ntasks=16
 #SBATCH --mem-per-cpu=32G
-#SBATCH --time=00:20:00
+#SBATCH --time=00:05:00
 #SBATCH --output=logs/abstract_%A_%a.out
 #SBATCH --error=logs/abstract_%A_%a.err
 
@@ -12,7 +12,7 @@ module load gcc/12.2.0 openmpi/4.1.6
 module load py-mpi4py/3.1.4
 module load cmake/3.27.7
 
-c_types=(constant)
+c_types=(constant layered piecewise_constant quasiperiodic sign_changing_mass turbulent waveguide)
 c=${c_types[$SLURM_ARRAY_TASK_ID]}
 
 mkdir -p kge_3d_analysis/abstracted/$c

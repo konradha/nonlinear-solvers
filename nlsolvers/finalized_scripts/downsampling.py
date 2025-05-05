@@ -254,7 +254,7 @@ def downsample_interpolation_3d(
         downsampled[t] = interp_func(points_new).reshape(
             target_nx, target_ny, target_nz)
 
-    return np.real(downsampled).astype(np.float64)
+    return downsampled.astype(u.dtype)
 
 
 def reconstruct_interpolation_3d(
@@ -298,7 +298,52 @@ def reconstruct_interpolation_3d(
 
         reconstructed[t] = interp_func(points).reshape(nx, ny, nz)
 
-    return np.real(reconstructed).astype(np.float64)
+    return reconstructed.astype(u.dtype)
+
+
+def main_2d():
+    fname_u = str(argv[1])
+    target_nx, target_ny = int(argv[2]), int(argv[3])
+
+    orig_nx, orig_ny = int(argv[4]), int(argv[5])
+    Lx, Ly = float(argv[6]), float(argv[7])
+
+
+    u = np.load(fname_u)
+    assert len(u.shape) == 3
+    nt = u.shape[0]
+    nx, ny = u.shape[1], u.shape[2]
+
+    ts = np.random.randint(0, nt)
+
+    is_complex = np.iscomplexobj(u)
+    downsampled = downsample_fft(u, (target_nx, target_ny))
+    reconstructed = reconstruct_fft(downsampled, (nx, ny))
+    #downsampled = downsample_interpolation(
+    #    u, (target_nx, target_ny), Lx, Ly)
+    #reconstructed = reconstruct_interpolation(
+    #    downsampled, (u.shape[1], u.shape[2]), Lx, Ly)
+
+
+
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(10, 5))
+    im = ax1.imshow(np.real(u[ts]) if is_complex else u[ts])
+    ax1.set_title("Original")
+    ax2.imshow(np.real(downsampled[ts]) if is_complex else downsampled[ts])
+    ax2.set_title("Downsampled")
+
+    diff = np.abs(np.real(u[ts] - reconstructed[ts])) if is_complex else np.abs(u[ts] - reconstructed[ts])
+    print(f"{is_complex=} {np.linalg.norm(u[ts] - reconstructed[ts], ord='fro')=:.4f}")
+    im_r = ax3.imshow(diff, cmap="seismic")
+    ax3.set_title("Reconstructed to original diff")
+
+
+
+    fig.colorbar(im, ax=[ax1, ax2], label='magnitude / [1]')
+    fig.colorbar(im_r, ax=[ax3], label="Diff / [1]")
+    fig.suptitle(f"{'NLSE' if is_complex else 'SGE'}; sample: {ts} / {nt} (num snapshots)")
+
+    plt.show()
 
 
 def main_3d():
@@ -366,48 +411,4 @@ def main_3d():
 
 
 if __name__ == '__main__':
-    main_3d()
-    """
-    fname_u = str(argv[1])
-    target_nx, target_ny = int(argv[2]), int(argv[3])
-
-    orig_nx, orig_ny = int(argv[4]), int(argv[5])
-    Lx, Ly = float(argv[6]), float(argv[7])
-
-
-    u = np.load(fname_u)
-    assert len(u.shape) == 3
-    nt = u.shape[0]
-    nx, ny = u.shape[1], u.shape[2]
-
-    ts = np.random.randint(0, nt)
-
-    is_complex = np.iscomplexobj(u)
-    downsampled = downsample_fft(u, (target_nx, target_ny))
-    reconstructed = reconstruct_fft(downsampled, (nx, ny))
-    #downsampled = downsample_interpolation(
-    #    u, (target_nx, target_ny), Lx, Ly)
-    #reconstructed = reconstruct_interpolation(
-    #    downsampled, (u.shape[1], u.shape[2]), Lx, Ly)
-
-
-
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(10, 5))
-    im = ax1.imshow(np.real(u[ts]) if is_complex else u[ts])
-    ax1.set_title("Original")
-    ax2.imshow(np.real(downsampled[ts]) if is_complex else downsampled[ts])
-    ax2.set_title("Downsampled")
-
-    diff = np.abs(np.real(u[ts] - reconstructed[ts])) if is_complex else np.abs(u[ts] - reconstructed[ts])
-    print(f"{is_complex=} {np.linalg.norm(u[ts] - reconstructed[ts], ord='fro')=:.4f}")
-    im_r = ax3.imshow(diff, cmap="seismic")
-    ax3.set_title("Reconstructed to original diff")
-
-
-
-    fig.colorbar(im, ax=[ax1, ax2], label='magnitude / [1]')
-    fig.colorbar(im_r, ax=[ax3], label="Diff / [1]")
-    fig.suptitle(f"{'NLSE' if is_complex else 'SGE'}; sample: {ts} / {nt} (num snapshots)")
-
-    plt.show()
-    """
+    pass 

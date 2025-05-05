@@ -11,12 +11,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from m_fields_2d import generate_m_fields
-from c_fields_2d import generate_c_fields
+from m_fields_3d import generate_m_fields
+from c_fields_3d import generate_c_fields
 
-from downsampling import downsample_fft, downsample_interpolation
-from real_sampler import RealWaveSampler
-from valid_spaces import get_parameter_spaces
+from downsampling import downsample_fft_3d, downsample_interpolation_3d
+from real_sampler import RealWaveSampler3d
+from valid_spaces_real import get_parameter_spaces_3d as get_parameter_spaces
 
 sys.stdout.reconfigure(line_buffering=True)
 class Launcher:
@@ -27,7 +27,7 @@ class Launcher:
         self.configure_grid()
         # restriction to play nice with hand-rolled C++ integrators
         assert args.nx == args.ny and np.abs(args.Lx - args.Ly) < 1e-8
-        self.sampler = RealWaveSampler(args.nx, args.ny, args.Lx)
+        self.sampler = RealWaveSampler3d(args.nx, args.ny, args.nz, args.Lx)
         self.system_type = args.system_type
 
     def setup_directories(self):
@@ -70,9 +70,11 @@ class Launcher:
     def configure_grid(self):
         self.x = np.linspace(-self.args.Lx, self.args.Lx, self.args.nx)
         self.y = np.linspace(-self.args.Ly, self.args.Ly, self.args.ny)
-        self.X, self.Y = np.meshgrid(self.x, self.y, indexing='ij')
+        self.z = np.linspace(-self.args.Lz, self.args.Lz, self.args.nz)
+        self.X, self.Y, self.Z = np.meshgrid(self.x, self.y, self.z, indexing='ij')
         self.dx = 2 * self.args.Lx / (self.args.nx - 1)
         self.dy = 2 * self.args.Ly / (self.args.ny - 1)
+        self.dz = 2 * self.args.Lz / (self.args.nz - 1)
         self.dV = self.dx * self.dy
 
     def generate_initial_condition(self, run_idx, phenomenon_params=None):
@@ -148,8 +150,10 @@ class Launcher:
             str(exe_path),
             str(self.args.nx),
             str(self.args.ny),
+            str(self.args.nz),
             str(self.args.Lx),
             str(self.args.Ly),
+            str(self.args.Lz),
             str(u0_file),
             str(v0_file),
             str(traj_file),
@@ -184,15 +188,16 @@ class Launcher:
             return traj_data
 
         elif self.args.dr_strategy == 'FFT':
-            return downsample_fft(traj_data,
-                                  target_shape=(self.args.dr_x, self.args.dr_y))
+            return downsample_fft_3d(traj_data,
+                                  target_shape=(self.args.dr_x, self.args.dr_y, self.args.dr_z))
 
         elif self.args.dr_strategy == 'interpolation':
-            return downsample_interpolation(
+            return downsample_interpolation_3d(
                 traj_data,
-                target_shape=(self.args.dr_x, self.args.dr_y),
+                target_shape=(self.args.dr_x, self.args.dr_y, self.args.dr_z),
                 Lx=self.args.Lx,
-                Ly=self.args.Ly
+                Ly=self.args.Ly,
+                Lz=self.args.Lz
             )
         else:
             raise ValueError(
@@ -220,8 +225,10 @@ class Launcher:
             grid = f.create_group('grid')
             grid.attrs['nx'] = self.args.nx
             grid.attrs['ny'] = self.args.ny
+            grid.attrs['nz'] = self.args.nz
             grid.attrs['Lx'] = self.args.Lx
             grid.attrs['Ly'] = self.args.Ly
+            grid.attrs['Lz'] = self.args.Lz
 
             time_grp = f.create_group('time')
             time_grp.attrs['T'] = self.args.T
@@ -234,7 +241,7 @@ class Launcher:
 
             m_grp = f.create_group('focusing')
             m_grp.attrs['type'] = self.args.m_type
-    
+
             m_grp.create_dataset('m', data=m)
             m_grp.create_dataset('c', data=c)
             f.create_dataset('u', data=traj_data)
@@ -261,6 +268,7 @@ class Launcher:
         dt = self.args.T / self.args.nt
         dx = 2 * self.args.Lx / (self.args.nx - 1)
         dy = 2 * self.args.Ly / (self.args.ny - 1)
+        dz = 2 * self.args.Lz / (self.args.nz - 1)
 
         sols = dict()
         for i in range(self.args.num_runs):
@@ -316,27 +324,24 @@ def parse_args():
                                  "klein_gordon"])
 
     parser.add_argument("--phenomenon", type=str, default="kink_field",
-                        choices=["kink_solution", "kink_field", "kink_array_field",
-                                 "multi_breather_field", "spiral_wave_field", "multi_spiral_state",
-                                 "ring_soliton", "colliding_rings", "multi_ring_state",
-                                 "skyrmion_solution", "skyrmion_lattice", "skyrmion_like_field",
-                                 "q_ball_solution", "multi_q_ball", "breather_solution",
-                                 "breather_field", "elliptical_soliton", "grf_modulated_soliton_field"],
+                        choices=["kink_field"],
                         help="Phenomenon type to simulate")
 
     parser.add_argument("--velocity-type", type=str, default="zero",
-                        choices=["zero", "fitting", "random"])
+                        choices=["zero",  "random"])
 
-    parser.add_argument("--anisotropy-type", type=str, default="constant", choices=['constant', 'periodic_structure','piecewise_constant','sign_changing_mass',
-                'layered', 'waveguide', 'quasiperiodic', 'turbulent'])
+    parser.add_argument("--anisotropy-type", type=str, default="constant", choices=['constant',
+        'piecewise_constant', 'sign_changing_mass', 'layered', 'waveguide', 'quasiperiodic', 'turbulent'])
+
 
     parser.add_argument("--m_type", type=str, default="constant",
-                        choices=['constant', 'piecewise', 'gradient', 'phase', 'topological',
-                                  'defects', 'quasiperiodic', 'multiscale'],
-                        help="Type of spatial amplification function m(x,y)")
+                        choices=['constant', 'piecewise', 'gradient',
+                                 'topological', 'defects', 'quasiperiodic', 'multiscale'],
+                        help="Type of spatial amplification function m(x,y,z)")
 
     parser.add_argument("--nx", type=int, default=128, help="Grid points in x")
     parser.add_argument("--ny", type=int, default=128, help="Grid points in y")
+    parser.add_argument("--nz", type=int, default=128, help="Grid points in z")
     parser.add_argument(
         "--Lx",
         type=float,
@@ -347,6 +352,11 @@ def parse_args():
         type=float,
         default=3.,
         help="Domain half-width in y")
+    parser.add_argument(
+        "--Lz",
+        type=float,
+        default=3.,
+        help="Domain half-width in z")
     parser.add_argument("--T", type=float, default=1.5, help="Simulation time")
     parser.add_argument(
         "--nt",
@@ -377,6 +387,8 @@ def parse_args():
                         help="Number of gridpoints to sample down for in x-direction")
     parser.add_argument("--dr-y", type=int, default=128,
                         help="Number of gridpoints to sample down for in y-direction")
+    parser.add_argument("--dr-z", type=int, default=128,
+                        help="Number of gridpoints to sample down for in z-direction")
     parser.add_argument("--dr-strategy", choices=["FFT", "interpolation", "none"],
                         default="interpolation",
                         help="Downsampling strategy: Default is interpolation due to " +
