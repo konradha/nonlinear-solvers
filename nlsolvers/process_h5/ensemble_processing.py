@@ -68,7 +68,8 @@ def calculate_energy_terms(u_snap, v_snap, c, m, dx, dy, dz=None, problem_type='
         gradient_term = np.sum(grad_term_integrand) * dV
         potential_term = -0.5 * np.sum((np.abs(u_snap)**4)) * dV
         total_energy = gradient_term + potential_term
-        return total_energy, np.nan, gradient_term, potential_term
+        # no kinetic term, we don't have velocity here
+        return total_energy, 0, gradient_term, potential_term
     
     elif problem_type == 'sine_gordon':
         kinetic_term = 0.5 * np.sum(v_snap**2) * dV
@@ -461,7 +462,7 @@ def generate_collective_stats(all_results, output_dir, group_key):
                         linewidth=0.7, alpha=0.2)
 
     ax4.set_yscale('symlog', linthresh=10)
-    ax4.set_ylim(bottom=1, top=max(10000, np.max(avg_kinetic + avg_gradient + avg_potential)*1.2)) # reasonable??
+    ax4.set_ylim(bottom=1, top=max(10000, np.max(avg_gradient + avg_potential)*1.2)) # reasonable??
     ax4.grid(True, which='both', linestyle=':', alpha=0.3)
     ax4.set_title(f'Energy Components - Main: {n_steps} steps, T={t_max} ({len(valid_results)} runs)', fontsize=12)
     ax4.set_xlabel('$t$', fontsize=11)
@@ -812,6 +813,7 @@ def plot_field_info(all_results, output_dir, group_key):
     fig = plt.figure(figsize=(10, 5))
     gs = plt.GridSpec(2, 3, figure=fig, height_ratios=[1, 2], width_ratios=[1, 1, 1])
     
+    print("Setting up snapshot plot")
     time_points = median_case['times']
     T_max = time_points[-1]
     snapshot_times = [0, T_max/2, T_max]
@@ -920,6 +922,7 @@ def plot_field_info(all_results, output_dir, group_key):
     ax_energy.spines['top'].set_visible(False)
     ax_energy.spines['right'].set_visible(False)
     
+    print("Before energy plot")
     for i, idx in enumerate(snapshot_indices):
         t = time_points[idx]
         ax_energy.axvline(x=t, color='gray', linestyle='--', alpha=0.5)
@@ -996,6 +999,8 @@ def plot_case_snapshots(all_results, output_dir, group_key):
         'ytick.direction': 'in',
     })
     
+    is_complex = False
+    snapshot_indices = []
     try:
         fig = plt.figure(figsize=(9, 8))
         gs = plt.GridSpec(4, 3, figure=fig, height_ratios=[1, 1, 1, 0.1])
@@ -1009,20 +1014,23 @@ def plot_case_snapshots(all_results, output_dir, group_key):
         
         u_data = {}
         u_min, u_max = float('inf'), float('-inf')
-        is_complex = False
         for case, filename in zip(case_labels, case_files):
             u_data[case] = []
             try:
                 with h5py.File(filename, 'r') as f:
                     u_dataset = f['u']
+                    is_complex = np.iscomplexobj(snapshot)
                     u_shape = u_dataset.shape
                     if len(u_shape) == 4:
                         nt, nx, ny, nz = u_shape
+                        snapshot_indices = [0, nt // 2, -1]
                     elif len(u_shape) == 3:
                         nt, nx, ny = u_shape
+                        snapshot_indices = [0, nt // 2, -1]
                     else:
                         raise Exception("Dataset ill-formed")
 
+                    print("In loop to generate different cases")
                     snapshot_indices = [0, nt // 2, -1]
                     mid_z = nz // 2 if len(u_shape) == 4 else None
                     for idx in snapshot_indices:
@@ -1032,8 +1040,7 @@ def plot_case_snapshots(all_results, output_dir, group_key):
                             snapshot = u_dataset[idx, :, :]
                         u_data[case].append(snapshot)
 
-                        if np.iscomplexobj(snapshot):
-                            is_complex = True
+                        if is_complex:
                             u_min = min(u_min, 0)
                             u_max = max(u_max, np.max(np.abs(snapshot)))
                         else:
@@ -1043,8 +1050,9 @@ def plot_case_snapshots(all_results, output_dir, group_key):
                 u_data[case] = [np.zeros((10, 10)), np.zeros((10, 10)), np.zeros((10, 10))]
                     
         cmap = 'viridis' if is_complex else 'coolwarm'
-        
+        # im = None
         for row, case in enumerate(case_labels):
+            print("Actually plotting the snapshots") 
             for col, (t, snap_idx) in enumerate(zip(snapshot_times, range(len(snapshot_indices)))):
                 ax = fig.add_subplot(gs[row, col])
                 
@@ -1063,8 +1071,8 @@ def plot_case_snapshots(all_results, output_dir, group_key):
                 ax.set_xticks([])
                 ax.set_yticks([])
         
-        cax = fig.add_subplot(gs[3, :])
-        cbar = plt.colorbar(im, cax=cax, orientation='horizontal')
+        # cax = fig.add_subplot(gs[3, :])
+        # cbar = plt.colorbar(im, cax=cax, orientation='horizontal')
         
         plt.tight_layout()
         fig_filename = output_path / f"case_snapshots_{dims}D_{problem_type}.png"

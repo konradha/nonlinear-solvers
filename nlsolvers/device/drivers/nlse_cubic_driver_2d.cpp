@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
       u_save_mat(u_save.data(), num_snapshots, nx * ny);
 
   bool is_3d = false;
-  device::NLSESolverDevice::Parameters params(num_snapshots, freq, 10);
+  device::NLSESolverDevice::Parameters params(num_snapshots, freq, 20);
   device::NLSESolverDevice solver(L, u0.data(), m.data(), is_3d, params);
   solver.store_snapshot_online(u_save.data()); // this should happen inside constructor ... maybe refactor later
   for (uint32_t i = 1; i < nt; ++i) {

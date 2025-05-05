@@ -48,7 +48,8 @@ for c_type in constant periodic_structure piecewise_constant sign_changing_mass 
 			        	        --nx $n --ny $n --Lx $L --Ly $L --nt ${nt_breather} --T ${T_breather} --snapshots ${snap_breather} \
 			        	        --dr-x ${dr} --dr-y ${dr} --delete-intermediates \
 			        	        --exe ${exe} --num-runs 2 \
-			        	        --output-dir=$SCRATCH/kge_2d/c_${c_type}/m_${m_type}/${p}
+			        	        --output-dir=$SCRATCH/kge_2d/c_${c_type}/m_${m_type}/${p}\
+						--seed $SLURM_JOB_ID
 				done
 			done
 			
@@ -62,7 +63,8 @@ for c_type in constant periodic_structure piecewise_constant sign_changing_mass 
 			                	--nx $n --ny $n --Lx $L --Ly $L --nt ${nt_other} --T ${T_other} --snapshots ${snap_other} \
 			                	--dr-x ${dr} --dr-y ${dr} --delete-intermediates \
 			                	--exe ${exe} --num-runs 2 \
-			                	--output-dir=$SCRATCH/kge_2d/c_${c_type}/m_${m_type}/${p}
+			                	--output-dir=$SCRATCH/kge_2d/c_${c_type}/m_${m_type}/${p}\
+						--seed $SLURM_JOB_ID
 				done
 			done
 		}
