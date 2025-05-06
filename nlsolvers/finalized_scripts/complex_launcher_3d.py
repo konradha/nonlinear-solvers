@@ -12,13 +12,13 @@ import numpy as np
 import torch
 
 
-from m_fields_2d import generate_m_fields
-from c_fields_2d import generate_c_fields
+from m_fields_3d import generate_m_fields
+from c_fields_3d import generate_c_fields
 
-from downsampling import downsample_fft, downsample_interpolation
-from nlse_sampler import NLSEPhenomenonSampler
+from downsampling import downsample_fft_3d, downsample_interpolation_3d
+from nlse_sampler import NLSE3DSampler as NLSEPhenomenonSampler
 
-from valid_spaces_complex import get_parameter_spaces
+from valid_spaces_complex import get_parameter_spaces_3d as get_parameter_spaces
 
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -30,7 +30,8 @@ class NLSELauncher:
         self.configure_grid()
         # restriction to play nice with hand-rolled C++ integrators
         assert args.nx == args.ny and np.abs(args.Lx - args.Ly) < 1e-8
-        self.sampler = NLSEPhenomenonSampler(args.nx, args.ny, args.Lx)
+        assert args.nz == args.ny and np.abs(args.Lz - args.Ly) < 1e-8
+        self.sampler = NLSEPhenomenonSampler(args.nx, args.ny, args.nz, args.Lx)
 
     def setup_directories(self):
         self.output_dir = Path(self.args.output_dir)
@@ -71,9 +72,11 @@ class NLSELauncher:
     def configure_grid(self):
         self.x = np.linspace(-self.args.Lx, self.args.Lx, self.args.nx)
         self.y = np.linspace(-self.args.Ly, self.args.Ly, self.args.ny)
-        self.X, self.Y = np.meshgrid(self.x, self.y, indexing='ij')
+        self.z = np.linspace(-self.args.Lz, self.args.Lz, self.args.nz)
+        self.X, self.Y, self.Z = np.meshgrid(self.x, self.y, self.z, indexing='ij')
         self.dx = 2 * self.args.Lx / (self.args.nx - 1)
         self.dy = 2 * self.args.Ly / (self.args.ny - 1)
+        self.dz = 2 * self.args.Lz / (self.args.nz - 1)
         self.dV = self.dx * self.dy
 
     def generate_initial_condition(self, run_idx, phenomenon_params=None):
@@ -146,8 +149,10 @@ class NLSELauncher:
             str(exe_path),
             str(self.args.nx),
             str(self.args.ny),
+            str(self.args.nz),
             str(self.args.Lx),
             str(self.args.Ly),
+            str(self.args.Lz),
             str(ic_file),
             str(traj_file),
             str(self.args.T),
@@ -176,19 +181,23 @@ class NLSELauncher:
     def downsample_trajectory(self, traj_data):
         if self.args.dr_strategy == 'none':
             return traj_data
+
         elif self.args.dr_strategy == 'FFT':
-            return downsample_fft(traj_data, target_shape=(
-                self.args.dr_x, self.args.dr_y))
+            return downsample_fft_3d(traj_data,
+                                  target_shape=(self.args.dr_x, self.args.dr_y, self.args.dr_z))
+
         elif self.args.dr_strategy == 'interpolation':
-            return downsample_interpolation(
+            return downsample_interpolation_3d(
                 traj_data,
-                target_shape=(self.args.dr_x, self.args.dr_y),
+                target_shape=(self.args.dr_x, self.args.dr_y, self.args.dr_z),
                 Lx=self.args.Lx,
-                Ly=self.args.Ly
+                Ly=self.args.Ly,
+                Lz=self.args.Lz
             )
         else:
             raise ValueError(
                 f"Unknown downsampling strategy: {self.args.dr_strategy}")
+
 
     def save_to_hdf5(self, run_idx, u0, m, c, traj_data,
                      phenomenon_params, elapsed_time):
@@ -212,8 +221,10 @@ class NLSELauncher:
             grid = f.create_group('grid')
             grid.attrs['nx'] = self.args.nx
             grid.attrs['ny'] = self.args.ny
+            grid.attrs['nz'] = self.args.ny
             grid.attrs['Lx'] = self.args.Lx
             grid.attrs['Ly'] = self.args.Ly
+            grid.attrs['Lz'] = self.args.Ly
 
             time_grp = f.create_group('time')
             time_grp.attrs['T'] = self.args.T
@@ -275,12 +286,10 @@ class NLSELauncher:
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Advanced NLSE cubic nonlinearity solver launcher")
+        description="Advanced NLSE cubic nonlinearity solver launcher [3D]")
 
-    parser.add_argument("--phenomenon", type=str, default="multi_soliton",
-                        choices=["multi_soliton", "vortex_lattice",
-                                 "multi_ring", "turbulent_condensate",
-                                 "akhmediev_breather",],
+    parser.add_argument("--phenomenon", type=str, default="multi_soliton_state",
+                        choices=["multi_soliton_state","skyrmion_tube",],
                         required=True,
                         help="Phenomenon type to simulate")
 
@@ -290,10 +299,11 @@ def parse_args():
     parser.add_argument("--m_type", type=str, default="constant",
                         choices=['constant', 'piecewise', 'gradient', 'phase', 'topological',
                                   'defects', 'quasiperiodic', 'multiscale'],
-                        help="Type of spatial amplification function m(x,y)")
+                        help="Type of spatial amplification function m(x,y,z)")
 
     parser.add_argument("--nx", type=int, default=128, help="Grid points in x")
     parser.add_argument("--ny", type=int, default=128, help="Grid points in y")
+    parser.add_argument("--nz", type=int, default=128, help="Grid points in z")
     parser.add_argument(
         "--Lx",
         type=float,
@@ -301,6 +311,11 @@ def parse_args():
         help="Domain half-width in x")
     parser.add_argument(
         "--Ly",
+        type=float,
+        default=10.0,
+        help="Domain half-width in y")
+    parser.add_argument(
+        "--Lz",
         type=float,
         default=10.0,
         help="Domain half-width in y")
@@ -334,6 +349,8 @@ def parse_args():
                         help="Number of gridpoints to sample down for in x-direction")
     parser.add_argument("--dr-y", type=int, default=128,
                         help="Number of gridpoints to sample down for in y-direction")
+    parser.add_argument("--dr-z", type=int, default=128,
+                        help="Number of gridpoints to sample down for in y-direction")
     parser.add_argument("--dr-strategy", choices=["FFT", "interpolation", "none"],
                         default="interpolation",
                         help="Downsampling strategy: Default is interpolation due to " +
@@ -341,6 +358,7 @@ def parse_args():
 
     parser.add_argument("--delete-intermediates", action="store_true", default=True,
                         help="Removing intermediate files (mostly npy to be recovered from hdf5)")
+    
 
     args = parser.parse_args()
 
