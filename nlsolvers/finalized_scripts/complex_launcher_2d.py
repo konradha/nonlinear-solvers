@@ -20,6 +20,7 @@ from nlse_sampler import NLSEPhenomenonSampler
 
 from valid_spaces_complex import get_parameter_spaces
 
+sys.stdout.reconfigure(line_buffering=True)
 
 class NLSELauncher:
     def __init__(self, args):

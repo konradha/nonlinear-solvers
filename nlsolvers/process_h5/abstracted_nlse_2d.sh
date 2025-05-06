@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=abstract_stats_nlse_2d
-#SBATCH --array=0-7
+#SBATCH --array=0-5
 #SBATCH --ntasks=16
-#SBATCH --mem-per-cpu=32G
+#SBATCH --mem-per-cpu=16G
 #SBATCH --time=00:10:00
 #SBATCH --output=logs/abstract_%A_%a.out
 #SBATCH --error=logs/abstract_%A_%a.err
@@ -12,7 +12,7 @@ module load gcc/12.2.0 openmpi/4.1.6
 module load py-mpi4py/3.1.4
 module load cmake/3.27.7
 
-c_types=(constant periodic_structure piecewise_constant sign_changing_mass layered waveguide quasiperiodic turbulent)
+c_types=(constant periodic_structure piecewise_constant sign_changing_mass layered waveguide)
 c=${c_types[$SLURM_ARRAY_TASK_ID]}
 
 mkdir -p nlse_2d_analysis/abstracted/$c

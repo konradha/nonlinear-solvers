@@ -1001,6 +1001,7 @@ def plot_case_snapshots(all_results, output_dir, group_key):
     
     is_complex = False
     snapshot_indices = []
+    """
     try:
         fig = plt.figure(figsize=(9, 8))
         gs = plt.GridSpec(4, 3, figure=fig, height_ratios=[1, 1, 1, 0.1])
@@ -1111,6 +1112,129 @@ def plot_case_snapshots(all_results, output_dir, group_key):
     except Exception as e:
         with open(output_path / f"error_snapshots_{dims}D_{problem_type}.txt", 'w') as f:
             f.write(f"Error generating case snapshots: {str(e)}\n")
+    """
+    try:
+        fig = plt.figure(figsize=(12, 10))
+        gs = plt.GridSpec(7, 3, figure=fig, height_ratios=[3, 0.3, 3, 0.3, 3, 0.3, 0.1])
+        
+        time_points = detailed_results[0]['times']
+        T_max = time_points[-1]
+        snapshot_times = [0, T_max/2, T_max]
+        
+        case_labels = ['Median', 'Most Explosive', 'Worst Conservation']
+        case_files = [median_filename, explosive_filename, deterioration_filename]
+        print(case_labels)
+        print(case_files)
+        
+        u_data = {}
+        case_ranges = {}
+        for c, filename in zip(case_labels, case_files):
+            u_data[c] = []
+            print("in loop:", c, filename)
+            try:
+                with h5py.File(filename, 'r') as f:
+                    u_dataset = f['u']
+                    is_complex = np.iscomplexobj(u_dataset)
+                    u_shape = u_dataset.shape
+                    print("traj shape:", u_dataset.shape)
+                    print("is complex:", is_complex) 
+                    print(u_dataset[0])
+                    if len(u_shape) == 4:
+                        nt, nx, ny, nz = u_shape
+                        snapshot_indices = [0, nt // 2, -1]
+                    elif len(u_shape) == 3:
+                        nt, nx, ny = u_shape
+                        snapshot_indices = [0, nt // 2, -1]
+                    else:
+                        raise Exception("Dataset ill-formed")
+
+                    print("In loop to generate different cases, taking mid-slice in Y in case of 3d data trajectories")
+                    snapshot_indices = [0, nt // 2, -1]
+                    mid_z = nz // 2 if len(u_shape) == 4 else None
+                    for idx in snapshot_indices:
+                        if len(u_shape) == 4: 
+                            snapshot = u_dataset[idx, :, :, mid_z]
+                        else:
+                            snapshot = u_dataset[idx, :, :]
+                        u_data[c].append(snapshot)
+            except Exception as e:
+                print("Exception thrown", e)
+                u_data[c] = [np.zeros((10, 10)), np.zeros((10, 10)), np.zeros((10, 10))]
+        
+        for c in case_labels:
+            case_data = u_data[c]
+            if np.iscomplexobj(case_data[0]):
+                case_min = 0
+                case_max = max([np.max(np.abs(data)) for data in case_data])
+            else:
+                case_min = min([np.min(data) for data in case_data])
+                case_max = max([np.max(data) for data in case_data])
+            case_ranges[c] = (case_min, case_max)
+        
+        cmap = 'viridis' if is_complex else 'coolwarm'
+        row_images = []
+        
+        for row, c in enumerate(case_labels):
+            print("Actually plotting the snapshots")
+            row_min, row_max = case_ranges[c]
+            row_pos = row * 2
+            
+            for col, (t, snap_idx) in enumerate(zip(snapshot_times, range(len(snapshot_indices)))):
+                ax = fig.add_subplot(gs[row_pos, col])
+                
+                data = u_data[c][snap_idx]
+                is_complex = np.iscomplexobj(data)
+
+                if is_complex:
+                    print("complex snapshots")
+                    im = ax.imshow(np.abs(data).T, origin='lower', cmap=cmap, vmin=row_min, vmax=row_max)
+                else:
+                    print("real snapshots")
+                    im = ax.imshow(data.T, origin='lower', cmap=cmap, vmin=row_min, vmax=row_max)
+                
+                if row == 0:
+                    ax.set_title(f'$t = {t:.2f}$', fontsize=12)
+                
+                if col == 0:
+                    ax.set_ylabel(c, fontsize=12, rotation=90, labelpad=15)
+                
+                ax.set_xticks([])
+                ax.set_yticks([])
+            
+            row_images.append(im)
+            cax = fig.add_subplot(gs[row_pos + 1, :])
+            cbar = plt.colorbar(im, cax=cax, orientation='horizontal')
+            cbar.set_label(f'Range: [{row_min:.2e}, {row_max:.2e}]', fontsize=8)
+            cbar.ax.tick_params(labelsize=8)
+        
+        plt.subplots_adjust(hspace=0.05, wspace=0.05)
+        plt.tight_layout()
+        fig_filename = output_path / f"case_snapshots_{dims}D_{problem_type}.png"
+        plt.savefig(fig_filename, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        with open(output_path / f"representative_cases_{dims}D_{problem_type}.txt", 'w') as f:
+            f.write(f"Representative Cases for {dims}D {problem_type}\n")
+            f.write("=" * 50 + "\n")
+            f.write(f"Median Case: {median_filename}\n")
+            f.write(f"  Conservation Metric: {energy_metrics[median_idx]['conservation_metric']:.6e}\n")
+            f.write(f"  Explosiveness Metric: {energy_metrics[median_idx]['explosiveness_metric']:.6e}\n")
+            f.write(f"  Final Deviation: {energy_metrics[median_idx]['final_deviation']:.6e}\n\n")
+            
+            f.write(f"Most Explosive Case: {explosive_filename}\n")
+            f.write(f"  Conservation Metric: {energy_metrics[explosive_idx]['conservation_metric']:.6e}\n")
+            f.write(f"  Explosiveness Metric: {energy_metrics[explosive_idx]['explosiveness_metric']:.6e}\n")
+            f.write(f"  Final Deviation: {energy_metrics[explosive_idx]['final_deviation']:.6e}\n\n")
+            
+            f.write(f"Worst Conservation Case: {deterioration_filename}\n")
+            f.write(f"  Conservation Metric: {energy_metrics[deterioration_idx]['conservation_metric']:.6e}\n")
+            f.write(f"  Explosiveness Metric: {energy_metrics[deterioration_idx]['explosiveness_metric']:.6e}\n")
+            f.write(f"  Final Deviation: {energy_metrics[deterioration_idx]['final_deviation']:.6e}\n")
+    except Exception as e:
+        with open(output_path / f"error_snapshots_{dims}D_{problem_type}.txt", 'w') as f:
+            f.write(f"Error generating case snapshots: {str(e)}\n")
+
+
 
 def main():
     comm = MPI.COMM_WORLD
