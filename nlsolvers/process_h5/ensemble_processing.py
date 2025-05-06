@@ -1011,16 +1011,22 @@ def plot_case_snapshots(all_results, output_dir, group_key):
         
         case_labels = ['Median', 'Most Explosive', 'Worst Conservation']
         case_files = [median_filename, explosive_filename, deterioration_filename]
+        print(case_labels)
+        print(case_files)
         
         u_data = {}
         u_min, u_max = float('inf'), float('-inf')
-        for case, filename in zip(case_labels, case_files):
-            u_data[case] = []
+        for c, filename in zip(case_labels, case_files):
+            u_data[c] = []
+            print("in loop:", c, filename)
             try:
                 with h5py.File(filename, 'r') as f:
                     u_dataset = f['u']
-                    is_complex = np.iscomplexobj(snapshot)
+                    is_complex = np.iscomplexobj(u_dataset)
                     u_shape = u_dataset.shape
+                    print("traj shape:", u_dataset.shape)
+                    print("is complex:", is_complex) 
+                    print(u_dataset[0])
                     if len(u_shape) == 4:
                         nt, nx, ny, nz = u_shape
                         snapshot_indices = [0, nt // 2, -1]
@@ -1030,7 +1036,7 @@ def plot_case_snapshots(all_results, output_dir, group_key):
                     else:
                         raise Exception("Dataset ill-formed")
 
-                    print("In loop to generate different cases")
+                    print("In loop to generate different cases, taking mid-slice in Y in case of 3d data trajectories")
                     snapshot_indices = [0, nt // 2, -1]
                     mid_z = nz // 2 if len(u_shape) == 4 else None
                     for idx in snapshot_indices:
@@ -1038,7 +1044,7 @@ def plot_case_snapshots(all_results, output_dir, group_key):
                             snapshot = u_dataset[idx, :, :, mid_z]
                         else:
                             snapshot = u_dataset[idx, :, :]
-                        u_data[case].append(snapshot)
+                        u_data[c].append(snapshot)
 
                         if is_complex:
                             u_min = min(u_min, 0)
@@ -1046,33 +1052,39 @@ def plot_case_snapshots(all_results, output_dir, group_key):
                         else:
                             u_min = min(u_min, np.min(snapshot))
                             u_max = max(u_max, np.max(snapshot))
-            except Exception:
-                u_data[case] = [np.zeros((10, 10)), np.zeros((10, 10)), np.zeros((10, 10))]
+            except Exception as e:
+                print("Exception thrown", e)
+                u_data[c] = [np.zeros((10, 10)), np.zeros((10, 10)), np.zeros((10, 10))]
                     
+        print("deciding cmap, is_complex:", is_complex)
         cmap = 'viridis' if is_complex else 'coolwarm'
-        # im = None
-        for row, case in enumerate(case_labels):
+        for row, c in enumerate(case_labels):
             print("Actually plotting the snapshots") 
             for col, (t, snap_idx) in enumerate(zip(snapshot_times, range(len(snapshot_indices)))):
                 ax = fig.add_subplot(gs[row, col])
                 
-                data = u_data[case][snap_idx]
+                data = u_data[c][snap_idx]
+                is_complex = np.iscomplexobj(data)
+
                 if is_complex:
+                    print("complex snapshots")
                     im = ax.imshow(np.abs(data).T, origin='lower', cmap=cmap, vmin=u_min, vmax=u_max)
                 else:
+                    print("real snapshots")
                     im = ax.imshow(data.T, origin='lower', cmap=cmap, vmin=u_min, vmax=u_max)
                 
                 if row == 0:
                     ax.set_title(f'$t = {t:.2f}$', fontsize=11)
                 
                 if col == 0:
-                    ax.set_ylabel(case, fontsize=11)
+                    ax.set_ylabel(c, fontsize=11)
                 
                 ax.set_xticks([])
                 ax.set_yticks([])
+
         
-        # cax = fig.add_subplot(gs[3, :])
-        # cbar = plt.colorbar(im, cax=cax, orientation='horizontal')
+        cax = fig.add_subplot(gs[3, :])
+        cbar = plt.colorbar(im, cax=cax, orientation='horizontal')
         
         plt.tight_layout()
         fig_filename = output_path / f"case_snapshots_{dims}D_{problem_type}.png"

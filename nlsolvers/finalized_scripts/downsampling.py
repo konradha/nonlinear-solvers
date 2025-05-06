@@ -30,7 +30,7 @@ def downsample_fft(u: np.ndarray, target_shape: tuple) -> np.ndarray:
     if not is_complex:
         downsampled_np = downsampled_np.real
 
-    return np.real(downsampled_np).astype(np.float64)
+    return downsampled_np.astype(u.dtype)
 
 
 def reconstruct_fft(downsampled: np.ndarray,
@@ -62,7 +62,7 @@ def reconstruct_fft(downsampled: np.ndarray,
     reconstructed_np = reconstructed.cpu().numpy()
     if not is_complex:
         reconstructed_np = reconstructed_np.real
-    return np.real(reconstructed_np).astype(np.float64)
+    return reconstructed_np.astype(u.dtype)
 
 
 def downsample_interpolation(
@@ -100,7 +100,7 @@ def downsample_interpolation(
 
         points = np.vstack([X_new.ravel(), Y_new.ravel()]).T
         downsampled[t] = interp_func(points).reshape(target_nx, target_ny)
-    return np.real(downsampled).astype(np.float64)
+    return downsampled.astype(u.dtype)
 
 
 def reconstruct_interpolation(
@@ -141,7 +141,7 @@ def reconstruct_interpolation(
 
         points = np.vstack([X.ravel(), Y.ravel()]).T
         reconstructed[t] = interp_func(points).reshape(nx, ny)
-    return np.real(reconstructed).astype(np.float64)
+    return reconstructed.astype(u.dtype)
 
 
 def downsample_fft_3d(u: np.ndarray, target_shape: tuple) -> np.ndarray:
@@ -171,7 +171,7 @@ def downsample_fft_3d(u: np.ndarray, target_shape: tuple) -> np.ndarray:
     if not is_complex:
         downsampled_np = downsampled_np.real
 
-    return np.real(downsampled_np).astype(np.float64)
+    return downsampled_np.astype(u.dtype)
 
 
 def reconstruct_fft_3d(downsampled: np.ndarray,
@@ -209,7 +209,7 @@ def reconstruct_fft_3d(downsampled: np.ndarray,
     if not is_complex:
         reconstructed_np = reconstructed_np.real
 
-    return np.real(reconstructed_np).astype(np.float64)
+    return reconstructed_np.astype(u.dtype)
 
 
 def downsample_interpolation_3d(
