@@ -221,8 +221,7 @@ public:
       
       std::complex<double> two_tau = 2.0 * tau;
       matfunc_->apply(d_buf3_, d_u_prev_, two_tau, "exp");
-
-      apply_sewi(d_u_, d_buf2_, d_buf3_, tau, n_);
+      apply_sewi(d_u_, d_buf3_, d_buf2_, tau, n_);
 
       thrust::device_ptr<thrust::complex<double>> u_prev_ptr(d_u_prev_);
       thrust::copy(buf_ptr, buf_ptr + n_, u_prev_ptr);

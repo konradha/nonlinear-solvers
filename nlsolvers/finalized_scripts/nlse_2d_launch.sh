@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=nlse_2d_dev
 #SBATCH --time=00:15:00
-#SBATCH --mem-per-cpu=32G
+#SBATCH --mem-per-cpu=8G
 #SBATCH --gpus=1
 #SBATCH --output=logs/%A_%a/nlse2d_solver_dev.out
 #SBATCH --error=logs/%A_%a/nlse2d_solver_dev.err

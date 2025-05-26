@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name=kge_2d_dev
-#SBATCH --time=07:30:00
-#SBATCH --mem-per-cpu=32G
+#SBATCH --time=03:45:00
+#SBATCH --mem-per-cpu=8G
 #SBATCH --gpus=1
 #SBATCH --output=logs/%j/kge2d_solver_dev.out
 #SBATCH --error=logs/%j/kge2d_solver_dev.err
@@ -23,7 +23,7 @@ module load ffmpeg
 
 L=3.
 
-n=250
+n=300
 nt_breather=15000 # using SV we're really _fast_
 nt_other=6000
 
@@ -37,7 +37,7 @@ snap_breather=100
 snap_other=50
 
 # This is unfortunately really dense, but expresses very exactly the fold we're doing.
-for c_type in constant periodic_structure piecewise_constant sign_changing_mass layered waveguide quasiperiodic turbulent; do
+for c_type in constant periodic_structure piecewise_constant layered waveguide quasiperiodic turbulent; do
 	for m_type in constant piecewise gradient phase topological defects quasiperiodic multiscale; do
 		time { # inner loop should be about (hopefully) 5-7 minutes		
 			for p in kink_field kink_array_field multi_breather_field breather_field; do
